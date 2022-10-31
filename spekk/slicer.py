@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from typing import Any, Optional, TypeVar, Union
 
-from spekk import Shape, Spec
+from spekk.shape import Shape
+from spekk.spec import Spec
 
 # Keep all elements for the axis. Same as writing just : when slicing, e.g. arr[:].
 _all_slice = slice(None, None, None)
