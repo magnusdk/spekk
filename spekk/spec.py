@@ -213,7 +213,7 @@ class Spec:
     def __eq__(self, other) -> bool:
         if not isinstance(other, Spec):
             return False
-        if self.shapes != other.shapes:
+        if tuple(self.shapes) != tuple(other.shapes):
             return False
         if self.names != other.names:
             return False
