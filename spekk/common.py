@@ -10,3 +10,7 @@ class Specable(Protocol):
 
 class ValidationError(Exception):
     ...
+
+
+class InvalidDimensionError(Exception):
+    ...

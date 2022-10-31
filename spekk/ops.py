@@ -11,6 +11,6 @@ def apply_across_dim(
     f: Callable[[Specable, int], Specable],
 ) -> Sequence[Any]:
     return [
-        f(data_item, axis) if axis is not None else data_item
-        for axis, data_item in zip(data_spec.indices_for(dim), data)
+        f(data_item, dim_index) if dim_index is not None else data_item
+        for dim_index, data_item in zip(data_spec.indices_for(dim), data)
     ]

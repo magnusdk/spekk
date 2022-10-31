@@ -1,105 +1,142 @@
 from typing import Dict, List, Optional, Sequence, Set, Union, overload
 
-from spekk.common import Specable, ValidationError
+from spekk.common import InvalidDimensionError, Specable, ValidationError
 from spekk.shape import Shape
 
 ShapeType = Union[Shape, Sequence[str]]
-Name = str
 
 
 class Spec:
     """A collection of (optionally named) shapes representing for example the dimensions
-    of a list of arguments."""
+    of a list of arguments.
+
+    >>> import numpy as np
+    >>> def my_func(a, b, c):
+    ...     return np.sum(a, 1) + np.sum(c, 0) + b
+    >>> spec = Spec([["foo", "bar"], [], ["bar"]])
+
+    """
 
     @overload
-    def __init__(self, shapes: List[ShapeType]):
+    def __init__(self, shapes: Sequence[ShapeType]):
         ...
 
     @overload
-    def __init__(self, shapes: List[ShapeType], names: Optional[List[Name]]):
+    def __init__(self, shapes: Sequence[ShapeType], names: Optional[Sequence[str]]):
         ...
 
     @overload
-    def __init__(self, shapes: Dict[Name, ShapeType]):
+    def __init__(self, shapes: Dict[str, ShapeType]):
         ...
 
     def __init__(
         self,
-        shapes: Union[Dict[Name, ShapeType], List[ShapeType]],
-        names: Optional[List[Name]] = None,
+        shapes: Union[Dict[str, ShapeType], Sequence[ShapeType]],
+        names: Optional[Sequence[str]] = None,
     ):
         if isinstance(shapes, dict):
-            assert names is None
-            names = [name for name in shapes.keys()]
-            shapes = [
-                shape if isinstance(shape, Shape) else Shape(shape)
-                for shape in shapes.values()
-            ]
-        else:
-            assert shapes is not None
-            shapes = [
-                shape if isinstance(shape, Shape) else Shape(shape) for shape in shapes
-            ]
-        self.shapes = shapes
-        self.names = names
+            names = shapes.keys()
+            shapes = shapes.values()
+        shapes = [s if isinstance(s, Shape) else Shape(*s) for s in shapes]
+        self.shapes = tuple(shapes)
+        self.names = tuple(names) if names is not None else None
 
-    def __sub__(self, dim: ShapeType) -> "Spec":
-        "Return a copy of this spec with the dimension removed from all its shapes."
+    def __sub__(self, dim: str) -> "Spec":
+        """Return a new spec with the dimension removed from all of its shapes.
+
+        >>> spec = Spec([["foo", "bar"], ["bar"]])
+        >>> spec - "foo"
+        Spec(
+          ('bar',),
+          ('bar',),
+        )
+        >>> spec - "bar"
+        Spec(
+          ('foo',),
+          (),
+        )
+        """
         return Spec([shape - dim for shape in self.shapes])
 
-    def indices_for(
-        self, dim: str, index_by_name: bool = False
-    ) -> List[Union[int, None]]:
-        """Return the indices of dimension dim for all shapes, None if the shape doesn't
-        contain the dimension."""
-        if index_by_name:
-            return {
-                name: shape.index(dim)
-                for (name, shape) in zip(self.names, self.shapes)
-                if dim in shape.dims
-            }
-        else:
-            return [shape.index(dim) for shape in self.shapes]
+    def indices_for(self, dim: str) -> List[Union[int, None]]:
+        """Return the index of dimension dim for all shapes, None if the shape doesn't
+        contain the dimension.
+
+        >>> spec = Spec([["foo", "bar"], ["bar"]])
+        >>> spec.indices_for("foo")
+        [0, None]
+        >>> spec.indices_for("bar")
+        [1, 0]
+        """
+        if not self.has_dim(dim):
+            raise InvalidDimensionError(
+                f"Dimension '{dim}' does not exist in this spec:\n{repr(self)}"
+            )
+        return [shape.index(dim) for shape in self.shapes]
 
     @property
     def dims(self) -> Set[ShapeType]:
-        """The dimensions contained in this spec. The union of the dimensions of all the
-        shapes of this spec."""
+        """The dimensions contained in this spec, i.e. the union of the dimensions of
+        all the shapes of this spec.
+
+        >>> spec = Spec([["foo", "bar"], ["bar"]])
+        >>> spec.dims == {"foo", "bar"}
+        True
+        >>> (spec - "bar").dims == {"foo"}
+        True
+        """
         all_dims = set()
         for shape in self.shapes:
             all_dims.update(shape.dims)
         return all_dims
 
-    def has_dim(self, dim: Union[str, Sequence[str]]) -> bool:
+    def has_dim(self, *dim: str) -> bool:
         """Return True if any of the shapes has the given dimension (or all of list of
-        dimensions) dim."""
-        if isinstance(dim, str):
-            dim = [dim]
+        dimensions) dim.
+
+        >>> spec = Spec([["foo", "bar"], ["bar"]])
+        >>> spec.has_dim("foo")
+        True
+        >>> spec.has_dim("foo", "bar")
+        True
+        >>> spec.has_dim("foo", "baz")
+        False
+        """
         return all([d in self.dims for d in dim])
 
-    def with_shape_at(self, **kwargs: Dict[Union[int, Name], ShapeType]) -> "Spec":
-        """Return a new copy of this spec with new shapes as specified by kwargs.
+    def with_shape_at(
+        self, shape_definitions: Dict[Union[int, str], ShapeType]
+    ) -> "Spec":
+        """Return a new copy of this spec with new shapes as specified by
+        shape_definitions.
 
-        kwargs must be a mapping from the index or name of a shape to the new shape.
-        Example:
         >>> spec = Spec([["foo"], ["foo", "bar"]], ["arg1", "arg2"])
-        >>> spec
+        >>> spec.with_shape_at({
+        ...   "arg2": ["foo"],
+        ...   "arg3": ["baz", "bar"]
+        ... })
         Spec(
-          arg1=['foo'],
-          arg2=['foo', 'bar']
-        )
-        >>> spec.with_shape_at(arg2=["foo"], arg3=["baz", "bar"])
-        Spec(
-          arg1=['foo'],
-          arg2=['foo'],
-          arg3=['baz', 'bar']
+          arg1=('foo',),
+          arg2=('foo',),
+          arg3=('baz', 'bar'),
         )
         """
+        if (
+            any([isinstance(key, str) for key in shape_definitions.keys()])
+            and self.names is None
+        ):
+            raise ValueError(
+                "You may only update shapes by name (string) if the spec has named shapes."
+            )
+
         new_spec = self
         new_shapes = [shape for shape in self.shapes]
         new_names = [name for name in self.names]
-        for index_or_name, new_shape in kwargs.items():
+        for index_or_name, new_shape in shape_definitions.items():
+            # Handle case where we update the shape by name (string)
             if isinstance(index_or_name, str):
+                if index_or_name not in new_names:
+                    new_names.append(index_or_name)
                 try:
                     index = self.names.index(index_or_name)
                 except:
@@ -107,16 +144,12 @@ class Spec:
             else:
                 index = index_or_name
 
-            new_shape = new_shape if isinstance(new_shape, Shape) else Shape(new_shape)
+            # Add the new shape to shapes
+            new_shape = new_shape if isinstance(new_shape, Shape) else Shape(*new_shape)
             if index < len(self.shapes):
                 new_shapes[index] = new_shape
             else:
                 new_shapes.append(new_shape)
-                if isinstance(index_or_name, str):
-                    assert len(self.names) == len(
-                        self.shapes
-                    ), "Spec must have names if new shape is added by name."
-                    new_names.append(index_or_name)
 
             new_spec = Spec(new_shapes, new_names)
         return new_spec
@@ -172,17 +205,19 @@ class Spec:
                     f"The size of a dimension must be the same for all arguments. The data has different sizes for dimension {dim}: {size_overview_str}."
                 )
 
-    def __getitem__(self, name_or_index: Union[str, int]) -> Shape:
-        if isinstance(name_or_index, int):
-            return self.shapes[name_or_index]
-        else:
-            return self.shapes[self.names.index(name_or_index)]
+    def __getitem__(self, index: Union[str, int]) -> Shape:
+        if isinstance(index, str):
+            index = self.names.index(index)
+        return self.shapes[index]
 
-    def __eq__(self, other):
-        if isinstance(other, Spec):
-            return self.shapes == other.shapes
-        else:
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, Spec):
             return False
+        if self.shapes != other.shapes:
+            return False
+        if self.names != other.names:
+            return False
+        return True
 
     def __repr__(self):
         if self.names:
@@ -194,7 +229,7 @@ class Spec:
                         for name, shape in zip(self.names, self.shapes)
                     ]
                 )
-                + "\n)"
+                + ",\n)"
             )
         else:
             return (
