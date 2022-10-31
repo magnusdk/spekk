@@ -47,3 +47,13 @@ from spekk.ops import apply_across_dim
 from spekk.shape import Shape
 from spekk.slicer import Slicer
 from spekk.spec import Spec
+
+__all__ = [
+    "Specable",
+    "Shape",
+    "Spec",
+    "ValidationError",
+    "apply_across_dim",
+    "slice_data",
+    "Slicer",
+]
