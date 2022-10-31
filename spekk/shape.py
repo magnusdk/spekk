@@ -137,6 +137,13 @@ class Shape:
         """
         return len(self.dims)
 
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, Shape):
+            return False
+        if tuple(self.dims) != tuple(other.dims):
+            return False
+        return True
+
     def __iter__(self):
         return iter(self.dims)
 
