@@ -137,6 +137,9 @@ class Shape:
         """
         return len(self.dims)
 
+    def __iter__(self):
+        return iter(self.dims)
+
     def __repr__(self) -> str:
         return f"Shape{tuple(self.dims)}"
 
