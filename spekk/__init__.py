@@ -45,7 +45,7 @@ spekk.common.ValidationError: The size of a dimension must be the same for all a
 from spekk.common import Specable, ValidationError
 from spekk.ops import apply_across_dim
 from spekk.shape import Shape
-from spekk.slicer import Slicer
+from spekk.slicer import Slicer, slice_data
 from spekk.spec import Spec
 
 __all__ = [
