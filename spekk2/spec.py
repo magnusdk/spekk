@@ -1,5 +1,5 @@
 from functools import reduce
-from typing import Optional, Sequence, Set
+from typing import Callable, Optional, Sequence, Set
 
 from spekk2.trees import Tree, TreeLens, traverse, traverse_with_state, tree_repr
 from spekk2.trees.registry import get_keys, get_values
@@ -26,15 +26,17 @@ class Spec(TreeLens):
     """
 
     def __init__(self, tree: Optional[Tree] = None, **kwargs: Tree):
-        if not ((tree is not None) ^ bool(kwargs)):
+        if (tree is not None) & bool(kwargs):
             raise ValueError(
-                f"Must specify either tree or kwargs (not both). Got {tree=} and {kwargs=}."
+                f"May not specify both a tree and kwargs. Got {tree=} and {kwargs=}."
             )
-        self.tree = tree or kwargs
+        self.tree = kwargs or tree
 
     def is_leaf(self, tree: Tree) -> bool:
         """The leaves of a spec is a list of dimension names."""
-        return isinstance(tree, Sequence) and all(isinstance(x, str) for x in tree)
+        return tree is None or (
+            isinstance(tree, Sequence) and all(isinstance(x, str) for x in tree)
+        )
 
     def remove_dimension(self, dimension: str) -> "Spec":
         """Remove the given dimension from the spec, searching recursively.
@@ -42,7 +44,7 @@ class Spec(TreeLens):
         >>> spec = Spec(signal=["transmits", "receivers"],
         ...             receiver={"position": ["receivers"], "direction": []})
         >>> spec.remove_dimension("receivers")
-        Spec({signal: [transmits], receiver: {position: [], direction: []}})
+        Spec({signal: ['transmits'], receiver: {position: [], direction: []}})
         """
         return Spec(
             traverse(
@@ -56,16 +58,16 @@ class Spec(TreeLens):
             )
         )
 
-    def indices_for(self, dimension: str) -> Tree:
+    def index_for(self, dimension: str, path: tuple = ()) -> Tree:
         """Return the indices of the given dimension in the spec.
 
         >>> spec = Spec(signal=["transmits", "receivers"],
         ...             receiver={"position": ["receivers"], "direction": []})
-        >>> spec.indices_for("receivers")
+        >>> spec.index_for("receivers")
         {'signal': 1, 'receiver': {'position': 0, 'direction': None}}
         """
         return traverse(
-            self.tree,
+            self.get(path),
             self.is_leaf,
             lambda subtree: (
                 (subtree.index(dimension) if dimension in subtree else None)
@@ -106,13 +108,28 @@ class Spec(TreeLens):
         """
         return all(dim in self.dimensions for dim in dimensions)
 
-    def update(self, updates: Tree) -> "Spec":
-        """Update the spec with the given tree.
+    def add_dimension(self, dimension: str, path: tuple = (), index: int = 0) -> "Spec":
+        """TODO: Docs and tests"""
+        current_dims = self.get(path)
+        current_dims = current_dims if current_dims is not None else []
+        if not self.is_leaf(current_dims):
+            raise ValueError(
+                f"The provided path does not lead to a dimensions definition. \
+Dimensions must be a list of strings, but got {current_dims} at the path {path}."
+            )
+        new_dims = (
+            tuple(current_dims[:index]) + (dimension,) + tuple(current_dims[index:])
+        )
+        return self.set(new_dims, path)
+
+    def replace(self, replacements: Tree) -> "Spec":
+        """Update the spec by replacing subtrees with corresponding subtrees in the
+        replacements tree.
 
         >>> spec = Spec(signal=["transmits", "receivers"],
         ...             receiver={"position": ["receivers"], "direction": []})
-        >>> spec.update({"receiver": {"direction": ["transmits"]}})
-        Spec({signal: [transmits, receivers], receiver: {position: [receivers], direction: [transmits]}})
+        >>> spec.replace({"receiver": {"direction": ["transmits"]}})
+        Spec({signal: ['transmits', 'receivers'], receiver: {position: ['receivers'], direction: ['transmits']}})
         """
 
         def f(state: Spec, tree: Tree, path: tuple) -> Spec:
@@ -123,8 +140,18 @@ class Spec(TreeLens):
             else:
                 return state, tree
 
-        state, _ = traverse_with_state(updates, self.is_leaf, f, self)
+        state, _ = traverse_with_state(
+            replacements, self.is_leaf, f, self, use_path=True
+        )
         return state
+
+    def update_leaves(self, f: Callable[[Sequence[str]], Sequence[str]]) -> "Spec":
+        state = traverse(
+            self.tree,
+            self.is_leaf,
+            lambda x: f(x) if self.is_leaf(x) else x,
+        )
+        return Spec(state)
 
     def copy_with(self, new_tree: Tree) -> "Spec":
         return Spec(new_tree)
@@ -159,10 +186,14 @@ class Spec(TreeLens):
                     new_state = state and get_keys(self.get(path)) == get_keys(tree)
                     return new_state, state
 
-            state, _ = traverse_with_state(other.tree, self.is_leaf, f, True)
+            state, _ = traverse_with_state(
+                other.tree, self.is_leaf, f, True, use_path=True
+            )
             return state
 
     def __repr__(self):
+        if self.tree is None:
+            return "Spec()"
         return f"Spec({tree_repr(self.tree, self.is_leaf)})"
 
 
