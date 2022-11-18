@@ -1,7 +1,14 @@
 from spekk2.trees.base import TreeLens
-from spekk2.trees.common import (Tree, remove, set, traverse,
-                                 traverse_with_state, tree_repr, update)
-from spekk2.trees.registry import register, treedef
+from spekk2.trees.common import (
+    Tree,
+    remove,
+    set,
+    traverse,
+    traverse_with_state,
+    tree_repr,
+    update,
+)
+from spekk2.trees.registry import TreeLike, register, treedef
 
 __all__ = [
     "TreeLens",
@@ -12,6 +19,7 @@ __all__ = [
     "traverse_with_state",
     "tree_repr",
     "update",
+    "TreeLike",
     "register",
     "treedef",
 ]
