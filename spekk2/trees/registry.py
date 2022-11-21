@@ -46,5 +46,5 @@ register(
     lambda t: range(len(t)),
     lambda t, i: t[i],
     lambda keys, values: tuple(values),
-    lambda t: "(" + ", ".join(f"{v}" for v in t) + ")",
+    lambda t: "(" + ", ".join(f"{v}" for v in t) + (")" if len(t) > 1 else ",)"),
 )
