@@ -8,7 +8,7 @@ from spekk2.trees.common import (
     tree_repr,
     update,
 )
-from spekk2.trees.registry import TreeLike, register, treedef
+from spekk2.trees.registry import register, treedef
 
 __all__ = [
     "TreeLens",
