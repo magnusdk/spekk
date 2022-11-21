@@ -6,10 +6,18 @@ def register(type, get_keys, get_value, create, repr_f=None):
 
 
 def treedef(tree):
-    get_keys, get_value, create, repr = registry.get(
-        type(tree), (None, None, None, None)
-    )
-    return get_keys(tree) if get_keys else None, get_value, create, repr
+    from spekk2.spec import Spec
+
+    # Special case for Spec since we know they are just wrappers of trees
+    if isinstance(tree, Spec):
+        keys, get_value, create_tree, repr = treedef(tree.tree)
+        create = lambda k, v: Spec(create_tree(k, v))
+        return keys, get_value, create, repr
+    else:
+        get_keys, get_value, create, repr = registry.get(
+            type(tree), (None, None, None, None)
+        )
+        return get_keys(tree) if get_keys else None, get_value, create, repr
 
 
 def get_values(tree):
