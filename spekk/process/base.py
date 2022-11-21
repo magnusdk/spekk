@@ -2,78 +2,62 @@ import inspect
 from dataclasses import dataclass, field
 from typing import Callable, Sequence, Tuple, Union
 
-from spekk import Shape, Spec
-from spekk.process.kernels import Kernel
-from spekk.process.transformations import InnerTransformation, OuterTransformation
-
-Transformation = Union[Kernel, InnerTransformation, OuterTransformation]
+from spekk.process.transformations import Kernel, Transformation
+from spekk.spec import Spec
 
 
 def _build_recursively(
-    spec: Spec,
-    transformations: Sequence[Transformation],
-) -> Tuple[Callable, Shape]:
+    input_spec: Spec,
+    transformations: Sequence[Union[Kernel, Transformation]],
+) -> Tuple[Callable, Spec]:
     t, *rest = transformations
-    if isinstance(t, OuterTransformation):
-        # Recursive call with new spec
-        f, shape = _build_recursively(t.new_spec(spec), rest)
-        return t(f, spec), t.new_shape(shape)
-    elif isinstance(t, InnerTransformation):
-        f, shape = _build_recursively(spec, rest)
-        return t(f, shape), t.new_shape(shape)
+    if isinstance(t, Transformation):
+        f, output_spec = _build_recursively(t.preprocess_spec(input_spec), rest)
+        return t(f, input_spec, output_spec), t.postprocess_spec(output_spec)
     elif isinstance(t, Kernel):
-        t.validate(spec)
-        return t.f, t.returned_shape
+        return t.f, t.output_spec
     else:
         raise TypeError(
-            f"Transformations must either be objects of OuterTransformation, InnerTransformation, or Kernel, but one with type {type(t)} was encountered."
+            f"Transformations must either be a Transformation or a Kernel, but got {t}."
         )
 
 
 @dataclass
 class Process:
-    data_spec: Spec
+    input_spec: Spec
     transformations: Sequence[Transformation]
     prefilled_kwargs: dict = field(default_factory=dict)
 
-    def _build(self) -> Tuple[Callable, Spec, Shape]:
-        # The last transformation is applied first, therefore we reverse the list
-        return _build_recursively(self.data_spec, reversed(self.transformations))
+    def __post_init__(self):
+        self.transformed_kernel, self.output_spec = _build_recursively(
+            # The last transformation is applied first, therefore we reverse the list
+            self.input_spec,
+            reversed(self.transformations),
+        )
 
     def __call__(self, *args, **kwargs):
-        f, shape = self._build()
-
+        kwargs = {**self.prefilled_kwargs, **kwargs}
         # Bind args and kwargs according to the kernel's signature.
         # We pass bound_args.args (positional args only) because vmap in_axes doesn't
-        # work with keyword args.
-        kwargs = {**self.prefilled_kwargs, **kwargs}
+        # work well with keyword args.
         kernel_f = self.transformations[0].f
         bound_args = inspect.signature(kernel_f).bind(*args, **kwargs)
         bound_args.apply_defaults()
-        return f(*bound_args.args)
-
-    @property
-    def shape(self):
-        f, shape = self._build()
-        return shape
-
-    def with_kwargs(self, **kwargs) -> "Process":
-        "Return a copy of this beamformer that has some arguments already filled in."
-        return Process(
-            self.data_spec, self.transformations, {**self.prefilled_kwargs, **kwargs}
-        )
+        return self.transformed_kernel(*bound_args.args)
 
     def __repr__(self) -> str:
-        repr_str = f"Process("
+        # TODO: FIX ME
+        repr_str = "Process(\n"
+        repr_str += f"  {self.input_spec},\n"
+        repr_str += "  ["
         if self.transformations[1:]:
             for fn in self.transformations:
-                repr_str += f"\n  {repr(fn)},"
+                repr_str += f"\n    {repr(fn)},"
             repr_str += "\n"
         else:
             repr_str += repr(self.transformations[0])
+        repr_str += "  ]\n"
         return repr_str + ")"
 
     def __hash__(self) -> int:
-        return hash(
-            (self.data_spec, tuple(self.transformations), repr(self.prefilled_kwargs))
-        )
+        return object.__hash__(self)

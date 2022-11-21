@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from functools import reduce
 from typing import Sequence, Tuple
 
-from spekk2.spec import Spec
-from spekk2.trees import Tree, traverse
+from spekk.spec import Spec
+from spekk.trees import Tree, traverse
 
 
 @dataclass

@@ -1,5 +1,5 @@
-from spekk2.trees.base import TreeLens
-from spekk2.trees.common import (
+from spekk.trees.base import TreeLens
+from spekk.trees.common import (
     Tree,
     remove,
     set,
@@ -8,7 +8,7 @@ from spekk2.trees.common import (
     tree_repr,
     update,
 )
-from spekk2.trees.registry import register, treedef
+from spekk.trees.registry import register, treedef
 
 __all__ = [
     "TreeLens",

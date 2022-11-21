@@ -6,7 +6,7 @@ def register(type, get_keys, get_value, create, repr_f=None):
 
 
 def treedef(tree):
-    from spekk2.spec import Spec
+    from spekk.spec import Spec
 
     # Special case for Spec since we know they are just wrappers of trees
     if isinstance(tree, Spec):

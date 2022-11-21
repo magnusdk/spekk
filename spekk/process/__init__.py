@@ -1,23 +1,5 @@
+from spekk.process.axis import Axis
 from spekk.process.base import Process
-from spekk.process.common import Axis
-from spekk.process.kernels import Kernel
-from spekk.process.transformations import (
-    Apply,
-    AtIndex,
-    ForAll,
-    InnerTransformation,
-    OuterTransformation,
-    Transpose,
-)
+from spekk.process.transformations import Apply, ForAll, Kernel
 
-__all__ = [
-    "Process",
-    "Kernel",
-    "Apply",
-    "AtIndex",
-    "Axis",
-    "ForAll",
-    "InnerTransformation",
-    "OuterTransformation",
-    "Transpose",
-]
+__all__ = ["Axis", "Process", "ForAll", "Apply", "Kernel"]

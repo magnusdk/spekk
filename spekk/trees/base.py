@@ -1,8 +1,8 @@
 from functools import reduce
 from typing import Any, Callable, Optional, Sequence, Tuple, Union
 
-from spekk2.trees.common import Tree, remove, set, tree_repr, update
-from spekk2.trees.registry import registry
+from spekk.trees.common import Tree, remove, set, tree_repr, update
+from spekk.trees.registry import registry
 
 
 class TreeLens:

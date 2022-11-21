@@ -2,123 +2,127 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Callable, Sequence, Union
 
-from spekk import Shape, Spec, apply_across_dim
-from spekk.backends.base import backend
-from spekk.process.common import Axis, concretize_axes
+from spekk.process.axis import Axis, concretize_axes
+from spekk.spec import Spec
+from spekk.trees import Tree, traverse_with_state
+
+
+@dataclass
+class Kernel(ABC):
+    f: Callable
+    required_spec: Spec
+    output_spec: Spec
+
+    def __repr__(self) -> str:
+        return f"Kernel({self.f})"
 
 
 class Transformation(ABC):
+    """A Transformation object acts as a higher-order function that takes a function and
+    a spec and returns a new transformed function. It also knows what happens to the
+    spec when the transformation is applied."""
+
     @abstractmethod
-    def new_spec(self, old_spec: Spec) -> Spec:
+    def __call__(self, f: Callable, input_spec: Spec, output_spec: Spec) -> Callable:
         ...
 
     @abstractmethod
-    def new_shape(self, old_shape: Shape) -> Shape:
+    def preprocess_spec(self, spec: Spec) -> Spec:
         ...
 
-
-class OuterTransformation(Transformation, ABC):
     @abstractmethod
-    def __call__(self, f: Callable, spec: Spec) -> Callable:
-        ...
-
-
-class InnerTransformation(Transformation, ABC):
-    @abstractmethod
-    def __call__(self, f: Callable, shape: Shape) -> Callable:
+    def postprocess_spec(self, spec: Spec) -> Spec:
         ...
 
 
 @dataclass
-class ForAll(OuterTransformation):
-    axis: str
+class ForAll(Transformation):
+    """A transformation that vectorizes a function over a dimension such that it can
+    take multiple values at once.
 
-    def __call__(self, f: Callable, spec: Spec) -> Callable:
-        return backend.vmap(f, in_axes=spec.indices_for(self.axis))
+    vmap is a higher-order function that is used to vectorize another function. An
+    example of this is jax.vmap from the JAX library, and you should refer to their
+    documentation for more details.
+    """
 
-    def new_spec(self, old_spec: Spec) -> Spec:
-        return old_spec - self.axis
+    dimension: str
+    vmap: Callable[[Callable, Sequence[Union[int, None]]], Callable]
 
-    def new_shape(self, old_shape: Shape) -> Shape:
-        return self.axis + old_shape
+    def __call__(self, f: Callable, input_spec: Spec, output_spec: Spec) -> Callable:
+        """Vectorize the function over the dimension."""
+        in_axes = input_spec.index_for(self.dimension)
+        if isinstance(in_axes, dict):
+            in_axes = list(in_axes.values())
+        return self.vmap(f, in_axes)
 
-    def __repr__(self) -> str:
-        return f'ForAll("{self.axis}")'
+    def preprocess_spec(self, spec: Spec) -> Spec:
+        """Remove the dimension from the spec that is passed to the transformed
+        function. Vectorization ensures that the function only has to know about one
+        value at a time, so we remove the dimension.
 
-    def __hash__(self) -> int:
-        return hash(("ForAll", self.axis))
+        See Transformation.preprocess_spec for more information."""
+        return spec.remove_dimension(self.dimension)
 
+    def postprocess_spec(self, spec: Spec) -> Spec:
+        """We add the dimension back to the spec as the result contains the dimension
+        that was vectorized over.
 
-@dataclass
-class AtIndex(OuterTransformation):
-    axis: str
-    index: Union[int, Sequence[int]]
-
-    def __call__(self, f: Callable, spec: Spec) -> Callable:
-        indices = backend.array(self.index)
-
-        def wrapped_f(*args):
-            # Replace arguments that have the given axis by selecting the element at a
-            # given index for that axis.
-            take_indices = lambda arg, dim_index: backend.take(arg, indices, dim_index)
-            new_args = apply_across_dim(args, spec, self.axis, take_indices)
-            if indices.ndim == 0:
-                return f(*new_args)
-            else:
-                return backend.vmap(f, in_axes=spec.indices_for(self.axis))(*new_args)
-
-        return wrapped_f
-
-    def new_spec(self, old_spec: Spec) -> Spec:
-        return old_spec - self.axis
-
-    def new_shape(self, old_shape: Shape) -> Shape:
-        if isinstance(self.index, int):
-            return old_shape
-        else:
-            # If not a single index, we keep the dimension
-            return self.axis + old_shape
+        See Transformation.postprocess_spec for more information."""
+        return spec.add_dimension(self.dimension)
 
     def __repr__(self) -> str:
-        return f'AtIndex("{self.axis}", index={self.index})'
-
-    def __hash__(self) -> int:
-        return hash(("AtIndex", self.axis, self.index))
+        return f'ForAll("{self.dimension}", {self.vmap.__qualname__})'
 
 
-class Apply(InnerTransformation):
-    def __init__(self, f, *args, **kwargs):
+class Apply(Transformation):
+    """A transformation that applies f to the result of the transformed function.
+
+    It also knows how to update the spec given the args and kwargs (if all axes are
+    defined using the Axis class).
+
+    >>> import numpy as np
+    >>> x = np.ones((3, 4))
+    >>> f = lambda x: x + 1
+    >>> input_spec = Spec({"x": ("a", "b")})
+    >>> output_spec = Spec(("a", "b"))
+    >>> transform_apply = Apply(np.sum, Axis("a"))
+    >>> transformed_f = transform_apply(f, input_spec, output_spec)
+    >>> transformed_f(x)
+    array([6., 6., 6., 6.])
+    >>> transform_apply.postprocess_spec(output_spec)
+    Spec(('b',))
+    """
+
+    def __init__(self, f: Callable, *args, **kwargs):
         self.f, self.args, self.kwargs = f, args, kwargs
-        self.replaces = {}
 
-    def __call__(self, fn_to_wrap, shape: Shape) -> Callable:
+    def __call__(self, fn_to_wrap, input_spec: Spec, output_spec: Spec) -> Callable:
+        """Return a function that calls fn_to_wrap and applies self.f to the result."""
+
         def inner(*inner_args) -> Callable:
             result = fn_to_wrap(*inner_args)
-            args, kwargs = concretize_axes(shape, *self.args, **self.kwargs)
+            args, kwargs = concretize_axes(output_spec, self.args, self.kwargs)
             return self.f(result, *args, **kwargs)
 
         return inner
 
-    def replacing(self, axis: str, new_axis: Union[str, Sequence[str]]) -> "Apply":
-        new_obj = Apply(self.f, *self.args, **self.kwargs)
-        new_obj.replaces[axis] = new_axis
-        return new_obj
+    def preprocess_spec(self, spec: Spec) -> Spec:
+        return spec  # Apply doesn't change the input.
 
-    def new_spec(self, old_spec: Spec) -> Spec:
-        return old_spec  # noop
+    def postprocess_spec(self, spec: Spec) -> Spec:
+        """Update the spec according to the Axis objects in self.args and self.kwargs.
 
-    def new_shape(self, old_shape: Shape) -> Shape:
-        shape = old_shape
-        for arg in [*self.args, *self.kwargs.values()]:
-            if isinstance(arg, Axis):
-                if arg.becomes:
-                    shape = shape.replaced(arg.name, arg.becomes)
-                elif not arg.keep:
-                    shape -= arg.name
-        for replaced_axis, replacement_axis in self.replaces.items():
-            shape = shape.replaced(replaced_axis, replacement_axis)
+        See Axis docstring for more details."""
 
-        return shape
+        def traverse_fn(state: Spec, x: Tree) -> Spec:
+            if isinstance(x, Axis):
+                state = state.update_leaves(x.new_dimensions)
+            return state, x
+
+        state, _ = traverse_with_state(
+            (self.args, self.kwargs), lambda x: isinstance(x, Axis), traverse_fn, spec
+        )
+        return state
 
     def __repr__(self) -> str:
         args_str = ", ".join([str(arg) for arg in self.args])
@@ -130,33 +134,8 @@ class Apply(InnerTransformation):
             repr_str += f", {kwargs_str}"
         return repr_str + ")"
 
-    def __hash__(self) -> int:
-        # Not always safe, but should work in all but the edgiest of cases.
-        return hash(("Apply", self.f, repr(self.args), repr(self.kwargs)))
 
+if __name__ == "__main__":
+    import doctest
 
-class Transpose(Apply):
-    def __init__(self, *axes: Sequence[Union[int, str, Axis]]):
-        self.axes = axes
-        super().__init__(
-            backend.transpose,
-            [Axis(axis) if isinstance(axis, str) else axis for axis in axes],
-        )
-
-    def new_shape(self, old_shape: Shape) -> Shape:
-        return Shape(
-            [
-                old_shape.dims[axis]
-                if isinstance(axis, int)
-                else axis.name
-                if isinstance(axis, Axis)
-                else axis
-                for axis in self.axes
-            ]
-        )
-
-    def __repr__(self) -> str:
-        return f"Transpose({', '.join(self.axes)})"
-
-    def __hash__(self) -> int:
-        return hash(tuple(self.axes))
+    doctest.testmod()

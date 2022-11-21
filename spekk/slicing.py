@@ -1,8 +1,8 @@
 from typing import Protocol, Sequence, Union
 
-from spekk2.spec import Spec
-from spekk2.trees import Tree, update
-from spekk2.trees.common import leaves
+from spekk.spec import Spec
+from spekk.trees import Tree, update
+from spekk.trees.common import leaves
 
 IndicesT = Union[int, slice, Sequence[int], None]
 

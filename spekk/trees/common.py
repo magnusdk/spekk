@@ -2,7 +2,7 @@
 
 from typing import Any, Callable, Generator, Mapping, Sequence, Tuple, Union
 
-from spekk2.trees import registry
+from spekk.trees import registry
 
 Tree = Union[Mapping[Any, "Tree"], Sequence["Tree"], Any]
 

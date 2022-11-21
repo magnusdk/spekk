@@ -1,244 +1,203 @@
-from typing import Dict, List, Optional, Sequence, Set, Union, overload
+from functools import reduce
+from typing import Callable, Optional, Sequence, Set
 
-from spekk.common import InvalidDimensionError, Specable, ValidationError
-from spekk.shape import Shape
-
-ShapeType = Union[Shape, Sequence[str]]
+from spekk.trees import Tree, TreeLens, traverse, traverse_with_state, tree_repr
+from spekk.trees.registry import get_keys, get_values
 
 
-class Spec:
-    """A collection of (optionally named) shapes representing for example the dimensions
-    of a list of arguments.
+class Spec(TreeLens):
+    """A spec describes the dimensions of each array in a tree of arrays.
 
-    >>> import numpy as np
-    >>> def my_func(a, b, c):
-    ...     return np.sum(a, 1) + np.sum(c, 0) + b
-    >>> spec = Spec([["foo", "bar"], [], ["bar"]])
+    A tree consists of nested dictionaries and/or sequences. The leaves of the tree are
+    sequences of dimension names (strings).
 
+    For example, let's say we have a set of images and a set of captions. Each image has
+    a width, a height, and 3 channels (RGB), and each caption has a set of tokens. They
+    are both stored in batches. This can be specced as follows:
+    >>> spec = Spec(image   = ["batch", "width", "height", "channels"],
+    ...             caption = ["batch", "tokens"])
+
+    Notice that both the image and the caption have a batch dimension. This dimension
+    should be processed simultaneously for both images and captions as it semantically
+    describes the same dimension.
+
+    Spec thus allows for describing arbitrary data structures containing multiple
+    arrays, with both different and shared dimensions.
     """
 
-    @overload
-    def __init__(self, shapes: Sequence[ShapeType]):
-        ...
-
-    @overload
-    def __init__(self, shapes: Sequence[ShapeType], names: Optional[Sequence[str]]):
-        ...
-
-    @overload
-    def __init__(self, shapes: Dict[str, ShapeType]):
-        ...
-
-    def __init__(
-        self,
-        shapes: Union[Dict[str, ShapeType], Sequence[ShapeType]],
-        names: Optional[Sequence[str]] = None,
-    ):
-        if isinstance(shapes, dict):
-            names = shapes.keys()
-            shapes = shapes.values()
-        shapes = [s if isinstance(s, Shape) else Shape(*s) for s in shapes]
-        self.shapes = tuple(shapes)
-        self.names = tuple(names) if names is not None else None
-
-    def __sub__(self, dim: str) -> "Spec":
-        """Return a new spec with the dimension removed from all of its shapes.
-
-        >>> spec = Spec([["foo", "bar"], ["bar"]])
-        >>> spec - "foo"
-        Spec(
-          ('bar',),
-          ('bar',),
-        )
-        >>> spec - "bar"
-        Spec(
-          ('foo',),
-          (),
-        )
-        """
-        return Spec([shape - dim for shape in self.shapes])
-
-    def indices_for(self, dim: str) -> List[Union[int, None]]:
-        """Return the index of dimension dim for all shapes, None if the shape doesn't
-        contain the dimension.
-
-        >>> spec = Spec([["foo", "bar"], ["bar"]])
-        >>> spec.indices_for("foo")
-        [0, None]
-        >>> spec.indices_for("bar")
-        [1, 0]
-        """
-        if not self.has_dim(dim):
-            raise InvalidDimensionError(
-                f"Dimension '{dim}' does not exist in this spec:\n{repr(self)}"
+    def __init__(self, tree: Optional[Tree] = None, **kwargs: Tree):
+        if (tree is not None) & bool(kwargs):
+            raise ValueError(
+                f"May not specify both a tree and kwargs. Got {tree=} and {kwargs=}."
             )
-        return [shape.index(dim) for shape in self.shapes]
+        self.tree = kwargs or tree
+
+    def is_leaf(self, tree: Tree) -> bool:
+        """The leaves of a spec is a list of dimension names."""
+        return tree is None or (
+            isinstance(tree, Sequence) and all(isinstance(x, str) for x in tree)
+        )
+
+    def remove_dimension(self, dimension: str) -> "Spec":
+        """Remove the given dimension from the spec, searching recursively.
+
+        >>> spec = Spec(signal=["transmits", "receivers"],
+        ...             receiver={"position": ["receivers"], "direction": []})
+        >>> spec.remove_dimension("receivers")
+        Spec({signal: ['transmits'], receiver: {position: [], direction: []}})
+        """
+        return Spec(
+            traverse(
+                self.tree,
+                self.is_leaf,
+                lambda subtree: (
+                    [x for x in subtree if x != dimension]
+                    if self.is_leaf(subtree)
+                    else subtree
+                ),
+            )
+        )
+
+    def index_for(self, dimension: str, path: tuple = ()) -> Tree:
+        """Return the indices of the given dimension in the spec.
+
+        >>> spec = Spec(signal=["transmits", "receivers"],
+        ...             receiver={"position": ["receivers"], "direction": []})
+        >>> spec.index_for("receivers")
+        {'signal': 1, 'receiver': {'position': 0, 'direction': None}}
+        """
+        return traverse(
+            self.get(path),
+            self.is_leaf,
+            lambda subtree: (
+                (subtree.index(dimension) if dimension in subtree else None)
+                if self.is_leaf(subtree)
+                else subtree
+            ),
+        )
 
     @property
-    def dims(self) -> Set[ShapeType]:
-        """The dimensions contained in this spec, i.e. the union of the dimensions of
-        all the shapes of this spec.
+    def dimensions(self) -> Set[str]:
+        """Return all dimensions in the spec.
 
-        >>> spec = Spec([["foo", "bar"], ["bar"]])
-        >>> spec.dims == {"foo", "bar"}
-        True
-        >>> (spec - "bar").dims == {"foo"}
-        True
+        >>> spec = Spec(signal=["transmits", "receivers"],
+        ...             receiver={"position": ["receivers"], "direction": []},
+        ...             point_position=["transmits", "points"])
+        >>> sorted(spec.dimensions)
+        ['points', 'receivers', 'transmits']
         """
-        all_dims = set()
-        for shape in self.shapes:
-            all_dims.update(shape.dims)
-        return all_dims
+        return traverse(
+            self.tree,
+            self.is_leaf,
+            lambda subtree: (
+                set(subtree)
+                if self.is_leaf(subtree)
+                else reduce(set.union, get_values(subtree), set())
+            ),
+        )
 
-    def has_dim(self, *dim: str) -> bool:
-        """Return True if any of the shapes has the given dimension (or all of list of
-        dimensions) dim.
+    def has_dimension(self, *dimensions: str) -> bool:
+        """Return True if the spec has the given dimension(s).
 
-        >>> spec = Spec([["foo", "bar"], ["bar"]])
-        >>> spec.has_dim("foo")
+        >>> spec = Spec(signal=["transmits", "receivers"],
+        ...             receiver={"position": ["receivers"], "direction": []})
+        >>> spec.has_dimension("transmits", "receivers")
         True
-        >>> spec.has_dim("foo", "bar")
-        True
-        >>> spec.has_dim("foo", "baz")
+        >>> spec.has_dimension("frames", "transmits", "receivers")
         False
         """
-        return all([d in self.dims for d in dim])
+        return all(dim in self.dimensions for dim in dimensions)
 
-    def with_shape_at(
-        self, shape_definitions: Dict[Union[int, str], ShapeType]
-    ) -> "Spec":
-        """Return a new copy of this spec with new shapes as specified by
-        shape_definitions.
-
-        >>> spec = Spec([["foo"], ["foo", "bar"]], ["arg1", "arg2"])
-        >>> spec.with_shape_at({
-        ...   "arg2": ["foo"],
-        ...   "arg3": ["baz", "bar"]
-        ... })
-        Spec(
-          arg1=('foo',),
-          arg2=('foo',),
-          arg3=('baz', 'bar'),
-        )
-        """
-        if (
-            any([isinstance(key, str) for key in shape_definitions.keys()])
-            and self.names is None
-        ):
+    def add_dimension(self, dimension: str, path: tuple = (), index: int = 0) -> "Spec":
+        """TODO: Docs and tests"""
+        current_dims = self.get(path)
+        current_dims = current_dims if current_dims is not None else []
+        if not self.is_leaf(current_dims):
             raise ValueError(
-                "You may only update shapes by name (string) if the spec has named shapes."
+                f"The provided path does not lead to a dimensions definition. \
+Dimensions must be a list of strings, but got {current_dims} at the path {path}."
             )
+        new_dims = (
+            tuple(current_dims[:index]) + (dimension,) + tuple(current_dims[index:])
+        )
+        return self.set(new_dims, path)
 
-        new_spec = self
-        new_shapes = [shape for shape in self.shapes]
-        new_names = [name for name in self.names]
-        for index_or_name, new_shape in shape_definitions.items():
-            # Handle case where we update the shape by name (string)
-            if isinstance(index_or_name, str):
-                if index_or_name not in new_names:
-                    new_names.append(index_or_name)
-                try:
-                    index = self.names.index(index_or_name)
-                except:
-                    index = len(self.shapes)
+    def replace(self, replacements: Tree) -> "Spec":
+        """Update the spec by replacing subtrees with corresponding subtrees in the
+        replacements tree.
+
+        >>> spec = Spec(signal=["transmits", "receivers"],
+        ...             receiver={"position": ["receivers"], "direction": []})
+        >>> spec.replace({"receiver": {"direction": ["transmits"]}})
+        Spec({signal: ['transmits', 'receivers'], receiver: {position: ['receivers'], direction: ['transmits']}})
+        """
+
+        def f(state: Spec, tree: Tree, path: tuple) -> Spec:
+            if tree is None:
+                return state.remove_subtree(path), tree
+            elif self.is_leaf(tree):
+                return state.set(tree, path), tree
             else:
-                index = index_or_name
+                return state, tree
 
-            # Add the new shape to shapes
-            new_shape = new_shape if isinstance(new_shape, Shape) else Shape(*new_shape)
-            if index < len(self.shapes):
-                new_shapes[index] = new_shape
-            else:
-                new_shapes.append(new_shape)
+        state, _ = traverse_with_state(
+            replacements, self.is_leaf, f, self, use_path=True
+        )
+        return state
 
-            new_spec = Spec(new_shapes, new_names)
-        return new_spec
+    def update_leaves(self, f: Callable[[Sequence[str]], Sequence[str]]) -> "Spec":
+        state = traverse(
+            self.tree,
+            self.is_leaf,
+            lambda x: f(x) if self.is_leaf(x) else x,
+        )
+        return Spec(state)
 
-    def validate(self, data: Union[dict, Sequence]) -> None:
-        """Raise a (hopefully) descriptive ValidationError if the data doesn't match
-        this spec."""
-        if len(data) != len(self.shapes):
-            raise ValidationError(
-                f"Mismatch between number of fields in data and number of specced fields (num fields in data: {len(data)}, num fields in spec: {len(self.shapes)})."
-            )
-        if isinstance(data, dict):
-            if self.names is None:
-                raise ValueError(
-                    "May only validate against a dict when names have been defined for the spec."
-                )
-            data = [data[name] for name in self.names]
-        for i, (item, shape) in enumerate(zip(data, self.shapes)):
-            shape_name = f"'{self.names[i]}'" if self.names else f"at index {i}"
-            if shape.ndim == 0:
-                if isinstance(item, Specable) and not len(item.shape) == 0:
-                    raise ValidationError(
-                        f"The shape {shape_name} has no dimensions but the corresponding data item is an array with {len(item.shape)} dimensions."
-                    )
-            elif not isinstance(item, Specable):
-                raise ValidationError(
-                    f"The shape {shape_name} has dimensions {shape.dims} but the corresponding data item is not an array (it has no shape attribute). It is of type {type(item)}."
-                )
-            elif len(item.shape) != shape.ndim:
-                raise ValidationError(
-                    f"The shape {shape_name} has dimensions {shape.dims} but the corresponding data item has shape {item.shape}, which does not have the same number of dimensions."
-                )
-
-        # Check that the size of any dimension is the same across all arguments that
-        # have that dimension.
-        for dim in self.dims:
-            shape_sizes_for_dim = [
-                (shape_name, item.shape[index])
-                for shape_name, item, index in zip(
-                    self.names or range(len(self.shapes)),
-                    data,
-                    self.indices_for(dim),
-                )
-                if index is not None
-            ]
-            num_distinct_sizes = len(set([size for _, size in shape_sizes_for_dim]))
-            assert num_distinct_sizes != 0
-            if num_distinct_sizes != 1:
-                size_overview_str = ", ".join(
-                    [f"{name} has size {size}" for name, size in shape_sizes_for_dim]
-                )
-                raise ValidationError(
-                    f"The size of a dimension must be the same for all arguments. The data has different sizes for dimension {dim}: {size_overview_str}."
-                )
-
-    def __getitem__(self, index: Union[str, int]) -> Shape:
-        if isinstance(index, str):
-            index = self.names.index(index)
-        return self.shapes[index]
+    def copy_with(self, new_tree: Tree) -> "Spec":
+        return Spec(new_tree)
 
     def __eq__(self, other) -> bool:
+        """Return True if the specs are equal.
+
+        >>> spec = Spec(signal=["transmits", "receivers"])
+        >>> spec == Spec(signal=["transmits", "receivers"])
+        True
+        >>> spec == Spec(signal=["frames", "transmits", "receivers"])
+        False
+        >>> spec == Spec(signal=["transmits", "receivers"], foo=["bar"])
+        False
+        >>> spec == Spec(foo=["bar"])
+        False
+        """
         if not isinstance(other, Spec):
             return False
-        if tuple(self.shapes) != tuple(other.shapes):
-            return False
-        if self.names != other.names:
-            return False
-        return True
+        else:
+
+            def f(state: bool, tree: Tree, path: tuple) -> bool:
+                if self.is_leaf(tree):
+                    new_state = (
+                        state
+                        and self.has_subtree(path)
+                        and len(tree) == len(self.get(path))
+                        and all(d1 == d2 for d1, d2 in zip(tree, self.get(path)))
+                    )
+                    return new_state, tree
+                else:
+                    new_state = state and get_keys(self.get(path)) == get_keys(tree)
+                    return new_state, state
+
+            state, _ = traverse_with_state(
+                other.tree, self.is_leaf, f, True, use_path=True
+            )
+            return state
 
     def __repr__(self):
-        if self.names:
-            return (
-                "Spec(\n  "
-                + ",\n  ".join(
-                    [
-                        f"{name}={shape.dims}"
-                        for name, shape in zip(self.names, self.shapes)
-                    ]
-                )
-                + ",\n)"
-            )
-        else:
-            return (
-                "Spec(\n  "
-                + ",\n  ".join([str(shape.dims) for shape in self.shapes])
-                + ",\n)"
-            )
+        if self.tree is None:
+            return "Spec()"
+        return f"Spec({tree_repr(self.tree, self.is_leaf)})"
 
-    def __hash__(self) -> int:
-        return hash(
-            (tuple(self.shapes), tuple(self.names) if self.names is not None else ())
-        )
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()
