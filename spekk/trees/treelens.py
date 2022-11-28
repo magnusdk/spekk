@@ -1,12 +1,16 @@
 from functools import reduce
 from typing import Any, Callable, Optional, Sequence, Tuple, Union
 
-from spekk.trees.common import Tree, remove, set, tree_repr, update
-from spekk.trees.registry import registry
+from spekk.trees.core import remove, set, update
+from spekk.trees.registry import Tree, treedef
 
 
 class TreeLens:
-    """TODO: Docstring"""
+    """A functional interface to a Tree.
+
+    A lens is an object in functional programming (FP) that allows you to access and
+    modify a value in a nested structure in an immutable way.
+    """
 
     def __init__(self, tree: Optional[Tree] = None, **kwargs: Tree):
         if not (bool(tree) ^ bool(kwargs)):
@@ -58,7 +62,7 @@ class TreeLens:
         try:
             self.get(path)
             return True
-        except:
+        except KeyError:
             return False
 
     def set(self, value: Any, path: Sequence[Any]) -> "TreeLens":
@@ -66,7 +70,7 @@ class TreeLens:
 
         >>> tree = TreeLens(a={"b": [1, 2, 3]}, d=[3])
         >>> tree.set(5, ["a", "b", 1])
-        TreeLens({a: {b: [1, 5, 3]}, d: [3]})
+        TreeLens({'a': {'b': [1, 5, 3]}, 'd': [3]})
         """
         return self.copy_with(set(self.tree, value, path))
 
@@ -75,7 +79,7 @@ class TreeLens:
 
         >>> tree = TreeLens(a={"b": [1, 2, 3]}, d=[3])
         >>> tree.update_subtree(lambda x: x + 10, ["a", "b", 1])
-        TreeLens({a: {b: [1, 12, 3]}, d: [3]})
+        TreeLens({'a': {'b': [1, 12, 3]}, 'd': [3]})
         """
         return self.copy_with(update(self.tree, f, path))
 
@@ -84,7 +88,7 @@ class TreeLens:
 
         >>> tree = TreeLens(a={"b": [1, 2, 3]}, d=[3])
         >>> tree.remove_subtree(["a", "b", 1])
-        TreeLens({a: {b: [1, 3]}, d: [3]})
+        TreeLens({'a': {'b': [1, 3]}, 'd': [3]})
         """
         return self.copy_with(remove(self.tree, path))
 
@@ -97,10 +101,18 @@ class TreeLens:
         return TreeLens(new_tree)
 
     def is_leaf(self, tree: Tree) -> bool:
-        return type(tree) not in registry
+        """Return True if the given tree is a leaf.
+
+        By default, this is True if the tree has not been registered with the treedef
+        registry, but should be overridden for more specialized trees."""
+        try:
+            treedef(tree)
+            return False
+        except ValueError:
+            return True
 
     def __repr__(self):
-        return f"TreeLens({tree_repr(self.tree, self.is_leaf)})"
+        return f"TreeLens({self.tree})"
 
 
 if __name__ == "__main__":

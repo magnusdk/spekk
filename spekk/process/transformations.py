@@ -4,7 +4,7 @@ from typing import Callable, Sequence, Union
 
 from spekk.process.axis import Axis, concretize_axes
 from spekk.spec import Spec
-from spekk.trees import Tree, traverse_with_state
+from spekk.trees import leaves
 
 
 @dataclass
@@ -114,14 +114,10 @@ class Apply(Transformation):
 
         See Axis docstring for more details."""
 
-        def traverse_fn(state: Spec, x: Tree) -> Spec:
-            if isinstance(x, Axis):
-                state = state.update_leaves(x.new_dimensions)
-            return state, x
-
-        state, _ = traverse_with_state(
-            (self.args, self.kwargs), lambda x: isinstance(x, Axis), traverse_fn, spec
-        )
+        state = spec
+        tree = (self.args, self.kwargs)
+        for leaf in leaves(tree, lambda x: isinstance(x, Axis)):
+            state = state.update_leaves(leaf.value.new_dimensions)
         return state
 
     def __repr__(self) -> str:
