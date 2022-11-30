@@ -4,7 +4,7 @@ from typing import Callable, Sequence, Union
 
 from spekk.process.axis import Axis, concretize_axes
 from spekk.spec import Spec
-from spekk.trees import leaves
+from spekk.trees import has_treedef, leaves
 
 
 @dataclass
@@ -116,8 +116,9 @@ class Apply(Transformation):
 
         state = spec
         tree = (self.args, self.kwargs)
-        for leaf in leaves(tree, lambda x: isinstance(x, Axis)):
-            state = state.update_leaves(leaf.value.new_dimensions)
+        for leaf in leaves(tree, lambda x: isinstance(x, Axis) or not has_treedef(x)):
+            if isinstance(leaf.value, Axis):
+                state = state.update_leaves(leaf.value.new_dimensions)
         return state
 
     def __repr__(self) -> str:

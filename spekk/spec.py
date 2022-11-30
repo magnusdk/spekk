@@ -30,7 +30,7 @@ class Spec(TreeLens):
             raise ValueError(
                 f"May not specify both a tree and kwargs. Got {tree=} and {kwargs=}."
             )
-        self.tree = kwargs or tree
+        self.tree = kwargs or tree or ()
 
     def is_leaf(self, tree: Tree) -> bool:
         """The leaves of a spec is a list of dimension names."""

@@ -18,12 +18,10 @@ class TreeDef(ABC):
     @abstractmethod
     def keys(self) -> Sequence:
         "Get the keys that can be used to get each subtree."
-        ...
 
     @abstractmethod
     def get(self, key: Any):
         "Get the subtree at the given key."
-        ...
 
     @abstractmethod
     def create(self, keys: Sequence, values: Sequence) -> Tree:
@@ -33,7 +31,6 @@ class TreeDef(ABC):
         >>> td.create(["a", "b"], [3, 4])
         {'a': 3, 'b': 4}
         """
-        ...
 
     @staticmethod
     def new_class(
@@ -67,9 +64,15 @@ def dispatch_by_type(tree: Tree):
         return type_registry[type(tree)](tree)
 
 
+def dispatch_treedef(tree: Tree):
+    "If the tree itself is a TreeDef, return it."
+    if isinstance(tree, TreeDef):
+        return tree
+
+
 # A registry of functions that can be used to get a TreeDef for a given tree (just a
 # list of functions that are tried in order until one of them returns a TreeDef).
-dispatch_fn_registry = [dispatch_by_type]
+dispatch_fn_registry = [dispatch_by_type, dispatch_treedef]
 
 
 def register_type(t: type, treedef: TreeDef):
@@ -81,8 +84,8 @@ def register_dispatch_fn(dispatch_fn: Callable[[Tree], Union[TreeDef, None]]):
     """Register a new TreeDef by dispatch function.
 
     Multiple dispatch functions may be registered, in which case they will be tried in
-    order until one of them returns a TreeDef. Note that dispatch_by_type always comes
-    first and takes precendence."""
+    order until one of them returns a TreeDef. Note that dispatch_by_type and
+    dispatch_treedef always comes first and takes precendence."""
     dispatch_fn_registry.append(dispatch_fn)
 
 
@@ -96,6 +99,15 @@ def treedef(tree: Tree) -> TreeDef:
     raise ValueError(
         f"No TreeDef found for {repr(tree)}. Perhaps you need to register one?"
     )
+
+
+def has_treedef(tree: Tree) -> bool:
+    """Return True if a TreeDef is registered for the given tree."""
+    try:
+        treedef(tree)
+        return True
+    except ValueError:
+        return False
 
 
 # Register some basic tree types

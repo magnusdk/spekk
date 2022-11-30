@@ -4,7 +4,7 @@ from typing import Sequence, Tuple
 
 import spekk.trees as trees
 from spekk.spec import Spec
-from spekk.trees import Tree, leaves
+from spekk.trees import Tree, has_treedef, leaves
 
 
 @dataclass
@@ -73,20 +73,19 @@ def concretize_axes(spec: Spec, args: Tree, kwargs: Tree) -> Tuple[list, dict]:
     """Convert any instance of Axis in args and kwargs to the concrete axis index, as
     defined by the spec.
 
-    >>> spec = Spec(foo=["a", "b"], bar=["b"])
+    >>> spec = Spec(["a", "b"])
     >>> args = (Axis("a"), Axis("b"))
     >>> kwargs = {"baz": Axis("b")}
     >>> concretize_axes(spec, args, kwargs)
-    ((0, 1), {'baz': 0})
+    ((0, 1), {'baz': 1})
     """
-    # TODO: This breaks
     state = (args, kwargs)
-    for leaf in leaves(state, lambda x: isinstance(x, Axis)):
-        index = spec.index_for(leaf.value.dimension)
-        if index is None:
-            raise AxisConcretizationError(leaf.value)
-        print(state, trees.set(state, index, leaf.path), leaf.path)
-        state = trees.set(state, index, leaf.path)
+    for leaf in leaves(state, lambda x: isinstance(x, Axis) or not has_treedef(x)):
+        if isinstance(leaf.value, Axis):
+            index = spec.index_for(leaf.value.dimension)
+            if index is None:
+                raise AxisConcretizationError(leaf.value)
+            state = trees.set(state, index, leaf.path)
     return state
 
 
