@@ -2,8 +2,9 @@ from dataclasses import dataclass
 from functools import reduce
 from typing import Sequence, Tuple
 
+import spekk.trees as trees
 from spekk.spec import Spec
-from spekk.trees import Tree, traverse
+from spekk.trees import Tree, has_treedef, leaves
 
 
 @dataclass
@@ -69,20 +70,23 @@ class AxisConcretizationError(ValueError):
 
 
 def concretize_axes(spec: Spec, args: Tree, kwargs: Tree) -> Tuple[list, dict]:
-    def traverse_fn(x: Tree, path: tuple):
-        if isinstance(x, Axis):
-            # Path is not for the spec
-            index = spec.index_for(x.dimension)
-            if index is None:
-                raise AxisConcretizationError(x)
-            return index
-        else:
-            return x
+    """Convert any instance of Axis in args and kwargs to the concrete axis index, as
+    defined by the spec.
 
-    args, kwargs = traverse(
-        (args, kwargs), lambda x: isinstance(x, Axis), traverse_fn, use_path=True
-    )
-    return args, kwargs
+    >>> spec = Spec(["a", "b"])
+    >>> args = (Axis("a"), Axis("b"))
+    >>> kwargs = {"baz": Axis("b")}
+    >>> concretize_axes(spec, args, kwargs)
+    ((0, 1), {'baz': 1})
+    """
+    state = (args, kwargs)
+    for leaf in leaves(state, lambda x: isinstance(x, Axis) or not has_treedef(x)):
+        if isinstance(leaf.value, Axis):
+            index = spec.index_for(leaf.value.dimension)
+            if index is None:
+                raise AxisConcretizationError(leaf.value)
+            state = trees.set(state, index, leaf.path)
+    return state
 
 
 if __name__ == "__main__":

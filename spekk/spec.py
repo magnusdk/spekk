@@ -1,8 +1,8 @@
 from functools import reduce
-from typing import Callable, Optional, Sequence, Set
+from typing import Callable, Dict, Optional, Sequence, Set, Union, overload
 
-from spekk.trees import Tree, TreeLens, traverse, traverse_with_state, tree_repr
-from spekk.trees.registry import get_keys, get_values
+import spekk.trees.core as trees
+from spekk.trees import Tree, TreeLens, leaves, traverse, treedef, register_dispatch_fn
 
 
 class Spec(TreeLens):
@@ -30,7 +30,7 @@ class Spec(TreeLens):
             raise ValueError(
                 f"May not specify both a tree and kwargs. Got {tree=} and {kwargs=}."
             )
-        self.tree = kwargs or tree
+        self.tree = kwargs or tree or ()
 
     def is_leaf(self, tree: Tree) -> bool:
         """The leaves of a spec is a list of dimension names."""
@@ -44,19 +44,13 @@ class Spec(TreeLens):
         >>> spec = Spec(signal=["transmits", "receivers"],
         ...             receiver={"position": ["receivers"], "direction": []})
         >>> spec.remove_dimension("receivers")
-        Spec({signal: ['transmits'], receiver: {position: [], direction: []}})
+        Spec({'signal': ['transmits'], 'receiver': {'position': [], 'direction': []}})
         """
-        return Spec(
-            traverse(
-                self.tree,
-                self.is_leaf,
-                lambda subtree: (
-                    [x for x in subtree if x != dimension]
-                    if self.is_leaf(subtree)
-                    else subtree
-                ),
-            )
-        )
+        state = self
+        for leaf in leaves(self.tree, self.is_leaf):
+            if dimension in leaf.value:
+                state = state.set([x for x in leaf.value if x != dimension], leaf.path)
+        return state
 
     def index_for(self, dimension: str, path: tuple = ()) -> Tree:
         """Return the indices of the given dimension in the spec.
@@ -66,15 +60,11 @@ class Spec(TreeLens):
         >>> spec.index_for("receivers")
         {'signal': 1, 'receiver': {'position': 0, 'direction': None}}
         """
-        return traverse(
-            self.get(path),
-            self.is_leaf,
-            lambda subtree: (
-                (subtree.index(dimension) if dimension in subtree else None)
-                if self.is_leaf(subtree)
-                else subtree
-            ),
-        )
+        state = self.tree
+        for leaf in leaves(self.tree, self.is_leaf):
+            index = leaf.value.index(dimension) if dimension in leaf.value else None
+            state = trees.set(state, index, leaf.path)
+        return state
 
     @property
     def dimensions(self) -> Set[str]:
@@ -86,14 +76,10 @@ class Spec(TreeLens):
         >>> sorted(spec.dimensions)
         ['points', 'receivers', 'transmits']
         """
-        return traverse(
-            self.tree,
-            self.is_leaf,
-            lambda subtree: (
-                set(subtree)
-                if self.is_leaf(subtree)
-                else reduce(set.union, get_values(subtree), set())
-            ),
+        return reduce(
+            lambda dims, leaf: dims.union(leaf.value),
+            leaves(self.tree, self.is_leaf),
+            set(),
         )
 
     def has_dimension(self, *dimensions: str) -> bool:
@@ -107,6 +93,46 @@ class Spec(TreeLens):
         False
         """
         return all(dim in self.dimensions for dim in dimensions)
+
+    @overload
+    def size(self, data: Tree) -> Dict[str, int]:
+        ...
+
+    @overload
+    def size(self, data: Tree, dimension: str) -> int:
+        ...
+
+    def size(
+        self,
+        data: Tree,
+        dimension: Optional[str] = None,
+    ) -> Union[int, Dict[str, int]]:
+        """Get the size of dimensions (or a single dimension) in the data.
+
+        >>> import numpy as np
+        >>> spec = Spec(signal=["transmits", "receivers"],
+        ...             receiver={"position": ["receivers"], "direction": []})
+        >>> data = {"signal": np.random.randn(10, 20),
+        ...         "receiver": {"position": np.random.randn(20, 3),
+        ...                      "direction": np.random.randn(20, 3)}}
+        >>> spec.size(data) == {'transmits': 10, 'receivers': 20}
+        True
+        >>> spec.size(data, "transmits")
+        10
+        >>> spec.size(data, "receivers")
+        20
+        """
+        if dimension is None:
+            return {dim: self.size(data, dim) for dim in self.dimensions}
+        if not self.has_dimension(dimension):
+            raise ValueError(f"Spec does not contain the dimension {dimension}.")
+
+        indices_tree = self.index_for(dimension)
+        for leaf in leaves(indices_tree, lambda x: isinstance(x, int) or x is None):
+            if leaf.value is not None:
+                # Assume that all data with the same dimension has the same size, so we
+                # just return the first one we find.
+                return trees.get(data, leaf.path).shape[leaf.value]
 
     def add_dimension(self, dimension: str, path: tuple = (), index: int = 0) -> "Spec":
         """TODO: Docs and tests"""
@@ -129,29 +155,27 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
         >>> spec = Spec(signal=["transmits", "receivers"],
         ...             receiver={"position": ["receivers"], "direction": []})
         >>> spec.replace({"receiver": {"direction": ["transmits"]}})
-        Spec({signal: ['transmits', 'receivers'], receiver: {position: ['receivers'], direction: ['transmits']}})
+        Spec({'signal': ['transmits', 'receivers'], 'receiver': {'position': ['receivers'], 'direction': ['transmits']}})
         """
-
-        def f(state: Spec, tree: Tree, path: tuple) -> Spec:
-            if tree is None:
-                return state.remove_subtree(path), tree
-            elif self.is_leaf(tree):
-                return state.set(tree, path), tree
-            else:
-                return state, tree
-
-        state, _ = traverse_with_state(
-            replacements, self.is_leaf, f, self, use_path=True
-        )
+        state = self
+        for replacement in traverse(replacements, self.is_leaf):
+            if replacement.value is None:
+                state = state.remove_subtree(replacement.path)
+            elif replacement.is_leaf:
+                state = state.set(replacement.value, replacement.path)
         return state
 
     def update_leaves(self, f: Callable[[Sequence[str]], Sequence[str]]) -> "Spec":
-        state = traverse(
-            self.tree,
-            self.is_leaf,
-            lambda x: f(x) if self.is_leaf(x) else x,
-        )
-        return Spec(state)
+        """
+
+        >>> spec = Spec(foo=["a", "b"], bar=["c"])
+        >>> spec.update_leaves(lambda dims: dims + ["new_dim"])
+        Spec({'foo': ['a', 'b', 'new_dim'], 'bar': ['c', 'new_dim']})
+        """
+        state = self
+        for leaf in leaves(self.tree, self.is_leaf):
+            state = state.set(f(leaf.value), leaf.path)
+        return state
 
     def copy_with(self, new_tree: Tree) -> "Spec":
         return Spec(new_tree)
@@ -172,29 +196,30 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
         if not isinstance(other, Spec):
             return False
         else:
-
-            def f(state: bool, tree: Tree, path: tuple) -> bool:
-                if self.is_leaf(tree):
-                    new_state = (
-                        state
-                        and self.has_subtree(path)
-                        and len(tree) == len(self.get(path))
-                        and all(d1 == d2 for d1, d2 in zip(tree, self.get(path)))
-                    )
-                    return new_state, tree
+            for subtree in traverse(other.tree, self.is_leaf):
+                if subtree.is_leaf:
+                    if not self.has_subtree(subtree.path):
+                        return False
+                    if len(subtree.value) != len(self.get(subtree.path)):
+                        return False
+                    for d1, d2 in zip(subtree.value, self.get(subtree.path)):
+                        if d1 != d2:
+                            return False
                 else:
-                    new_state = state and get_keys(self.get(path)) == get_keys(tree)
-                    return new_state, state
-
-            state, _ = traverse_with_state(
-                other.tree, self.is_leaf, f, True, use_path=True
-            )
-            return state
+                    if (
+                        treedef(self.get(subtree.path)).keys()
+                        != treedef(subtree.value).keys()
+                    ):
+                        return False
+            return True
 
     def __repr__(self):
         if self.tree is None:
             return "Spec()"
-        return f"Spec({tree_repr(self.tree, self.is_leaf)})"
+        return f"Spec({self.tree})"
+
+
+register_dispatch_fn(lambda t: treedef(t.tree) if isinstance(t, Spec) else None)
 
 
 if __name__ == "__main__":

@@ -1,8 +1,7 @@
 from typing import Protocol, Sequence, Union
 
 from spekk.spec import Spec
-from spekk.trees import Tree, update
-from spekk.trees.common import leaves
+from spekk.trees import Tree, leaves, update
 
 IndicesT = Union[int, slice, Sequence[int], None]
 
@@ -68,8 +67,10 @@ def slice_data(
     """
     is_axis = lambda x: isinstance(x, int) or x is None
     for dimension, indices in zip(slice_definitions[::2], slice_definitions[1::2]):
-        for axis, path in leaves(spec.index_for(dimension), is_axis):
-            data = update(data, lambda a: slice_array_1(a, axis, indices), path)
+        for leaf in leaves(spec.index_for(dimension), is_axis):
+            data = update(
+                data, lambda a: slice_array_1(a, leaf.value, indices), leaf.path
+            )
         if isinstance(indices, int):
             spec = spec.remove_dimension(dimension)
     return data

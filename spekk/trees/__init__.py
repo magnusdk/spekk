@@ -1,25 +1,26 @@
-from spekk.trees.base import TreeLens
-from spekk.trees.common import (
+from spekk.trees.core import get, leaves, remove, set, traverse, update
+from spekk.trees.registry import (
     Tree,
-    remove,
-    set,
-    traverse,
-    traverse_with_state,
-    tree_repr,
-    update,
+    TreeDef,
+    has_treedef,
+    register_dispatch_fn,
+    register_type,
+    treedef,
 )
-from spekk.trees.registry import register, treedef
+from spekk.trees.treelens import TreeLens
 
 __all__ = [
-    "TreeLens",
-    "Tree",
+    "get",
+    "leaves",
     "remove",
     "set",
     "traverse",
-    "traverse_with_state",
-    "tree_repr",
     "update",
-    "TreeLike",
-    "register",
+    "Tree",
+    "TreeDef",
+    "has_treedef",
+    "register_dispatch_fn",
+    "register_type",
     "treedef",
+    "TreeLens",
 ]
