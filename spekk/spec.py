@@ -2,7 +2,7 @@ from functools import reduce
 from typing import Callable, Optional, Sequence, Set
 
 import spekk.trees.core as trees
-from spekk.trees import Tree, TreeLens, leaves, traverse, treedef
+from spekk.trees import Tree, TreeLens, leaves, traverse, treedef, register_dispatch_fn
 
 
 class Spec(TreeLens):
@@ -177,6 +177,9 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
         if self.tree is None:
             return "Spec()"
         return f"Spec({self.tree})"
+
+
+register_dispatch_fn(lambda t: treedef(t.tree) if isinstance(t, Spec) else None)
 
 
 if __name__ == "__main__":
