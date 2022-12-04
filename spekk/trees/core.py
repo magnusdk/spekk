@@ -23,6 +23,21 @@ def update(tree: Tree, f: Callable[[Tree], Tree], path: tuple):
     return td.create(td.keys(), values)
 
 
+def get(tree: Tree, path: tuple):
+    """Get the subtree at the given path.
+
+    >>> tree = {"a": [1, {"b": 2}, 3], "c": 4}
+    >>> get(tree, ("a", 1, "b"))
+    2
+    """
+    if not path:
+        return tree
+
+    key, *remaining_path = path
+    td = treedef(tree)
+    return get(td.get(key), remaining_path)
+
+
 def set(tree: Tree, value: Any, path: tuple):
     """Set the value of the subtree at the given path.
 
