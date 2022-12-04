@@ -1,5 +1,5 @@
 from functools import reduce
-from typing import Callable, Optional, Sequence, Set
+from typing import Callable, Dict, Optional, Sequence, Set, Union, overload
 
 import spekk.trees.core as trees
 from spekk.trees import Tree, TreeLens, leaves, traverse, treedef, register_dispatch_fn
@@ -93,6 +93,46 @@ class Spec(TreeLens):
         False
         """
         return all(dim in self.dimensions for dim in dimensions)
+
+    @overload
+    def size(self, data: Tree) -> Dict[str, int]:
+        ...
+
+    @overload
+    def size(self, data: Tree, dimension: str) -> int:
+        ...
+
+    def size(
+        self,
+        data: Tree,
+        dimension: Optional[str] = None,
+    ) -> Union[int, Dict[str, int]]:
+        """Get the size of dimensions (or a single dimension) in the data.
+
+        >>> import numpy as np
+        >>> spec = Spec(signal=["transmits", "receivers"],
+        ...             receiver={"position": ["receivers"], "direction": []})
+        >>> data = {"signal": np.random.randn(10, 20),
+        ...         "receiver": {"position": np.random.randn(20, 3),
+        ...                      "direction": np.random.randn(20, 3)}}
+        >>> spec.size(data) == {'transmits': 10, 'receivers': 20}
+        True
+        >>> spec.size(data, "transmits")
+        10
+        >>> spec.size(data, "receivers")
+        20
+        """
+        if dimension is None:
+            return {dim: self.size(data, dim) for dim in self.dimensions}
+        if not self.has_dimension(dimension):
+            raise ValueError(f"Spec does not contain the dimension {dimension}.")
+
+        indices_tree = self.index_for(dimension)
+        for leaf in leaves(indices_tree, lambda x: isinstance(x, int) or x is None):
+            if leaf.value is not None:
+                # Assume that all data with the same dimension has the same size, so we
+                # just return the first one we find.
+                return trees.get(data, leaf.path).shape[leaf.value]
 
     def add_dimension(self, dimension: str, path: tuple = (), index: int = 0) -> "Spec":
         """TODO: Docs and tests"""
