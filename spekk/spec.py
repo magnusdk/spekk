@@ -164,11 +164,14 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
         >>> spec = Spec(signal=["transmits", "receivers"],
         ...             receiver={"position": ["receivers"], "direction": []})
         >>> spec.replace({"receiver": {"direction": None}})
-        Spec({'receiver': {'position': ['receivers']}, 'signal': ['transmits', 'receivers']})
+        Spec({'receiver': {'position': ['receivers']}, 'signal': ['transmits', \
+'receivers']})
         >>> spec.replace({"receiver": {"direction": ["transmits"]}})
-        Spec({'receiver': {'direction': ['transmits'], 'position': ['receivers']}, 'signal': ['transmits', 'receivers']})
+        Spec({'receiver': {'direction': ['transmits'], 'position': ['receivers']}, \
+'signal': ['transmits', 'receivers']})
         >>> spec.replace({"receiver": {"efficiency": ["receivers"]}})
-        Spec({'receiver': {'efficiency': ['receivers'], 'position': ['receivers'], 'direction': []}, 'signal': ['transmits', 'receivers']})
+        Spec({'receiver': {'efficiency': ['receivers'], 'position': ['receivers'], \
+'direction': []}, 'signal': ['transmits', 'receivers']})
         """
         state = self
         for replacement in traverse(replacements, self.is_leaf):
