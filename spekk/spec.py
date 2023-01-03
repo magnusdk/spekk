@@ -34,8 +34,10 @@ class Spec(TreeLens):
 
     def is_leaf(self, tree: Tree) -> bool:
         """The leaves of a spec is a list of dimension names."""
-        return tree is None or (
-            isinstance(tree, Sequence) and all(isinstance(x, str) for x in tree)
+        return (
+            tree is None
+            or (isinstance(tree, Spec) and self.is_leaf(tree.tree))
+            or (isinstance(tree, Sequence) and all(isinstance(x, str) for x in tree))
         )
 
     def remove_dimension(self, dimension: str) -> "Spec":
@@ -152,10 +154,21 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
         """Update the spec by replacing subtrees with corresponding subtrees in the
         replacements tree.
 
+        - A value of None in the replacements tree removes the subtree at the
+          corresponding path.
+        - A leaf (list of dimensions, see Spec.is_leaf) in the replacements tree always
+          replaces the leaf (or subtree) at the corresponding path.
+        - Keys present in the replacements tree but not in the spec are added to the
+          spec at the corresponding path.
+
         >>> spec = Spec(signal=["transmits", "receivers"],
         ...             receiver={"position": ["receivers"], "direction": []})
+        >>> spec.replace({"receiver": {"direction": None}})
+        Spec({'receiver': {'position': ['receivers']}, 'signal': ['transmits', 'receivers']})
         >>> spec.replace({"receiver": {"direction": ["transmits"]}})
-        Spec({'signal': ['transmits', 'receivers'], 'receiver': {'position': ['receivers'], 'direction': ['transmits']}})
+        Spec({'receiver': {'direction': ['transmits'], 'position': ['receivers']}, 'signal': ['transmits', 'receivers']})
+        >>> spec.replace({"receiver": {"efficiency": ["receivers"]}})
+        Spec({'receiver': {'efficiency': ['receivers'], 'position': ['receivers'], 'direction': []}, 'signal': ['transmits', 'receivers']})
         """
         state = self
         for replacement in traverse(replacements, self.is_leaf):
@@ -163,6 +176,18 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
                 state = state.remove_subtree(replacement.path)
             elif replacement.is_leaf:
                 state = state.set(replacement.value, replacement.path)
+            else:
+                replacement_value = trees.filter(
+                    replacement.value,
+                    self.is_leaf,
+                    lambda tree: tree is not None,
+                )
+                state = state.update_subtree(
+                    # Current value takes presedence over replacement value in order to
+                    # preserve replace semantics.
+                    lambda current_value: trees.merge(replacement_value, current_value),
+                    replacement.path,
+                )
         return state
 
     def update_leaves(self, f: Callable[[Sequence[str]], Sequence[str]]) -> "Spec":
@@ -212,6 +237,9 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
                     ):
                         return False
             return True
+
+    def __len__(self):
+        return len(self.tree)
 
     def __repr__(self):
         if self.tree is None:

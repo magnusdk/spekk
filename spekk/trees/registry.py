@@ -23,6 +23,10 @@ class TreeDef(ABC):
     def get(self, key: Any):
         "Get the subtree at the given key."
 
+    def values(self) -> Sequence:
+        "Get the subtrees for each key in the treedef."
+        return [self.get(k) for k in self.keys()]
+
     @abstractmethod
     def create(self, keys: Sequence, values: Sequence) -> Tree:
         """Create a new instance of the tree with the given keys and values.
