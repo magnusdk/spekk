@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, Sequence, Union
+from typing import Callable, Optional, Sequence, Union, final
 
 from spekk.process.axis import Axis, concretize_axes
 from spekk.spec import Spec
@@ -17,22 +17,48 @@ class Kernel(ABC):
         return f"Kernel({self.f})"
 
 
+@dataclass
+class TransformationException(Exception):
+    "An exception raised either while building a process or while running it."
+    raised_by: "Transformation"
+    original_exception: Optional[Exception]
+
+
 class Transformation(ABC):
-    """A Transformation object acts as a higher-order function that takes a function and
-    a spec and returns a new transformed function. It also knows what happens to the
-    spec when the transformation is applied."""
+    """A Transformation object takes a function and a spec and returns a new transformed
+    function. It also knows what happens to the spec when the transformation is applied.
+    """
 
     @abstractmethod
-    def __call__(self, f: Callable, input_spec: Spec, output_spec: Spec) -> Callable:
+    def transform(self, f: Callable, input_spec: Spec, output_spec: Spec) -> Callable:
         ...
 
     @abstractmethod
     def preprocess_spec(self, spec: Spec) -> Spec:
-        ...
+        "Return the spec that is passed down to the next step in the process."
 
     @abstractmethod
     def postprocess_spec(self, spec: Spec) -> Spec:
-        ...
+        "Return the resulting spec after running the transformed function."
+
+    @final
+    def __call__(self, f: Callable, input_spec: Spec, output_spec: Spec) -> Callable:
+        # Catch errors that occur while transforming
+        transform = self._wrap_catch_exception(self.transform)
+        transformed_f = transform(f, input_spec, output_spec)
+        # Catch errors that occur while running
+        return self._wrap_catch_exception(transformed_f)
+
+    def _wrap_catch_exception(self, f: Callable):
+        def wrapped(*args, **kwargs) -> Callable:
+            try:
+                return f(*args, **kwargs)
+            except TransformationException as e:
+                raise e  # Bubble up
+            except Exception as e:
+                raise TransformationException(self, e)
+
+        return wrapped
 
 
 @dataclass
@@ -48,8 +74,11 @@ class ForAll(Transformation):
     dimension: str
     vmap: Callable[[Callable, Sequence[Union[int, None]]], Callable]
 
-    def __call__(self, f: Callable, input_spec: Spec, output_spec: Spec) -> Callable:
+    def transform(self, f: Callable, input_spec: Spec, output_spec: Spec) -> Callable:
         """Vectorize the function over the dimension."""
+        if not input_spec.has_dimension(self.dimension):
+            raise ValueError(f'Dimension "{self.dimension}" not found in spec')
+
         in_axes = input_spec.index_for(self.dimension)
         if isinstance(in_axes, dict):
             in_axes = list(in_axes.values())
@@ -96,7 +125,7 @@ class Apply(Transformation):
     def __init__(self, f: Callable, *args, **kwargs):
         self.f, self.args, self.kwargs = f, args, kwargs
 
-    def __call__(self, fn_to_wrap, input_spec: Spec, output_spec: Spec) -> Callable:
+    def transform(self, fn_to_wrap, input_spec: Spec, output_spec: Spec) -> Callable:
         """Return a function that calls fn_to_wrap and applies self.f to the result."""
 
         def inner(*inner_args) -> Callable:

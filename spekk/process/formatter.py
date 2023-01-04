@@ -12,6 +12,17 @@ def default_repr_fn(t: Union[Transformation, Kernel]) -> str:
     return f"    {repr(t)},"
 
 
+def get_error_repr_fn(e: TransformationException):
+    def repr_fn(t: Union[Transformation, Kernel]):
+        return (
+            f"⚠   {repr(t)},\n⚠     ↳ This step raised {repr(e.original_exception)}"
+            if t is e.raised_by
+            else f"    {repr(t)},"
+        )
+
+    return repr_fn
+
+
 def get_process_repr(
     input_spec: Spec,
     transformations: Sequence[Transformation],

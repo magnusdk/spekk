@@ -2,7 +2,12 @@ import inspect
 from dataclasses import dataclass, field
 from typing import Callable, Sequence, Tuple, Union
 
-from spekk.process.transformations import Kernel, Transformation
+from spekk.process.formatter import default_repr_fn, get_error_repr_fn, get_process_repr
+from spekk.process.transformations import (
+    Kernel,
+    Transformation,
+    TransformationException,
+)
 from spekk.spec import Spec
 
 
@@ -29,11 +34,18 @@ class Process:
     prefilled_kwargs: dict = field(default_factory=dict)
 
     def __post_init__(self):
-        self.transformed_kernel, self.output_spec = _build_recursively(
-            # The last transformation is applied first, therefore we reverse the list
-            self.input_spec,
-            reversed(self.transformations),
-        )
+        try:
+            self.transformed_kernel, self.output_spec = _build_recursively(
+                self.input_spec,
+                # Because the last transformation is applied first we reverse the list
+                reversed(self.transformations),
+            )
+        except TransformationException as e:
+            repr_str = get_process_repr(
+                self.input_spec, self.transformations, get_error_repr_fn(e)
+            )
+            repr_str += "\n^ The above error occurred while building the process."
+            raise ValueError(f"Oof:\n{repr_str}") from e.original_exception
 
     def __call__(self, *args, **kwargs):
         kwargs = {**self.prefilled_kwargs, **kwargs}
@@ -43,7 +55,14 @@ class Process:
         kernel_f = self.transformations[0].f
         bound_args = inspect.signature(kernel_f).bind(*args, **kwargs)
         bound_args.apply_defaults()
-        return self.transformed_kernel(*bound_args.args)
+        try:
+            return self.transformed_kernel(*bound_args.args)
+        except TransformationException as e:
+            repr_str = get_process_repr(
+                self.input_spec, self.transformations, get_error_repr_fn(e)
+            )
+            repr_str += "\n^ The above error occurred while running the process."
+            raise ValueError(f"Oof:\n{repr_str}") from e.original_exception
 
     def __repr__(self) -> str:
         return get_process_repr(self.input_spec, self.transformations, default_repr_fn)
