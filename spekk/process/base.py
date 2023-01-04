@@ -46,18 +46,7 @@ class Process:
         return self.transformed_kernel(*bound_args.args)
 
     def __repr__(self) -> str:
-        # TODO: FIX ME
-        repr_str = "Process(\n"
-        repr_str += f"  {self.input_spec},\n"
-        repr_str += "  ["
-        if self.transformations[1:]:
-            for fn in self.transformations:
-                repr_str += f"\n    {repr(fn)},"
-            repr_str += "\n"
-        else:
-            repr_str += repr(self.transformations[0])
-        repr_str += "  ]\n"
-        return repr_str + ")"
+        return get_process_repr(self.input_spec, self.transformations, default_repr_fn)
 
     def __hash__(self) -> int:
         return object.__hash__(self)
