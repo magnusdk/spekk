@@ -26,7 +26,7 @@ class Spec(TreeLens):
     """
 
     def __init__(self, tree: Optional[Tree] = None, **kwargs: Tree):
-        if (tree is not None) & bool(kwargs):
+        if (tree is not None) and bool(kwargs):
             raise ValueError(
                 f"May not specify both a tree and kwargs. Got {tree=} and {kwargs=}."
             )
