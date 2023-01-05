@@ -4,7 +4,7 @@ from spekk import Spec
 from spekk.process.transformations import (
     Kernel,
     Transformation,
-    TransformationException,
+    TransformationError,
 )
 
 
@@ -12,7 +12,7 @@ def default_repr_fn(t: Union[Transformation, Kernel]) -> str:
     return f"    {repr(t)},"
 
 
-def get_error_repr_fn(e: TransformationException):
+def get_error_repr_fn(e: TransformationError):
     def repr_fn(t: Union[Transformation, Kernel]):
         return (
             f"⚠   {repr(t)},\n⚠     ↳ This step raised {repr(e.original_exception)}"
