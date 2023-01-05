@@ -68,8 +68,13 @@ def remove(tree: Tree, path: tuple):
     return update(tree, remove_sub_tree, path[:-1])
 
 
-def merge(t1: Tree, t2: Tree) -> Tree:
+def merge(t1: Tree, t2: Tree, preserve_order: int = "first") -> Tree:
     """Merge two trees (assuming this is possible).
+
+    The order of the keys in the merged tree is determined by the preserve_order. If it
+    is first, then the order is the same as the first tree. If it is last, then the
+    order is the same as the second tree. Any other new keys are appended to the end of
+    the tree.
 
     >>> merge({"a": 1, "b": 2}, {"c": 3})
     {'a': 1, 'b': 2, 'c': 3}
@@ -82,10 +87,19 @@ def merge(t1: Tree, t2: Tree) -> Tree:
     [4, 5, 3]
     """
     treedef1, treedef2 = treedef(t1), treedef(t2)
-    merged = {
-        **dict(zip(treedef1.keys(), treedef1.values())),
-        **dict(zip(treedef2.keys(), treedef2.values())),
-    }
+
+    if preserve_order == "first":
+        merged = dict(zip(treedef1.keys(), treedef1.values()))
+        for key in treedef2.keys():
+            merged[key] = treedef2.get(key)
+    elif preserve_order == "last":
+        merged = dict(zip(treedef2.keys(), treedef2.values()))
+        for key in treedef1.keys():
+            if key not in merged:
+                merged[key] = treedef1.get(key)
+    else:
+        raise ValueError("preserve_order must be either 'first' or 'last'")
+
     return treedef1.create(merged.keys(), merged.values())
 
 

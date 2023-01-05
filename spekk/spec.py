@@ -188,7 +188,9 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
                 state = state.update_subtree(
                     # Current value takes presedence over replacement value in order to
                     # preserve replace semantics.
-                    lambda current_value: trees.merge(replacement_value, current_value),
+                    lambda current_value: trees.merge(
+                        replacement_value, current_value, "last"
+                    ),
                     replacement.path,
                 )
         return state
