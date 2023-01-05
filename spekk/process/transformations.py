@@ -18,7 +18,7 @@ class Kernel(ABC):
 
 
 @dataclass
-class TransformationException(Exception):
+class TransformationError(Exception):
     "An exception raised either while building a process or while running it."
     raised_by: "Transformation"
     original_exception: Optional[Exception]
@@ -53,10 +53,10 @@ class Transformation(ABC):
         def wrapped(*args, **kwargs) -> Callable:
             try:
                 return f(*args, **kwargs)
-            except TransformationException as e:
+            except TransformationError as e:
                 raise e  # Bubble up
             except Exception as e:
-                raise TransformationException(self, e)
+                raise TransformationError(self, e)
 
         return wrapped
 
