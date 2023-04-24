@@ -57,8 +57,38 @@ class TreeDef(ABC):
         return _TreeDef
 
 
+class DuckTypedTreeDef(TreeDef):
+    """An object can be a TreeDef if it has the dunder-methods: 
+    __spekk_treedef_keys__, __spekk_treedef_get__, and __spekk_treedef_create__"""
+    def __init__(self, obj: Any):
+        if not (
+            hasattr(obj, "__spekk_treedef_keys__")
+            and hasattr(obj, "__spekk_treedef_get__")
+            and hasattr(obj, "__spekk_treedef_create__")
+        ):
+            raise ValueError(
+                f"Object {obj} does not have the required dunder-methods to be a treedef."
+            )
+        self.obj = obj
+
+    def keys(self) -> Sequence:
+        return getattr(self.obj, "__spekk_treedef_keys__")()
+
+    def get(self, key: Any):
+        return getattr(self.obj, "__spekk_treedef_get__")(key)
+
+    def create(self, keys: Sequence, values: Sequence) -> Any:
+        return getattr(self.obj, "__spekk_treedef_create__")(keys, values)
+
+
 # A registry of types to TreeDef's.
 type_registry = {}
+
+
+def dispatch_treedef(tree: Tree):
+    "If the tree itself is a TreeDef, return it."
+    if isinstance(tree, TreeDef):
+        return tree
 
 
 def dispatch_by_type(tree: Tree):
@@ -68,15 +98,18 @@ def dispatch_by_type(tree: Tree):
         return type_registry[type(tree)](tree)
 
 
-def dispatch_treedef(tree: Tree):
-    "If the tree itself is a TreeDef, return it."
-    if isinstance(tree, TreeDef):
-        return tree
+def dispatch_by_duck_type(tree: Tree):
+    """Given a tree, return a TreeDef if it has the required dunder-methods. See 
+    DuckTypedTreeDef for more details."""
+    try:
+        return DuckTypedTreeDef(tree)
+    except ValueError:
+        return None
 
 
 # A registry of functions that can be used to get a TreeDef for a given tree (just a
 # list of functions that are tried in order until one of them returns a TreeDef).
-dispatch_fn_registry = [dispatch_by_type, dispatch_treedef]
+dispatch_fn_registry = [dispatch_treedef, dispatch_by_type, dispatch_by_duck_type]
 
 
 def register_type(t: type, treedef: TreeDef):
