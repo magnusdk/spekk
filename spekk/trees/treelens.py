@@ -62,7 +62,7 @@ class TreeLens:
         try:
             self.get(path)
             return True
-        except KeyError:
+        except (KeyError, TypeError):
             return False
 
     def set(self, value: Any, path: Sequence[Any]) -> "TreeLens":
