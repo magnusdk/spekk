@@ -96,6 +96,16 @@ class Spec(TreeLens):
         """
         return all(dim in self.dimensions for dim in dimensions)
 
+    @property
+    def at(self):
+        class Getter:
+            def __getitem__(_, key) -> Spec:
+                if not isinstance(key, tuple):
+                    key = (key,)
+                return Spec(self.get(key))
+
+        return Getter()
+
     @overload
     def size(self, data: Tree) -> Dict[str, int]:
         ...
