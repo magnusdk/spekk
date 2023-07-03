@@ -6,3 +6,4 @@ __all__ = [
     "slice_data",
     "slice_spec",
 ]
+__version__ = "0.1.0"
