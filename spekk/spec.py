@@ -28,8 +28,8 @@ def _is_spec_leaf(tree: Optional[Tree]):
 
 
 class Spec(TreeLens):
-    """In a nested tree of arrays, a Spec describes the dimensions of the arrays. Spec 
-    is a subclass of :class:`TreeLens` which takes the ``tree`` as an argument when 
+    """In a nested tree of arrays, a Spec describes the dimensions of the arrays. Spec
+    is a subclass of :class:`TreeLens` which takes the ``tree`` as an argument when
     constructing an object.
 
     The tree of a Spec is a nested data-structure consisting of dictionaries and
@@ -163,7 +163,7 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
         >>> spec.replace({"foo": None})
         Spec({'bar': ['b']})
 
-        Removing a subtree such that its parent becomes an empty collection also 
+        Removing a subtree such that its parent becomes an empty collection also
         removes the parent:
         >>> spec.replace({"foo": {"baz": None}})
         Spec({'bar': ['b']})
@@ -172,7 +172,7 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
         >>> spec.replace({"foo": ["c"]})
         Spec({'foo': ['c'], 'bar': ['b']})
 
-        Other than that, it is assumed that the ``replacements`` tree structure mirrors 
+        Other than that, it is assumed that the ``replacements`` tree structure mirrors
         the spec structure:
         >>> spec.replace({"foo": {"baz": ["c"]}})
         Spec({'foo': {'baz': ['c']}, 'bar': ['b']})
@@ -211,13 +211,16 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
             state = state.set(f(leaf.value), leaf.path)
         return state
 
-    @overload
-    def size(self, data: Tree) -> Dict[str, int]:
-        ...
+    def validate(self, data: Tree):
+        """Validate that the data conforms to the spec, raising a
+        :class:`~spekk.validation.ValidationError` if not.
 
-    @overload
-    def size(self, data: Tree, dimension: str) -> int:
-        ...
+        See also:
+            :func:`~spekk.validation.validate`
+        """
+        from spekk.validation import validate
+
+        validate(self, data)
 
     def size(
         self,
