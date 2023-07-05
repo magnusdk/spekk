@@ -167,7 +167,7 @@ def filter(
     is_leaf: Callable[[Tree], bool],
     predicate: Callable[[Tree], bool],
     path: tuple = (),
-) -> Generator[TraversalItem, None, None]:
+) -> Tree:
     """Remove all subtrees for which the predicate returns False.
 
     >>> tree = {"a": [1, {"b": 2}, 3], "c": 4, "d": 5}
