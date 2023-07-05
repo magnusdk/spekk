@@ -2,68 +2,94 @@ from functools import reduce
 from typing import Callable, Dict, Optional, Sequence, Set, Union, overload
 
 import spekk.trees.core as trees
-from spekk.trees import Tree, TreeLens, leaves, traverse, treedef, register_dispatch_fn
+from spekk.trees import Tree, TreeLens, leaves, register_dispatch_fn, traverse, treedef
+from spekk.trees.registry import Tree
+
+
+def _is_spec_leaf(tree: Optional[Tree]):
+    """A Spec-tree is a leaf if it is None or a sequence of strings.
+
+    >>> _is_spec_leaf(None)
+    True
+    >>> _is_spec_leaf(["a", "b"])
+    True
+
+    Anything else is not a leaf, in the following case a list of list of strings:
+    >>> _is_spec_leaf([["a"], ["c"]])
+    False
+    """
+    if tree is None:
+        return True
+    if isinstance(tree, Sequence) and all(isinstance(x, str) for x in tree):
+        return True
+    if isinstance(tree, Spec):
+        return _is_spec_leaf(tree.tree)
+    return False
 
 
 class Spec(TreeLens):
-    """A spec describes the dimensions of each array in a tree of arrays.
+    """In a nested tree of arrays, a Spec describes the dimensions of the arrays. Spec 
+    is a subclass of :class:`TreeLens` which takes the ``tree`` as an argument when 
+    constructing an object.
 
-    A tree consists of nested dictionaries and/or sequences. The leaves of the tree are
-    sequences of dimension names (strings).
+    The tree of a Spec is a nested data-structure consisting of dictionaries and
+    sequences, where the leaves are sequences of strings. An example of a Spec is as
+    follows:
+    >>> spec = Spec({"foo": ["a", "b"], "bar": ["b"]})
 
-    For example, let's say we have a set of images and a set of captions. Each image has
-    a width, a height, and 3 channels (RGB), and each caption has a set of tokens. They
-    are both stored in batches. This can be specced as follows:
-    >>> spec = Spec(image   = ["batch", "width", "height", "channels"],
-    ...             caption = ["batch", "tokens"])
+    The above ``spec`` describes a dictionary of arrays. As data, it could look
+    something like this:
+    >>> import numpy as np
+    >>> data = {"foo": np.ones([2, 3]), "bar": np.ones([3])}
 
-    Notice that both the image and the caption have a batch dimension. This dimension
-    should be processed simultaneously for both images and captions as it semantically
-    describes the same dimension.
+    Note that the structure of the ``spec`` mirrors the structure of the data, but
+    where each array has been replaced with a list of strings, representing the
+    dimensions of the arrays. Note also that the second dimension of the ``"foo"``
+    array share the same name as the first dimension of the ``"bar"`` array, meaning
+    that they are semantically the same dimension. This is better understood with a
+    more concrete example:
+    >>> spec = Spec({"image":   ["batch", "width", "height", "channels"],
+    ...              "caption": ["batch", "tokens"]})
 
-    Spec thus allows for describing arbitrary data structures containing multiple
-    arrays, with both different and shared dimensions.
+    In the above example, both the ``"image"`` and the ``"caption"`` has the same
+    ``"batch"`` dimension so we know that if we loop over the batch-items we must loop
+    over both the images and captions.
     """
 
-    def __init__(self, tree: Optional[Tree] = None, **kwargs: Tree):
-        if (tree is not None) and bool(kwargs):
-            raise ValueError(
-                f"May not specify both a tree and kwargs. Got {tree=} and {kwargs=}."
-            )
-        self.tree = kwargs or tree or ()
+    def is_leaf(self) -> bool:
+        """This spec represents the dimensions of an array (i.e.: not a nested
+        data-structure of arrays).
 
-    def is_leaf(self, tree: Tree) -> bool:
-        """The leaves of a spec is a list of dimension names."""
-        return (
-            tree is None
-            or (isinstance(tree, Spec) and self.is_leaf(tree.tree))
-            or (isinstance(tree, Sequence) and all(isinstance(x, str) for x in tree))
-        )
+        See also:
+            func:`._is_spec_leaf`).
+        """
+        return _is_spec_leaf(self.tree)
 
-    def remove_dimension(self, dimension: str) -> "Spec":
-        """Remove the given dimension from the spec, searching recursively.
+    def remove_dimension(self, dimension: str, path: Sequence = ()) -> "Spec":
+        """Remove the given dimension from everywhere in the spec.
 
-        >>> spec = Spec(signal=["transmits", "receivers"],
-        ...             receiver={"position": ["receivers"], "direction": []})
+        >>> spec = Spec({"signal": ["transmits", "receivers"],
+        ...              "receiver": {"position": ["receivers"], "direction": []}})
         >>> spec.remove_dimension("receivers")
         Spec({'signal': ['transmits'], 'receiver': {'position': [], 'direction': []}})
         """
-        state = self
-        for leaf in leaves(self.tree, self.is_leaf):
+        state = self.get(path)
+        for leaf in leaves(state.tree, _is_spec_leaf):
             if dimension in leaf.value:
                 state = state.set([x for x in leaf.value if x != dimension], leaf.path)
         return state
 
-    def index_for(self, dimension: str, path: tuple = ()) -> Tree:
-        """Return the indices of the given dimension in the spec.
+    def index_for(self, dimension: str, path: Sequence = ()) -> Tree:
+        """Return the indices of the given dimension in the spec with the same
+        structure as the spec.
 
-        >>> spec = Spec(signal=["transmits", "receivers"],
-        ...             receiver={"position": ["receivers"], "direction": []})
+        >>> spec = Spec({"signal": ["transmits", "receivers"],
+        ...              "receiver": {"position": ["receivers"], "direction": []}})
         >>> spec.index_for("receivers")
         {'signal': 1, 'receiver': {'position': 0, 'direction': None}}
         """
-        state = self.tree
-        for leaf in leaves(self.tree, self.is_leaf):
+        state = self.get(path).tree
+        for leaf in leaves(state, _is_spec_leaf):
             index = leaf.value.index(dimension) if dimension in leaf.value else None
             state = trees.set(state, index, leaf.path)
         return state
@@ -72,23 +98,23 @@ class Spec(TreeLens):
     def dimensions(self) -> Set[str]:
         """Return all dimensions in the spec.
 
-        >>> spec = Spec(signal=["transmits", "receivers"],
-        ...             receiver={"position": ["receivers"], "direction": []},
-        ...             point_position=["transmits", "points"])
+        >>> spec = Spec({"signal": ["transmits", "receivers"],
+        ...              "receiver": {"position": ["receivers"], "direction": []},
+        ...              "point_position": ["transmits", "points"]})
         >>> sorted(spec.dimensions)
         ['points', 'receivers', 'transmits']
         """
         return reduce(
             lambda dims, leaf: dims.union(leaf.value),
-            leaves(self.tree, self.is_leaf),
+            leaves(self.tree, _is_spec_leaf),
             set(),
         )
 
     def has_dimension(self, *dimensions: str) -> bool:
         """Return True if the spec has the given dimension(s).
 
-        >>> spec = Spec(signal=["transmits", "receivers"],
-        ...             receiver={"position": ["receivers"], "direction": []})
+        >>> spec = Spec({"signal": ["transmits", "receivers"],
+        ...              "receiver": {"position": ["receivers"], "direction": []}})
         >>> spec.has_dimension("transmits", "receivers")
         True
         >>> spec.has_dimension("frames", "transmits", "receivers")
@@ -96,15 +122,94 @@ class Spec(TreeLens):
         """
         return all(dim in self.dimensions for dim in dimensions)
 
-    @property
-    def at(self):
-        class Getter:
-            def __getitem__(_, key) -> Spec:
-                if not isinstance(key, tuple):
-                    key = (key,)
-                return Spec(self.get(key))
+    def add_dimension(
+        self, dimension: str, path: Sequence = (), index: int = 0
+    ) -> "Spec":
+        """Add the dimension to the list of dimensions at the specified path and at the
+        specified index in the list.
 
-        return Getter()
+        >>> spec = Spec({"foo": {"baz": ["a", "b"]}, "bar": ["b"]})
+        >>> spec.add_dimension("c", ["foo", "baz"], 0)
+        Spec({'foo': {'baz': ['c', 'a', 'b']}, 'bar': ['b']})
+        >>> spec.add_dimension("c", ["foo", "baz"], 1)
+        Spec({'foo': {'baz': ['a', 'c', 'b']}, 'bar': ['b']})
+        >>> spec.add_dimension("c", ["bar"], 0)
+        Spec({'foo': {'baz': ['a', 'b']}, 'bar': ['c', 'b']})
+        """
+        current_dims = self.get(path)
+        current_dims = current_dims.tree if current_dims is not None else []
+        if not _is_spec_leaf(current_dims):
+            raise ValueError(
+                f"The provided path does not lead to a dimensions definition. \
+Dimensions must be a list of strings, but got {current_dims} at the path {path}."
+            )
+        new_dims = [*current_dims[:index], dimension, *current_dims[index:]]
+        return self.set(new_dims, path)
+
+    def replace(self, replacements: Tree) -> "Spec":
+        """Update the spec by replacing subtrees with corresponding subtrees in the
+        replacements tree.
+
+        * A value of None in the replacements tree removes the subtree at the
+          corresponding path.
+        * A leaf (list of dimensions, see Spec.is_leaf) in the replacements tree always
+          replaces the leaf (or subtree) at the corresponding path.
+        * Keys present in the replacements tree but not in the spec are added to the
+          spec at the corresponding path.
+
+        >>> spec = Spec({"foo": {"baz": ["a", "b"]}, "bar": ["b"]})
+
+        Replacing a path with None removes the subtree at that path:
+        >>> spec.replace({"foo": None})
+        Spec({'bar': ['b']})
+
+        Removing a subtree such that its parent becomes an empty collection also 
+        removes the parent:
+        >>> spec.replace({"foo": {"baz": None}})
+        Spec({'bar': ['b']})
+
+        Replacing an existing path with a list of dimensions overwrites the path:
+        >>> spec.replace({"foo": ["c"]})
+        Spec({'foo': ['c'], 'bar': ['b']})
+
+        Other than that, it is assumed that the ``replacements`` tree structure mirrors 
+        the spec structure:
+        >>> spec.replace({"foo": {"baz": ["c"]}})
+        Spec({'foo': {'baz': ['c']}, 'bar': ['b']})
+        """
+        state = self
+        for replacement in traverse(replacements, _is_spec_leaf):
+            if replacement.value is None:
+                state = state.remove_subtree(replacement.path)
+            elif replacement.is_leaf or state.get(replacement.path).is_leaf():
+                state = state.set(replacement.value, replacement.path)
+            else:
+                replacement_value = trees.filter(
+                    replacement.value,
+                    _is_spec_leaf,
+                    lambda tree: tree is not None,
+                )
+                state = state.update_subtree(
+                    # Current value takes presedence over replacement value in order to
+                    # preserve replace semantics.
+                    lambda current_value: trees.merge(
+                        replacement_value, current_value, "last"
+                    ),
+                    replacement.path,
+                )
+        return state.prune_empty_branches(_is_spec_leaf)
+
+    def update_leaves(self, f: Callable[[Sequence[str]], Sequence[str]]) -> "Spec":
+        """Update all lists of dimensions in the spec by applying the function ``f``.
+
+        >>> spec = Spec({"foo": ["a", "b"], "bar": ["c"]})
+        >>> spec.update_leaves(lambda dims: dims + ["new_dim"])
+        Spec({'foo': ['a', 'b', 'new_dim'], 'bar': ['c', 'new_dim']})
+        """
+        state = self
+        for leaf in leaves(self.tree, _is_spec_leaf):
+            state = state.set(f(leaf.value), leaf.path)
+        return state
 
     @overload
     def size(self, data: Tree) -> Dict[str, int]:
@@ -122,8 +227,8 @@ class Spec(TreeLens):
         """Get the size of dimensions (or a single dimension) in the data.
 
         >>> import numpy as np
-        >>> spec = Spec(signal=["transmits", "receivers"],
-        ...             receiver={"position": ["receivers"], "direction": []})
+        >>> spec = Spec({"signal": ["transmits", "receivers"],
+        ...              "receiver": {"position": ["receivers"], "direction": []}})
         >>> data = {"signal": np.random.randn(10, 20),
         ...         "receiver": {"position": np.random.randn(20, 3),
         ...                      "direction": np.random.randn(20, 3)}}
@@ -146,103 +251,31 @@ class Spec(TreeLens):
                 # just return the first one we find.
                 return trees.get(data, leaf.path).shape[leaf.value]
 
-    def add_dimension(self, dimension: str, path: tuple = (), index: int = 0) -> "Spec":
-        """TODO: Docs and tests"""
-        current_dims = self.get(path)
-        current_dims = current_dims if current_dims is not None else []
-        if not self.is_leaf(current_dims):
-            raise ValueError(
-                f"The provided path does not lead to a dimensions definition. \
-Dimensions must be a list of strings, but got {current_dims} at the path {path}."
-            )
-        new_dims = (
-            tuple(current_dims[:index]) + (dimension,) + tuple(current_dims[index:])
-        )
-        return self.set(new_dims, path)
-
-    def replace(self, replacements: Tree) -> "Spec":
-        """Update the spec by replacing subtrees with corresponding subtrees in the
-        replacements tree.
-
-        - A value of None in the replacements tree removes the subtree at the
-          corresponding path.
-        - A leaf (list of dimensions, see Spec.is_leaf) in the replacements tree always
-          replaces the leaf (or subtree) at the corresponding path.
-        - Keys present in the replacements tree but not in the spec are added to the
-          spec at the corresponding path.
-
-        >>> spec = Spec(signal=["transmits", "receivers"],
-        ...             receiver={"position": ["receivers"], "direction": []})
-        >>> spec.replace({"receiver": {"direction": None}})
-        Spec({'receiver': {'position': ['receivers']}, 'signal': ['transmits', \
-'receivers']})
-        >>> spec.replace({"receiver": {"direction": ["transmits"]}})
-        Spec({'receiver': {'direction': ['transmits'], 'position': ['receivers']}, \
-'signal': ['transmits', 'receivers']})
-        >>> spec.replace({"receiver": {"efficiency": ["receivers"]}})
-        Spec({'receiver': {'efficiency': ['receivers'], 'position': ['receivers'], \
-'direction': []}, 'signal': ['transmits', 'receivers']})
-        """
-        state = self
-        for replacement in traverse(replacements, self.is_leaf):
-            if replacement.value is None:
-                state = state.remove_subtree(replacement.path)
-            elif replacement.is_leaf:
-                state = state.set(replacement.value, replacement.path)
-            else:
-                replacement_value = trees.filter(
-                    replacement.value,
-                    self.is_leaf,
-                    lambda tree: tree is not None,
-                )
-                state = state.update_subtree(
-                    # Current value takes presedence over replacement value in order to
-                    # preserve replace semantics.
-                    lambda current_value: trees.merge(
-                        replacement_value, current_value, "last"
-                    ),
-                    replacement.path,
-                )
-        return state
-
-    def update_leaves(self, f: Callable[[Sequence[str]], Sequence[str]]) -> "Spec":
-        """
-
-        >>> spec = Spec(foo=["a", "b"], bar=["c"])
-        >>> spec.update_leaves(lambda dims: dims + ["new_dim"])
-        Spec({'foo': ['a', 'b', 'new_dim'], 'bar': ['c', 'new_dim']})
-        """
-        state = self
-        for leaf in leaves(self.tree, self.is_leaf):
-            state = state.set(f(leaf.value), leaf.path)
-        return state
-
-    def copy_with(self, new_tree: Tree) -> "Spec":
-        return Spec(new_tree)
-
     def __eq__(self, other) -> bool:
         """Return True if the specs are equal.
 
-        >>> spec = Spec(signal=["transmits", "receivers"])
-        >>> spec == Spec(signal=["transmits", "receivers"])
+        >>> spec = Spec({"signal": ["transmits", "receivers"]})
+        >>> spec == Spec({"signal": ["transmits", "receivers"]})
         True
-        >>> spec == Spec(signal=["frames", "transmits", "receivers"])
+        >>> spec == Spec({"signal": ["frames", "transmits", "receivers"]})
         False
-        >>> spec == Spec(signal=["transmits", "receivers"], foo=["bar"])
+        >>> spec == Spec({"signal": ["transmits", "receivers"], "foo": ["bar"]})
         False
-        >>> spec == Spec(foo=["bar"])
+        >>> spec == Spec({"foo": ["bar"]})
         False
         """
         if not isinstance(other, Spec):
             return False
         else:
-            for subtree in traverse(other.tree, self.is_leaf):
+            for subtree in traverse(other.tree, _is_spec_leaf):
                 if subtree.is_leaf:
                     if not self.has_subtree(subtree.path):
                         return False
                     if len(subtree.value) != len(self.get(subtree.path)):
                         return False
                     for d1, d2 in zip(subtree.value, self.get(subtree.path)):
+                        if isinstance(d2, Spec):
+                            d2 = d2.tree
                         if d1 != d2:
                             return False
                 else:
