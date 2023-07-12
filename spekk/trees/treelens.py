@@ -1,5 +1,5 @@
 from functools import reduce
-from typing import Any, Callable, Sequence, Tuple, TypeVar, Union
+from typing import Any, Callable, Optional, Sequence, Tuple, TypeVar, Union
 
 from spekk.trees.core import filter, remove, set, update, update_leaves
 from spekk.trees.registry import Tree, treedef
@@ -109,11 +109,13 @@ class TreeLens:
 
     def prune_empty_branches(
         self: Union[TSelf, Tree],
-        is_leaf: Callable[[Tree], bool],
+        is_leaf: Optional[Callable[[Tree], bool]] = None,
     ) -> Union[TSelf, Tree]:
         """Remove all empty subtrees.
 
         May be called as a static method where self is a Tree."""
+        if is_leaf is None:
+            is_leaf = self.is_leaf
         tree = self.tree if isinstance(self, TreeLens) else self
         not_empty = lambda tree: is_leaf(tree) or len(tree) > 0
         pruned_tree = filter(tree, is_leaf, not_empty)
