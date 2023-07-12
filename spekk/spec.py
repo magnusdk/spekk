@@ -1,5 +1,5 @@
 from functools import reduce
-from typing import Callable, Dict, Optional, Sequence, Set, Union, overload
+from typing import Dict, Optional, Sequence, Set, Union
 
 import spekk.trees.core as trees
 from spekk.trees import Tree, TreeLens, leaves, register_dispatch_fn, traverse, treedef
@@ -56,14 +56,24 @@ class Spec(TreeLens):
     over both the images and captions.
     """
 
-    def is_leaf(self) -> bool:
-        """This spec represents the dimensions of an array (i.e.: not a nested
-        data-structure of arrays).
+    def is_leaf(self, tree: Optional[Tree] = "_NOT_GIVEN") -> bool:
+        """Return True if this spec object represents the dimensions of an array
+        (i.e.: not a nested data-structure of arrays).
+
+        May optionally be called as a static method where ``self`` is a tree, or with
+        an explicitly given tree.
 
         See also:
             func:`._is_spec_leaf`).
         """
-        return _is_spec_leaf(self.tree)
+        if tree == "_NOT_GIVEN":  # `None` has a semantic meaning
+            if isinstance(self, Spec):
+                return _is_spec_leaf(self.tree)
+            else:
+                # is_leaf was called as a static method
+                return _is_spec_leaf(self)
+        else:
+            return _is_spec_leaf(tree)
 
     def remove_dimension(self, dimension: str, path: Sequence = ()) -> "Spec":
         """Remove the given dimension from everywhere in the spec.
@@ -74,7 +84,7 @@ class Spec(TreeLens):
         Spec({'signal': ['transmits'], 'receiver': {'position': [], 'direction': []}})
         """
         state = self.get(path)
-        for leaf in leaves(state.tree, _is_spec_leaf):
+        for leaf in leaves(state.tree, self.is_leaf):
             if dimension in leaf.value:
                 state = state.set([x for x in leaf.value if x != dimension], leaf.path)
         return state
@@ -89,8 +99,12 @@ class Spec(TreeLens):
         {'signal': 1, 'receiver': {'position': 0, 'direction': None}}
         """
         state = self.get(path).tree
-        for leaf in leaves(state, _is_spec_leaf):
-            index = leaf.value.index(dimension) if dimension in leaf.value else None
+        for leaf in leaves(state, self.is_leaf):
+            index = (
+                leaf.value.index(dimension)
+                if (leaf.value is not None and dimension in leaf.value)
+                else None
+            )
             state = trees.set(state, index, leaf.path)
         return state
 
@@ -106,7 +120,7 @@ class Spec(TreeLens):
         """
         return reduce(
             lambda dims, leaf: dims.union(leaf.value),
-            leaves(self.tree, _is_spec_leaf),
+            leaves(self.tree, self.is_leaf),
             set(),
         )
 
@@ -138,7 +152,7 @@ class Spec(TreeLens):
         """
         current_dims = self.get(path)
         current_dims = current_dims.tree if current_dims is not None else []
-        if not _is_spec_leaf(current_dims):
+        if not self.is_leaf(current_dims):
             raise ValueError(
                 f"The provided path does not lead to a dimensions definition. \
 Dimensions must be a list of strings, but got {current_dims} at the path {path}."
@@ -177,19 +191,22 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
         >>> spec.replace({"foo": {"baz": ["c"]}})
         Spec({'foo': {'baz': ['c']}, 'bar': ['b']})
         """
-        state = self
-        for replacement in traverse(replacements, _is_spec_leaf):
+        state = self.tree
+        for replacement in traverse(replacements, self.is_leaf):
             if replacement.value is None:
-                state = state.remove_subtree(replacement.path)
-            elif replacement.is_leaf or state.get(replacement.path).is_leaf():
-                state = state.set(replacement.value, replacement.path)
+                state = trees.remove(state, replacement.path)
+            elif replacement.is_leaf or self.is_leaf(
+                trees.get(state, replacement.path)
+            ):
+                state = trees.set(state, replacement.value, replacement.path)
             else:
                 replacement_value = trees.filter(
                     replacement.value,
-                    _is_spec_leaf,
+                    self.is_leaf,
                     lambda tree: tree is not None,
                 )
-                state = state.update_subtree(
+                state = trees.update(
+                    state,
                     # Current value takes presedence over replacement value in order to
                     # preserve replace semantics.
                     lambda current_value: trees.merge(
@@ -197,19 +214,7 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
                     ),
                     replacement.path,
                 )
-        return state.prune_empty_branches(_is_spec_leaf)
-
-    def update_leaves(self, f: Callable[[Sequence[str]], Sequence[str]]) -> "Spec":
-        """Update all lists of dimensions in the spec by applying the function ``f``.
-
-        >>> spec = Spec({"foo": ["a", "b"], "bar": ["c"]})
-        >>> spec.update_leaves(lambda dims: dims + ["new_dim"])
-        Spec({'foo': ['a', 'b', 'new_dim'], 'bar': ['c', 'new_dim']})
-        """
-        state = self
-        for leaf in leaves(self.tree, _is_spec_leaf):
-            state = state.set(f(leaf.value), leaf.path)
-        return state
+        return Spec(state).prune_empty_branches()
 
     def validate(self, data: Tree):
         """Validate that the data conforms to the spec, raising a
@@ -218,7 +223,7 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
         See also:
             :func:`~spekk.validation.validate`
         """
-        from spekk.validation import validate
+        from spekk.util.validation import validate
 
         validate(self, data)
 
@@ -254,6 +259,9 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
                 # just return the first one we find.
                 return trees.get(data, leaf.path).shape[leaf.value]
 
+    def __hash__(self):
+        return hash(self.tree)
+
     def __eq__(self, other) -> bool:
         """Return True if the specs are equal.
 
@@ -270,7 +278,7 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
         if not isinstance(other, Spec):
             return False
         else:
-            for subtree in traverse(other.tree, _is_spec_leaf):
+            for subtree in traverse(other.tree, self.is_leaf):
                 if subtree.is_leaf:
                     if not self.has_subtree(subtree.path):
                         return False
