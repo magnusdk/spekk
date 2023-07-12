@@ -1,7 +1,7 @@
 from functools import reduce
 from typing import Any, Callable, Sequence, Tuple, TypeVar, Union
 
-from spekk.trees.core import filter, remove, set, update
+from spekk.trees.core import filter, remove, set, update, update_leaves
 from spekk.trees.registry import Tree, treedef
 
 TSelf = TypeVar("TSelf", bound="TreeLens")
@@ -82,6 +82,10 @@ class TreeLens:
         TreeLens({'a': {'b': [1, 12, 3]}, 'd': [3]})
         """
         return self.copy_with(update(self.tree, f, path))
+
+    def update_leaves(self: TSelf, f: Callable, path: Sequence[Any] = ()) -> TSelf:
+        "See :func:`~spekk.trees.core.update_leaves`."
+        return self.copy_with(update_leaves(self.tree, self.is_leaf, f, path))
 
     def remove_subtree(self: TSelf, path: Sequence[Any]) -> TSelf:
         """Remove the value or subtree at the given path.
