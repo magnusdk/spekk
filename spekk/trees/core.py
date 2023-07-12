@@ -1,5 +1,6 @@
+import operator
 from dataclasses import dataclass
-from typing import Any, Callable, Generator
+from typing import Any, Callable, Generator, Sequence
 
 from spekk.trees.registry import Tree, treedef
 
@@ -180,6 +181,52 @@ def filter(
         if not predicate(t.value):
             state = remove(state, t.path)
     return state
+
+
+def update_leaves(
+    tree: Tree,
+    is_leaf: Callable[[Tree], bool],
+    f: Callable[[Sequence[str]], Sequence[str]],
+    path: tuple = (),
+) -> Tree:
+    """Apply ``f`` to all leaves in the tree.
+
+    >>> tree = {"foo": ["a", "b"], "bar": ["c"]}
+    >>> update_leaves(
+    ...     tree,
+    ...     lambda t: isinstance(t, list),
+    ...     lambda dims: dims + ["new_dim"])
+    {'foo': ['a', 'b', 'new_dim'], 'bar': ['c', 'new_dim']}
+    """
+    state = tree
+    for leaf in leaves(tree, is_leaf, path):
+        state = set(state, f(leaf.value), leaf.path)
+    return state
+
+
+def are_equal(
+    tree1: Tree,
+    tree2: Tree,
+    is_leaf: Callable[[Tree], bool],
+    leafs_are_equal: Callable[[Any, Any], bool] = operator.eq,
+    path: tuple = (),
+) -> bool:
+    for t in traverse(tree1, is_leaf, path):
+        # Check if the path exists in the other tree.
+        try:
+            other_value = get(tree2, t.path)
+        except KeyError:
+            return False
+        
+        if t.is_leaf:
+            if not leafs_are_equal(t.value, other_value):
+                return False
+        else:
+            treedef1 = treedef(t.value)
+            treedef2 = treedef(other_value)
+            if tuple(treedef1.keys()) != tuple(treedef2.keys()):
+                return False
+    return True
 
 
 if __name__ == "__main__":

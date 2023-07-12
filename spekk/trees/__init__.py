@@ -1,4 +1,13 @@
-from spekk.trees.core import get, leaves, remove, set, traverse, update
+from spekk.trees.core import (
+    are_equal,
+    get,
+    leaves,
+    remove,
+    set,
+    traverse,
+    update,
+    update_leaves,
+)
 from spekk.trees.registry import (
     Tree,
     TreeDef,
@@ -10,12 +19,14 @@ from spekk.trees.registry import (
 from spekk.trees.treelens import TreeLens
 
 __all__ = [
+    "are_equal",
     "get",
     "leaves",
     "remove",
     "set",
     "traverse",
     "update",
+    "update_leaves",
     "Tree",
     "TreeDef",
     "has_treedef",
