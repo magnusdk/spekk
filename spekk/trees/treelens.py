@@ -103,10 +103,19 @@ class TreeLens:
         except ValueError:
             return True
 
-    def prune_empty_branches(self: TSelf, is_leaf: Callable[[Tree], bool]) -> TSelf:
-        "Remove all empty subtrees."
+    def prune_empty_branches(
+        self: Union[TSelf, Tree],
+        is_leaf: Callable[[Tree], bool],
+    ) -> Union[TSelf, Tree]:
+        """Remove all empty subtrees.
+
+        May be called as a static method where self is a Tree."""
+        tree = self.tree if isinstance(self, TreeLens) else self
         not_empty = lambda tree: is_leaf(tree) or len(tree) > 0
-        return self.copy_with(filter(self.tree, is_leaf, not_empty))
+        pruned_tree = filter(tree, is_leaf, not_empty)
+        if isinstance(self, TreeLens):
+            pruned_tree = self.copy_with(pruned_tree)
+        return pruned_tree
 
     def copy_with(self: TSelf, tree: Tree) -> TSelf:
         return self.__class__(tree)
