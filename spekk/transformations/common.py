@@ -1,3 +1,5 @@
+"Some common utility functions used by :mod:`spekk.transformations`."
+
 from typing import Any, Sequence, Union
 
 import numpy as np
@@ -10,34 +12,38 @@ def compose(x, *wrapping_functions):
     """Apply each f in fs to x.
 
     Let's say we have some functions:
+
     >>> f = lambda x: x+1
     >>> g = lambda x: x*2
     >>> h = lambda x: x**2
 
-    We can use compose to apply each function in order:
-    >>> compose(1, f, g, h)
+    We can use :func:`compose` to apply each function in order:
+
+    >>> compose(1, f, g, h)  # ((1 + 1) * 2) ** 2 = 16
     16
 
     This would be the same as calling:
-    >>> h(g(f(1)))
+
+    >>> h(g(f(1)))  # ((1 + 1) * 2) ** 2 = 16
     16
 
-    In situations with a lot of nested function calls, compose may be more readable.
-    Also notice that when using compose, functions are evaluated in the order that they
-    are passed in (left-to-right), while with the nested function calls, the functions
-    are evaluated in the reverse order (right-to-left).
+    In situations with a lot of nested function calls, :func:`compose` may be more 
+    readable. Also notice that when using compose, functions are evaluated in the order 
+    that they are passed in (left-to-right), while with the nested function calls, the 
+    functions are evaluated in the reverse order (right-to-left).
 
-    Compose can also be used to build up a function from smaller function
+    :func:`compose` can also be used to build up a function from smaller function
     transformations:
 
-    >>> wrap_double = lambda f: (lambda x: 2*f(x))
+    >>> wrap_f_double = lambda f: (lambda x: 2*f(x))
+    >>> wrap_f_square = lambda f: (lambda x: f(x)**2)
     >>> f = compose(
     ...   lambda x: x+1,
-    ...   wrap_double,
-    ...   wrap_double,
+    ...   wrap_f_double,
+    ...   wrap_f_square,
     ... )
-    >>> f(1)
-    8
+    >>> f(1)  # ((1 + 1) * 2) ** 2 = 16
+    16
     """
     for wrap in wrapping_functions:
         x = wrap(x)
@@ -66,7 +72,7 @@ def getitem_along_axis(x, axis: int, i: int):
             return np.array(x).__getitem__(slice_)
         except Exception:
             raise ValueError(
-                f"Cannot get item at index {i} along axis {axis} of object with type {type(x)}"
+                f"Cannot get item at index {i} along axis {axis} for {x!r}"
             )
 
 
@@ -91,30 +97,6 @@ def map_1_flattened(
 
     kwargs = unflatten(args)
     return map_f(**kwargs)
-
-
-def shape(x) -> Sequence[int]:
-    """Get the shape of an array, number, or a nested sequence of numbers.
-
-    >>> shape(1.0)
-    ()
-    >>> shape([0, 1, 2])
-    (3,)
-    >>> shape([[0, 1, 2], [3, 4, 5]])
-    (2, 3)
-
-    >>> import numpy as np
-    >>> shape(np.ones((2, 3)))
-    (2, 3)
-    """
-    if isinstance(x, (int, float, complex)):
-        return ()
-    elif hasattr(x, "shape"):
-        return x.shape
-    elif hasattr(x, "__len__") and hasattr(x, "__getitem__"):
-        # Assume each item in x has the same shape.
-        return (len(x), *shape(x[0]))
-    raise ValueError(f"Cannot get shape of object with type {type(x)}")
 
 
 if __name__ == "__main__":

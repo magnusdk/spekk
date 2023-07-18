@@ -1,3 +1,5 @@
+"Slice data using a :class:`~spekk.spec.Spec`."
+
 from typing import Protocol, Sequence, Union
 
 from spekk.spec import Spec
@@ -38,30 +40,34 @@ def slice_data(
     data: Tree, spec: Spec, slice_definitions: Sequence[Union[str, IndicesT]]
 ):
     """Slice the data given a spec and a dict (kwargs) of slice definitions. The keys
-    of slice_definitions are the names of the dimensions to slice, and the values are
-    the indices to slice along that dimension. Returns the sliced data and the
+    of ``slice_definitions`` are the names of the dimensions to slice, and the values 
+    are the indices to slice along that dimension. Returns the sliced data and the
     (possibly modified) spec.
 
-    The data may have an arbitrary tree-like shape (nested dicts, lists, tuples, etc.),
-    but the leaves must support numpy indexing. The returned sliced data has the same
-    shape as the input data. The spec argument describes the shape of the data.
+    The data may have an arbitrary tree-like shape (nested ``dict``, `list`, `tuple`, 
+    etc.), but the leaves must support numpy indexing. The returned sliced data has the 
+    same shape as the input data. The spec argument describes the shape of the data.
 
-    If a indices for a dimension in slice_definitions is just an integer, said
+    If the indices for a dimension in ``slice_definitions`` is just an integer, said
     dimension is removed from the returned spec.
 
     >>> import numpy as np
     >>> data = {"foo": ({"bar": np.ones((4,5))},)}
     >>> spec = Spec({"foo": ({"bar": ["a", "b"]},)})
 
-    Getting the first item in the "a" dimension removes that dimension from the spec:
+    Getting the first item in the ``"a"`` dimension removes that dimension from the 
+    spec:
+
     >>> slice_data(data, spec, ("a", 0))
     {'foo': ({'bar': array([1., 1., 1., 1., 1.])},)}
 
     We can slice multiple dimensions at once:
+
     >>> slice_data(data, spec, ("a", 0, "b", slice(0, 3)))
     {'foo': ({'bar': array([1., 1., 1.])},)}
 
-    Here, both the "a" and "b" dimensions are removed from the spec:
+    Here, both the ``"a"`` and ``"b"`` dimensions are removed from the spec:
+
     >>> slice_data(data, spec, ("a", 0, "b", 0))
     {'foo': ({'bar': 1.0},)}
     """

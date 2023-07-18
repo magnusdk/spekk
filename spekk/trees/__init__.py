@@ -1,3 +1,5 @@
+"""Classes and functions for working with tree-like structures."""
+
 from spekk.trees.core import (
     are_equal,
     get,

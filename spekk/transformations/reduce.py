@@ -1,3 +1,11 @@
+""":class:`Reduce` transforms a function that works on scalar inputs such that it works 
+on arrays instead and iteratively reduces the values of a dimension. For example, 
+``Reduce.Sum("dimension")`` produces equivalent results as a ``ForAll("dimension")`` 
+followed by an ``Apply(np.sum, "dimension")`` transformation, but will potentially use 
+less memory because it sums the partial results iteratively isntead of trying to 
+parallelize over the dimension first (in the case of using GPU-backends such as JAX).
+"""
+
 import operator
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, Optional, TypeVar
@@ -13,33 +21,32 @@ T_reduce = Callable[[T_reduce_fn, Iterable, T_reduction_result], T_reduction_res
 
 @dataclass
 class Reduce(Transformation):
-    """Reduce the values of a dimension iteratively.
+    """Transform a function to make it reduce the values of a dimension iteratively.
 
-    A Reduce transformation is generally a ForAll and Apply transformation combined,
-    if the Apply transformation somehow aggregates the result (for example by summing
-    over the vectorized axis).
+    A :class:`Reduce` transformation is generally a :class:`ForAll` and :class:`Apply`
+    transformation combined, if the :class:`Apply` transformation somehow aggregates
+    the result (for example by summing over the vectorized axis).
 
     As a concrete example:
-    ForAll("transmits") followed by Apply(np.sum, Axis("transmits") is equivalent to
-    Reduce.Sum("transmits"), but using Reduce.Sum will likely allocate a lot less
-    memory, potentially at the cost of processing time.
-
-    Args:
-      dimension: The dimension to reduce over.
-      reduce_f: The function to reduce with. For example operator.add for summation.
-      initial_value: The initial value for the reduction. For example 0 for summation.
-      unroll: The number of iterations to unroll. Unrolling the loop may make it run
-        faster at the cost of compilation time.
+    ``ForAll("transmits")`` followed by ``Apply(np.sum, Axis("transmits")`` is
+    equivalent to ``Reduce.Sum("transmits")``, but using ``Reduce.Sum`` will likely
+    allocate a lot less memory, potentially at the cost of processing time.
     """
 
-    dimension: str
-    reduce_fn: T_reduce_fn
-    initial_value: Optional[T_reduction_result] = None
-    reduce_impl: Optional[T_reduce] = None
+    dimension: str  #: The dimension to reduce over.
+    reduce_fn: T_reduce_fn  #: The function to reduce with. For example operator.add for summation.
+    initial_value: Optional[
+        T_reduction_result
+    ] = None  #: The initial value for the reduction. For example 0 for summation.
+    reduce_impl: Optional[
+        T_reduce
+    ] = None  #: The ``reduce`` implementation to use. Defaults to Python's built-in :func:`functools.reduce`.
 
     def __post_init__(self):
         if self.reduce_impl is None:
-            raise ValueError("You must provide a reduce_impl.")
+            import functools
+
+            self.reduce_impl = functools.reduce
 
     def transform_function(
         self, to_be_transformed: callable, input_spec: Spec, output_spec: Spec
@@ -79,6 +86,8 @@ class Reduce(Transformation):
         initial_value: Optional[T_reduction_result] = None,
         reduce_impl: T_reduce = None,
     ) -> "Reduce":
+        """Transformation that iteratively adds the results of the wrapped function for 
+        each item in the given dimension."""
         return Reduce(dimension, operator.add, initial_value, reduce_impl)
 
     @staticmethod
@@ -87,6 +96,8 @@ class Reduce(Transformation):
         initial_value: Optional[T_reduction_result] = None,
         reduce_impl: T_reduce = None,
     ) -> "Reduce":
+        """Transformation that iteratively multiplies the results of the wrapped 
+        function for each item in the given dimension."""
         return Reduce(dimension, operator.mul, initial_value, reduce_impl)
 
 

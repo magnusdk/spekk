@@ -1,3 +1,5 @@
+":class:`TreeLens` is a functional interface to a tree-like data structure."
+
 from functools import reduce
 from typing import Any, Callable, Optional, Sequence, Tuple, TypeVar, Union
 
@@ -124,6 +126,7 @@ class TreeLens:
         return pruned_tree
 
     def copy_with(self: TSelf, tree: Tree) -> TSelf:
+        "Return a copy of this object with the given tree."
         return self.__class__(tree)
 
     def __repr__(self):

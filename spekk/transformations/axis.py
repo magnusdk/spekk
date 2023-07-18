@@ -1,3 +1,6 @@
+"""An :class:`Axis` references an axis of an array by its corresponding dimension name 
+in a spec."""
+
 from dataclasses import dataclass
 from functools import reduce
 from typing import Sequence, Tuple
@@ -11,28 +14,30 @@ from spekk.trees import Tree, has_treedef, leaves
 class Axis:
     """A placeholder for an array axis, given by the name of that axis (dimension).
 
-    In the context of a transformation, an Axis is a way to get the concrete axis-index
-    of an array, and also to specify what happens to that dimension in the
+    In the context of a transformation, an :class:`Axis` is a way to get the concrete 
+    axis-index of an array, and also to specify what happens to that dimension in the
     transformation.
 
     By default, the dimension is removed, which makes sense for common operations like
-    numpy.sum or numpy.mean. If you want to keep the dimension, set keep=True. If you
-    want to replace the dimension with something else, set becomes=(something, else).
+    :func:`numpy.sum` or :func:`numpy.mean`. If you want to keep the dimension, set 
+    ``keep=True``. If you want to replace the dimension with something else, set 
+    ``becomes=("something", "else")``.
     """
 
-    dimension: str
-    keep: bool = False
-    becomes: Tuple[str] = ()
+    dimension: str  #: The referenced dimension
+    keep: bool = False  #: Whether to keep the dimension in the spec after referencing it (default ``False``, i.e. the dimension is removed from the spec).
+    becomes: Tuple[str] = ()  #: If set, the dimension is replaced in the spec with the given dimensions.
 
     def new_dimensions(self, dimensions: Sequence[str]) -> Tuple[str]:
-        """Given a sequence of dimensions return the new dimensions after this Axis has
-        been parsed.
+        """Given a sequence of dimensions return the new dimensions after this 
+        :class:`Axis` has been parsed.
 
-        By default, the dimension is removed. If keep=True, the dimension is kept. If
-        becomes is set, the dimension is replaced with the dimensions defined by the
-        becomes field.
+        By default, the dimension is removed. If ``keep=True``, the dimension is kept. 
+        If ``becomes`` is set, the dimension is replaced with the dimensions defined by 
+        the ``becomes`` field.
 
         Examples:
+
         >>> old_dimensions = ("a", "b", "c")
         >>> Axis("b").new_dimensions(old_dimensions)
         ('a', 'c')
@@ -70,8 +75,8 @@ class AxisConcretizationError(ValueError):
 
 
 def concretize_axes(spec: Spec, args: Tree, kwargs: Tree) -> Tuple[list, dict]:
-    """Convert any instance of Axis in args and kwargs to the concrete axis index, as
-    defined by the spec.
+    """Convert any instance of :class:`Axis` in ``args`` and ``kwargs`` to the concrete 
+    axis index, as defined by the spec.
 
     >>> spec = Spec(["a", "b"])
     >>> args = (Axis("a"), Axis("b"))

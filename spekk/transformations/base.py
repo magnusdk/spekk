@@ -1,3 +1,5 @@
+"""The base classes and abstract classes for working with :class:`Transformation`s."""
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, Sequence, TypeVar, Union
@@ -22,10 +24,18 @@ class Buildable(ABC):
             transformed function.
     """
 
-    input_spec: Optional[Spec] = None
-    passed_spec: Optional[Spec] = None
-    returned_spec: Optional[Spec] = None
-    output_spec: Optional[Spec] = None
+    input_spec: Optional[
+        Spec
+    ] = None  #: The spec for the input kwargs for the function.
+    passed_spec: Optional[
+        Spec
+    ] = None  #: The spec for the input kwargs that are passed down into the wrapped function after the transformation has been applied.
+    returned_spec: Optional[
+        Spec
+    ] = None  #: The spec of the returned value from the wrapped function.
+    output_spec: Optional[
+        Spec
+    ] = None  #: The spec of the final returned value from the transformed function.
 
     @abstractmethod
     def build(self: TBuildableSelf, input_spec: Spec) -> TBuildableSelf:
@@ -125,8 +135,8 @@ forget to call build()?"
 
 @dataclass
 class TransformedFunction(Buildable):
-    wrapped_fn: Union[callable, "TransformedFunction"]
-    transformation: "Transformation"
+    wrapped_fn: Union[callable, "TransformedFunction"]  #: The original function that was wrapped by the transformation.
+    transformation: "Transformation"  #: The :class:`Transformation` that was applied to the wrapped function.
 
     def __call__(self, *args, **kwargs):
         try:
@@ -297,18 +307,22 @@ class PartialTransformation(Transformation):
     >>> from spekk.transformations import ForAll, compose
 
     Let's create an example kernel function along with some data and a spec:
+
     >>> kernel = lambda x: x**2
     >>> data = {"x": np.ones((2, 3)) * 2}
     >>> spec = Spec({"x": ["a", "b"]})
 
     Create a partial transformation by composing two transformations:
+
     >>> forall_xy = compose(ForAll("a"), ForAll("b"))
 
     Create and build two equivalent transformed functions:
+
     >>> tf_partial = compose(kernel, forall_xy).build(spec)
     >>> tf_full = compose(kernel, ForAll("a"), ForAll("b")).build(spec)
 
     The two transformed functions are equivalent:
+
     >>> np.array_equal(tf_partial(**data), tf_full(**data))
     True
     """
@@ -352,25 +366,25 @@ class PartialTransformation(Transformation):
 
 @dataclass
 class Specced(Buildable):
-    """A wrapper around f that has information about what happens to the spec when the
-    function is called."""
+    """A wrapper around ``f`` that has information about what happens to the spec when
+    the function is called."""
 
-    f: callable
-    transform_input_spec: Callable[[Spec], Spec] = identity
-    transform_output_spec: Callable[[Spec], Spec] = identity
+    f: callable  #: The function to wrap.
+    transform_spec: Callable[
+        [Spec], Spec
+    ]  #: A function that transforms the spec, returning the spec of the return-value of ``f``.
 
     def build(self, input_spec: Spec) -> "Specced":
-        new_obj = Specced(self.f, self.transform_input_spec, self.transform_output_spec)
+        new_obj = Specced(self.f, self.transform_spec)
         new_obj.input_spec = input_spec
-        new_obj.passed_spec = self.transform_input_spec(new_obj.input_spec)
-        new_obj.output_spec = self.transform_output_spec(new_obj.passed_spec)
+        new_obj.output_spec = self.transform_spec(input_spec)
         return new_obj
 
     def __call__(self, *args, **kwargs):
         return self.f(*args, **kwargs)
 
     def __hash__(self):
-        return hash((self.f, self.transform_input_spec, self.transform_output_spec))
+        return hash((self.f, self.transform_spec))
 
 
 if __name__ == "__main__":

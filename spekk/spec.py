@@ -1,3 +1,6 @@
+"""Module containing the :class:`Spec` class — the most important component of the 
+``spekk`` library."""
+
 from functools import reduce
 from typing import Dict, Optional, Sequence, Set, Union
 
@@ -35,10 +38,12 @@ class Spec(TreeLens):
     The tree of a Spec is a nested data-structure consisting of dictionaries and
     sequences, where the leaves are sequences of strings. An example of a Spec is as
     follows:
+
     >>> spec = Spec({"foo": ["a", "b"], "bar": ["b"]})
 
     The above ``spec`` describes a dictionary of arrays. As data, it could look
     something like this:
+
     >>> import numpy as np
     >>> data = {"foo": np.ones([2, 3]), "bar": np.ones([3])}
 
@@ -48,6 +53,7 @@ class Spec(TreeLens):
     array share the same name as the first dimension of the ``"bar"`` array, meaning
     that they are semantically the same dimension. This is better understood with a
     more concrete example:
+
     >>> spec = Spec({"image":   ["batch", "width", "height", "channels"],
     ...              "caption": ["batch", "tokens"]})
 
@@ -174,20 +180,24 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
         >>> spec = Spec({"foo": {"baz": ["a", "b"]}, "bar": ["b"]})
 
         Replacing a path with None removes the subtree at that path:
+
         >>> spec.replace({"foo": None})
         Spec({'bar': ['b']})
 
         Removing a subtree such that its parent becomes an empty collection also
         removes the parent:
+
         >>> spec.replace({"foo": {"baz": None}})
         Spec({'bar': ['b']})
 
         Replacing an existing path with a list of dimensions overwrites the path:
+
         >>> spec.replace({"foo": ["c"]})
         Spec({'foo': ['c'], 'bar': ['b']})
 
         Other than that, it is assumed that the ``replacements`` tree structure mirrors
         the spec structure:
+        
         >>> spec.replace({"foo": {"baz": ["c"]}})
         Spec({'foo': {'baz': ['c']}, 'bar': ['b']})
         """

@@ -1,3 +1,5 @@
+"Functions that operate on trees."
+
 import operator
 from dataclasses import dataclass
 from typing import Any, Callable, Generator, Sequence
@@ -60,6 +62,7 @@ def remove(tree: Tree, path: tuple):
     >>> remove(tree, ("c",))
     {'a': [1, {'b': 2}, 3], 'd': 5}
     """
+
     def remove_sub_tree(tree):
         td = treedef(tree)
         keys = [k for k in td.keys() if k != path[-1]]
@@ -84,6 +87,7 @@ def merge(t1: Tree, t2: Tree, preserve_order: int = "first") -> Tree:
 
     Merging two lists treats the indices as keys, and the second tree overwrites the
     indices of the first one.
+
     >>> merge([1, 2, 3], [4, 5])
     [4, 5, 3]
     """
@@ -106,10 +110,10 @@ def merge(t1: Tree, t2: Tree, preserve_order: int = "first") -> Tree:
 
 @dataclass
 class TraversalItem:
-    "An object returned from the traverse and leaves generator functions."
-    value: Any
-    path: tuple
-    is_leaf: bool
+    "An object returned from the :func:`traverse` and :func:`leaves` generator functions."
+    value: Any  #: The value of the node that was traversed onto.
+    path: tuple  #: The path to the node.
+    is_leaf: bool  #: Whether the node is a leaf or not.
 
 
 def traverse(
@@ -117,8 +121,8 @@ def traverse(
     is_leaf: Callable[[Tree], bool],
     path: tuple = (),
 ) -> Generator[TraversalItem, None, None]:
-    """Traverse a tree and yield all nodes (subtrees and leaves) as TraversalItem
-    objects. The traversal is depth-first, left-to-right.
+    """Traverse a tree and yield all nodes (subtrees and leaves) as 
+    :class:`TraversalItem` objects. The traversal is depth-first, left-to-right.
 
     >>> tree = {"a": [1, {"b": 2}, 3], "c": 4}
     >>> for item in traverse(tree, is_leaf=lambda x: isinstance(x, int)):
@@ -149,8 +153,8 @@ def leaves(
     is_leaf: Callable[[Tree], bool],
     path: tuple = (),
 ) -> Generator[TraversalItem, None, None]:
-    """Traverse a tree and yield all leaves as TraversalItem objects. The traversal is
-    depth-first, left-to-right.
+    """Traverse a tree and yield all leaves as :class:`TraversalItem` objects. The 
+    traversal is depth-first, left-to-right.
 
     >>> tree = {"a": [1, {"b": 2}, 3], "c": 4}
     >>> for item in leaves(tree, is_leaf=lambda x: isinstance(x, int)):
@@ -169,7 +173,7 @@ def filter(
     predicate: Callable[[Tree], bool],
     path: tuple = (),
 ) -> Tree:
-    """Remove all subtrees for which the predicate returns False.
+    """Remove all subtrees for which the predicate returns ``False``.
 
     >>> tree = {"a": [1, {"b": 2}, 3], "c": 4, "d": 5}
     >>> is_leaf = lambda x: isinstance(x, int)
@@ -211,13 +215,15 @@ def are_equal(
     leafs_are_equal: Callable[[Any, Any], bool] = operator.eq,
     path: tuple = (),
 ) -> bool:
+    """Return ``True`` if the two trees has the same structure and each leaf are equal
+    according to ``leafs_are_equal`` (defaults to ``==`` operator)."""
     for t in traverse(tree1, is_leaf, path):
         # Check if the path exists in the other tree.
         try:
             other_value = get(tree2, t.path)
         except KeyError:
             return False
-        
+
         if t.is_leaf:
             if not leafs_are_equal(t.value, other_value):
                 return False

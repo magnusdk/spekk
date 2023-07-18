@@ -1,7 +1,9 @@
+"Validate data according to a :class:`~spekk.spec.Spec`."
+
 from dataclasses import dataclass
 from typing import Generator, Sequence
 
-from spekk import trees
+from spekk import trees, util
 from spekk.spec import Spec
 
 
@@ -68,13 +70,12 @@ def _check_path_present_in_data(data, path):
 def _check_value_has_shape_attribute(value, path):
     """Return the shape of the value, raising a :class:`ValidationError` if it does not
     have a ``__spekk_shape__`` or ``shape`` attribute."""
-    if hasattr(value, "__spekk_shape__"):
-        return value.__spekk_shape__
-    if hasattr(value, "shape"):
-        return value.shape
-    raise ValidationError(
-        f"Value at path {list(path)} with type {type(value)} has no shape attribute."
-    )
+    try:
+        return util.shape(value)
+    except Exception as e:
+        raise ValidationError(
+            f"Unable to get the shape of value at path {list(path)} with type {type(value)}."
+        ) from e
 
 
 def _check_value_has_dimensions(spec, shape, path):
@@ -128,6 +129,7 @@ def validate(spec: Spec, data: trees.Tree):
 
     The following data is valid because ``"dim2"`` under path ``["foo", "bar"]`` has
     the same size as under path ``["baz"]`` and it has the same structure as the spec:
+
     >>> validate(spec, {
     ...     "foo": {"bar": np.ones((2, 3))},
     ...     "baz": np.ones((3,)),
@@ -135,6 +137,7 @@ def validate(spec: Spec, data: trees.Tree):
 
     If we try to validate against a spec with a path that is not present in the data, a
     :class:`ValidationError` is raised:
+
     >>> validate(spec, {
     ...     "foo": {"invalid_key": np.ones((2, 3))},
     ...     "baz": np.ones((3,)),
@@ -143,16 +146,19 @@ def validate(spec: Spec, data: trees.Tree):
         ...
     ValidationError: Path ['foo', 'bar'] is not present in the data yet it is present in the spec.
 
-    All specced values must have a ``shape`` (or ``__spekk_shape__``) attribute:
+    All specced values must have a ``shape`` attribute (or more generally; be supported
+    by :func:`spekk.util.shape.shape`):
+
     >>> validate(spec, {
     ...     "foo": {"bar": np.ones((2, 3))},
-    ...     "baz": [1, 2, 3],  # <- A list does not have a shape attribute
+    ...     "baz": object(),  # <- An object does not have a shape attribute
     ... })
     Traceback (most recent call last):
         ...
-    ValidationError: Value at path ['baz'] with type <class 'list'> has no shape attribute.
+    ValidationError: Unable to get the shape of value at path ['baz'] with type <class 'object'>.
 
     The data must have at least as many dimensions as the spec:
+
     >>> validate(
     ...     Spec({"foo": ["dim1", "dim2"]}),
     ...     {"foo": np.ones((2,))},  # <- Too few dimensions!
@@ -162,6 +168,7 @@ def validate(spec: Spec, data: trees.Tree):
     ValidationError: The data has only 1 dimension while the spec specifies dimensions ['dim1', 'dim2'] (2 in total) at the path ['foo'].
 
     It is OK if the data has more dimensions than the spec:
+
     >>> validate(
     ...     Spec({"foo": ["dim1", "dim2"]}),    # <- spec specifies 2 dimensions
     ...     {"foo": np.ones((2, 3, 4, 5, 6))},  # <- 5 dimensions is more than 2, which is OK!
@@ -169,6 +176,7 @@ def validate(spec: Spec, data: trees.Tree):
 
     The data must have the same size for a given dimension in all places where it is
     used:
+
     >>> validate(spec, {
     ...     "foo": {"bar": np.ones((2, 3))},
     ...     "baz": np.ones((4,)),  # <- Size of dim2 is 4 here, but 3 above!
@@ -184,7 +192,8 @@ def validate(spec: Spec, data: trees.Tree):
     ...     "baz": np.ones((3,)),  # <- This has the same size as the one above
     ... })
 
-    The spec may not specify the dimensions for all paths:
+    The spec does not have to specify the dimensions for all paths in the data:
+
     >>> validate(spec, {
     ...     "foo": {"bar": np.ones((2, 3))},
     ...     "baz": np.ones((3,)),

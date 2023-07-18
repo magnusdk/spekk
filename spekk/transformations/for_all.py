@@ -1,3 +1,6 @@
+""":class:`ForAll` transforms a function that works on scalar inputs such that it works 
+on arrays instead (vectorization), and can be used with :func:`jax.vmap`."""
+
 from dataclasses import dataclass
 from typing import Callable, Optional, Sequence
 
@@ -10,8 +13,14 @@ T_vmap = Callable[[callable, T_in_axes], callable]
 
 @dataclass
 class ForAll(Transformation):
-    dimension: str
-    vmap_impl: Optional[T_vmap] = None
+    """Vectorize/"make looped" a function such that it works on arrays instead of
+    scalars.
+    """
+
+    dimension: str  #: The dimension to vectorize/loop over.
+    vmap_impl: Optional[
+        T_vmap
+    ] = None  #: The ``vmap`` implementation to use. Defaults to a simple Python implementation, but can also (for example) be set to :func:`jax.vmap`.
 
     def transform_function(
         self, to_be_transformed: callable, input_spec: Spec, output_spec: Spec
@@ -41,9 +50,8 @@ def specced_vmap(
     dimension: str,
     vmap_impl: Optional[T_vmap] = None,
 ):
-    """Similar to vmap, but flattens/decomposes the kwargs to a list that is supported
-    by vmap. It also ensures that each input to the vmapped function (vmap(f, ...))
-    does not have any field that does not have the given dimension.
+    """Similar to ``vmap``, but flattens/decomposes the ``kwargs`` to a list that is
+    supported by ``vmap``.
     """
     if vmap_impl is None:
         vmap_impl = python_vmap
@@ -67,6 +75,8 @@ def specced_vmap(
 
 
 def python_vmap(f, in_axes):
+    """A simple Python implementation of JAX's :func:`jax.vmap` based on for-loops."""
+
     def wrapped(*args):
         sizes = [common.shape(arg)[a] for arg, a in zip(args, in_axes) if a is not None]
         size = sizes[0]

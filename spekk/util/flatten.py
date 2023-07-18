@@ -1,3 +1,9 @@
+""":func:`flatten` flattens a tree-like data structure into a list of tree-like data 
+structures given a dimension and a spec, such that each item in the list either does 
+not contain the dimension or it contains *ONLY* the dimension. In effect, we are 
+de-structuring the data structure such that it becomes possible to easily loop over the 
+dimension for arbitrary data structures."""
+
 from dataclasses import dataclass, field
 from typing import Any, Callable, List, Tuple, Union
 

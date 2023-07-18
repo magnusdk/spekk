@@ -1,3 +1,5 @@
+":class:`Apply` applies function ``f`` to the output of the wrapped function."
+
 from typing import Callable
 
 import spekk.transformations.common as common
@@ -7,6 +9,13 @@ from spekk.transformations.base import Transformation
 
 
 class Apply(Transformation):
+    """Transform a function such that ``f`` is applied to the output of it.
+    
+    Attributes:
+        f: The function to apply to the result of the wrapped function.
+        args: Optional extra positional arguments to pass to ``f``.
+        kwargs: Optional extra keyword arguments to pass to ``f``.
+    """
     def __init__(self, f: Callable, *args, **kwargs):
         self.f = f
         self.args = args

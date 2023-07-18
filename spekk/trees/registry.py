@@ -1,3 +1,6 @@
+"""Module for abstracting over tree-like data structures; in essence, everything that 
+is tree-like can be represented as a mapping of keys and values."""
+
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Mapping, Sequence, Union
 
@@ -5,7 +8,7 @@ Tree = Union[Mapping[Any, "Tree"], Sequence["Tree"], Any]
 
 
 class TreeDef(ABC):
-    """A TreeDef is an abstraction for a tree-like data structure.
+    """A :class:`TreeDef` is an abstraction for a tree-like data structure.
 
     We must be able to get the subtrees of the tree (keys and get) and create a copy
     with updated values (create). Anything that can support these operations can be used
@@ -42,7 +45,7 @@ class TreeDef(ABC):
         get_fn: Callable[[Tree, Any], Any],
         create_fn: Callable[[Sequence, Sequence], Tree],
     ) -> "TreeDef":
-        "Helper function for creating a new TreeDef class."
+        "Helper function for creating a new :class:`TreeDef` class."
 
         class _TreeDef(TreeDef):
             def keys(self) -> Sequence:
@@ -58,8 +61,9 @@ class TreeDef(ABC):
 
 
 class DuckTypedTreeDef(TreeDef):
-    """An object can be a TreeDef if it has the dunder-methods: 
-    __spekk_treedef_keys__, __spekk_treedef_get__, and __spekk_treedef_create__"""
+    """An object can be a :class:`TreeDef` if it has the dunder-methods: 
+    ``__spekk_treedef_keys__``, ``__spekk_treedef_get__``, and 
+    ``__spekk_treedef_create__``."""
     def __init__(self, obj: Any):
         if not (
             hasattr(obj, "__spekk_treedef_keys__")
@@ -86,21 +90,22 @@ type_registry = {}
 
 
 def dispatch_treedef(tree: Tree):
-    "If the tree itself is a TreeDef, return it."
+    "If the tree itself is a :class:`TreeDef`, return it."
     if isinstance(tree, TreeDef):
         return tree
 
 
 def dispatch_by_type(tree: Tree):
-    "Given a tree, return the TreeDef for its type (through the type_registry)."
+    """Given a tree, return the :class:`TreeDef` for its type (through the 
+    ``type_registry``)."""
     t = type(tree)
     if t in type_registry:
         return type_registry[type(tree)](tree)
 
 
 def dispatch_by_duck_type(tree: Tree):
-    """Given a tree, return a TreeDef if it has the required dunder-methods. See 
-    DuckTypedTreeDef for more details."""
+    """Given a tree, return a :class:`TreeDef` if it has the required dunder-methods. 
+    See :class:`DuckTypedTreeDef` for more details."""
     try:
         return DuckTypedTreeDef(tree)
     except ValueError:
@@ -113,22 +118,23 @@ dispatch_fn_registry = [dispatch_treedef, dispatch_by_type, dispatch_by_duck_typ
 
 
 def register_type(t: type, treedef: TreeDef):
-    "Register a new TreeDef by type."
+    "Register a new :class:`TreeDef` by type."
     type_registry[t] = treedef
 
 
 def register_dispatch_fn(dispatch_fn: Callable[[Tree], Union[TreeDef, None]]):
-    """Register a new TreeDef by dispatch function.
+    """Register a new :class:`TreeDef` by dispatch function.
 
     Multiple dispatch functions may be registered, in which case they will be tried in
-    order until one of them returns a TreeDef. Note that dispatch_by_type and
-    dispatch_treedef always comes first and takes precendence."""
+    order until one of them returns a :class:`TreeDef`. Note that 
+    :func:`dispatch_by_type` and :func:`dispatch_treedef` always comes first and takes 
+    precendence."""
     dispatch_fn_registry.append(dispatch_fn)
 
 
 def treedef(tree: Tree) -> TreeDef:
-    """Return the TreeDef (if registered) for the given tree. Dicts, lists, and tuples
-    are registered by default."""
+    """Return the :class:`TreeDef` (if registered) for the given tree (``dict``, 
+    ``list``, and ``tuple`` are registered by default)."""
     for dispatch_fn in dispatch_fn_registry:
         td = dispatch_fn(tree)
         if td:
@@ -139,7 +145,7 @@ def treedef(tree: Tree) -> TreeDef:
 
 
 def has_treedef(tree: Tree) -> bool:
-    """Return True if a TreeDef is registered for the given tree."""
+    """Return ``True`` if a :class:`TreeDef` is registered for the given tree."""
     try:
         treedef(tree)
         return True
