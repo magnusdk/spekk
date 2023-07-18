@@ -3,3 +3,5 @@
 **.egg-info
 .vscode
 .hypothesis
+docs/_build
+docs/_autosummary
