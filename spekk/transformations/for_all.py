@@ -78,7 +78,7 @@ def python_vmap(f, in_axes):
     """A simple Python implementation of JAX's :func:`jax.vmap` based on for-loops."""
 
     def wrapped(*args):
-        sizes = [common.shape(arg)[a] for arg, a in zip(args, in_axes) if a is not None]
+        sizes = [util.shape(arg)[a] for arg, a in zip(args, in_axes) if a is not None]
         size = sizes[0]
         results = []
         for i in range(size):

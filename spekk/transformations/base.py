@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Optional, Sequence, TypeVar, Union
 
 from spekk import Spec
-from spekk.transformations.common import get_fn_name, identity
+from spekk.transformations.common import get_fn_name
 
 TBuildableSelf = TypeVar("TBuildableSelf", bound="Buildable")
 
