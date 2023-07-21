@@ -1,5 +1,7 @@
 # spekk is a tool for working with named dimensions for arrays
-`spekk` lets you declare specifications of the shapes of your arrays. A common problem with array programming (i.e. working with libraries such as NumPy or JAX) is that an array can have many dimensions, and it can be easy to get them wrong. Additionally, some semantically equivalent dimensions may exist across different arrays, for example a `"batch"` dimension for a set of images and corresponding label tokens — each element in the `"batch"` dimension consist of one image and one label.
+`spekk` lets you declare specifications of the shapes of your arrays.
+
+A common problem with array programming (i.e. working with libraries such as NumPy or JAX) is that an array can have many dimensions, and it can be easy to get them wrong. Additionally, dimensions may be "shared" across different arrays, for example a `"batch"` dimension may exist both for a set of images and their corresponding label tokens — each element in the `"batch"` dimension consist of one image and one label. `spekk` attempts to solve this by providing a way to declare the dimensions of arrays using a class called `Spec`.
 
 `spekk` exists independently of the underlying arrays and can thus be used to specify the dimensions of both NumPy and JAX arrays (or anything else that has a `shape` property).
 
@@ -73,9 +75,9 @@ assert spec.index_for("particles") == {
 
 
 ## Building up more complex specced functions using function transformations
-`spekk` is quite verbose, but it also solves a problem: keeping track of the dimensions of arrays inside nested data structures. It gets more useful when used as a building block for describing what happens to the spec(s) of a function when it is transformed.
+`spekk` is quite verbose, but it gets more useful when used as a building block for describing what happens to data when it is passed as arguments to a function.
 
-Let's say we have a function that takes a point at position (`x`, `y`) and a scalar value `c` and returns the value of a circle or hyperbola at that point:
+Let's say we have a function that takes a point at position (`x`, `y`) and a scalar value `c` and returns the value of a circle and a hyperbola at that point:
 
 ```python
 def f(x, y, c):
@@ -86,18 +88,18 @@ def f(x, y, c):
     }
 ```
 
-We can spec this function by wrapping it in a `Specced` object. The `Specced` acts the same as the original function when called but it describes what happens to the `input_spec`, aka the spec of the arguments to the function, after calling it. In this case we assume (without actually checking) that all input arguments are scalars and we return a dictionary with two numbers, one for the circle value and one for the hyperbola function:
+We can spec this function by wrapping it in a `Specced` object. The `Specced` function acts the same as the original function when called, but it additionally describes what happens to the `input_spec` (aka the spec of the arguments to the function) after it has been called. In this case we assume (without actually checking) that all input arguments are scalars, and we return a dictionary with two numbers, one for the circle and one for the hyperbola:
 
 ```python
 from spekk.transformations import Specced
 
-specced_f = Specced(f, lambda input_spec: {"circle": (), "hyperbola": ()})
+specced_f = Specced(f, lambda input_spec: {"circle": (), "hyperbola": ()})  # An empty dimensions-sequence represent a 0-dimensional array, also called a scalar
 
 # The returned values are the same before and after speccing the function:
 assert f(x=1, y=2, c=3) == specced_f(x=1, y=2, c=3)
 ```
 
-But what if we want a function that takes a list of `x`-values and a list of `y`-values and evaluate `f` on all the points in the grid? It would be awesome if we could write it like this:
+But what if we want a function that takes a list of `x`-values and a list of `y`-values and evaluate `f` on all the points in the grid? It would be nice if we could write it like this:
 
 ```python
 from spekk.transformations import ForAll, compose
@@ -109,7 +111,7 @@ f_for_grid = compose(
 )
 ```
 
-This is actually valid `spekk` code. `compose` wraps each function in the previous step with a transformation, so starting with `specced_f`, `ForAll("y-values")` transforms it into a function that automatically runs it for all the `"y-values"` (defined by a spec as shown below). `ForAll("x-values")` then takes the result of the function transformation and transforms it again to run for all the `"x-values"`.
+This is valid `spekk` code. `compose` wraps each function in the previous step with a transformation, so starting with `specced_f`, `ForAll("y-values")` transforms it into a function that automatically runs it for all the `"y-values"` (defined by a spec as shown below). `ForAll("x-values")` then takes the result of the function transformation and transforms it again to run for all the `"x-values"`.
 
 Let's create some example data and define the corresponding spec:
 
@@ -132,7 +134,7 @@ f_for_grid = f_for_grid.build(spec)  # Now it knows how to loop over the data :)
 
 # We can call it now with the lists of x- and y-values:
 result = f_for_grid(x=x, y=y, c=c)
-# result is a dictionary with keys "circle" and "hyperbola", each value is a 2D array 
+# result is a dictionary with keys "circle" and "hyperbola", each value is a 2D list 
 # with shape (20, 30), corresponding to the output_spec:
 assert f_for_grid.output_spec == Spec({
     "circle":    ["x-values", "y-values"],
@@ -146,11 +148,11 @@ We can further transform the function over arbitrary dimensions, as long as we a
 f_for_all_xyc = compose(
     f_for_grid,
     ForAll("c-values"),
-).build(spec.replace({"c": ["c-values"]}))  # <- Update the spec to include the "c" dimension
+).build(spec.replace({"c": ["c-values"]}))  # <- Update the spec to include the "c-values" dimension for the c argument.
 
 # We can now call it with multiple values for "c" as well:
 result = f_for_grid(x=x, y=y, c=np.arange(0, 6))  # <- 6 values for "c"
-# result is a dictionary with keys "circle" and "hyperbola", each value is a 2D array 
+# result is a dictionary with keys "circle" and "hyperbola", each value is a 2D list 
 # with shape (20, 30), corresponding to the output_spec:
 assert f_for_all_xyc.output_spec == Spec({
     "circle":    ["c-values", "x-values", "y-values"],
