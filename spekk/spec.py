@@ -197,7 +197,7 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
 
         Other than that, it is assumed that the ``replacements`` tree structure mirrors
         the spec structure:
-        
+
         >>> spec.replace({"foo": {"baz": ["c"]}})
         Spec({'foo': {'baz': ['c']}, 'bar': ['b']})
         """
@@ -257,6 +257,8 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
         >>> spec.size(data, "receivers")
         20
         """
+        from spekk import util
+
         if dimension is None:
             return {dim: self.size(data, dim) for dim in self.dimensions}
         if not self.has_dimension(dimension):
@@ -267,7 +269,7 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
             if leaf.value is not None:
                 # Assume that all data with the same dimension has the same size, so we
                 # just return the first one we find.
-                return trees.get(data, leaf.path).shape[leaf.value]
+                return util.shape(trees.get(data, leaf.path))[leaf.value]
 
     def __hash__(self):
         return hash(self.tree)
