@@ -6,6 +6,12 @@ A common problem with array programming (i.e. working with libraries such as Num
 `spekk` exists independently of the underlying arrays and can thus be used to specify the dimensions of both NumPy and JAX arrays (or anything else that has a `shape` property).
 
 
+# Installation
+```bash
+python3 -m pip install spekk
+```
+
+
 # How does it work
 Anything that can be represented as a (nested) tree of arrays _(see `spekk.trees.registry.TreeDef`)_ can be specced. This means that we can easily spec custom classes, dictionaries, or the arguments to a function:
 
