@@ -135,7 +135,9 @@ forget to call build()?"
 
 @dataclass
 class TransformedFunction(Buildable):
-    wrapped_fn: Union[callable, "TransformedFunction"]  #: The original function that was wrapped by the transformation.
+    wrapped_fn: Union[
+        callable, "TransformedFunction"
+    ]  #: The original function that was wrapped by the transformation.
     transformation: "Transformation"  #: The :class:`Transformation` that was applied to the wrapped function.
 
     def __call__(self, *args, **kwargs):
@@ -375,9 +377,13 @@ class Specced(Buildable):
     ]  #: A function that transforms the spec, returning the spec of the return-value of ``f``.
 
     def build(self, input_spec: Spec) -> "Specced":
+        output_spec = self.transform_spec(input_spec)
+        if not isinstance(output_spec, Spec):
+            output_spec = Spec(output_spec)
+
         new_obj = Specced(self.f, self.transform_spec)
         new_obj.input_spec = input_spec
-        new_obj.output_spec = self.transform_spec(input_spec)
+        new_obj.output_spec = output_spec
         return new_obj
 
     def __call__(self, *args, **kwargs):
