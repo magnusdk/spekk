@@ -19,10 +19,11 @@ def shape(x) -> Sequence[int]:
         return ()
     elif hasattr(x, "shape"):
         return x.shape
-    elif hasattr(x, "__len__") and hasattr(x, "__getitem__"):
+    elif isinstance(x, (list, tuple)):
         # Assume each item in x has the same shape.
         return (len(x), *shape(x[0]))
     raise ValueError(f"Cannot get shape of object with type {type(x)}")
+
 
 if __name__ == "__main__":
     import doctest
