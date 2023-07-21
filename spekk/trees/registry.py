@@ -58,6 +58,9 @@ class TreeDef(ABC):
                 return create_fn(keys, values)
 
         return _TreeDef
+    
+    def items(self):
+        return zip(self.keys(), self.values())
 
 
 class DuckTypedTreeDef(TreeDef):
