@@ -38,7 +38,7 @@ class ForAll(Transformation):
 
     def transform_output_spec(self, spec: Spec) -> Spec:
         # We re-add the dimension after the function has been applied to each element.
-        return spec.add_dimension(self.dimension)
+        return spec.update_leaves(lambda dimensions: [self.dimension, *dimensions])
 
     def __repr__(self) -> str:
         return f'ForAll("{self.dimension}")'
