@@ -27,9 +27,9 @@ def compose(x, *wrapping_functions):
     >>> h(g(f(1)))  # ((1 + 1) * 2) ** 2 = 16
     16
 
-    In situations with a lot of nested function calls, :func:`compose` may be more 
-    readable. Also notice that when using compose, functions are evaluated in the order 
-    that they are passed in (left-to-right), while with the nested function calls, the 
+    In situations with a lot of nested function calls, :func:`compose` may be more
+    readable. Also notice that when using compose, functions are evaluated in the order
+    that they are passed in (left-to-right), while with the nested function calls, the
     functions are evaluated in the reverse order (right-to-left).
 
     :func:`compose` can also be used to build up a function from smaller function
@@ -74,6 +74,15 @@ def getitem_along_axis(x, axis: int, i: int):
             raise ValueError(
                 f"Cannot get item at index {i} along axis {axis} for {x!r}"
             )
+
+
+def get_args_for_index(
+    args: Sequence, in_axes: Sequence[Union[int, None]], i: int
+) -> Sequence:
+    return [
+        common.getitem_along_axis(arg, a, i) if a is not None else arg
+        for arg, a in zip(args, in_axes)
+    ]
 
 
 def map_1_flattened(
