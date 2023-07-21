@@ -1,22 +1,24 @@
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+build-backend = "hatchling.build"
+requires = ["hatchling"]
 
 [project]
-name = "spekk"
-version = "1.0.1"
 authors = [
-  { name="Magnus Dalen Kvalevåg", email="magnus.kvalevag@ntnu.no" },
+  {name = "Magnus Dalen Kvalevåg", email = "magnus.kvalevag@ntnu.no"},
 ]
-description = "General speccing library"
-readme = "README.md"
-requires-python = ">=3.7"
 classifiers = [
   "Programming Language :: Python :: 3",
   "License :: OSI Approved :: Apache Software License",
   "Operating System :: OS Independent",
 ]
+dependencies = ["numpy"]
+description = "Named dimensions of nested arrays, independent of array implementation (Numpy, JAX, etc)"
+name = "spekk"
+readme = "README.md"
+requires-python = ">=3.9"
+version = "1.0.1"
 
 [project.urls]
-"Homepage" = "https://github.com/magnusdk/spekk"
+"Homepage" = "https://github.com/magnusdk/spekk/"
+"Documentation" = "https://spekk.readthedocs.io/en/latest/"
 "Bug Tracker" = "https://github.com/magnusdk/spekk/issues"
