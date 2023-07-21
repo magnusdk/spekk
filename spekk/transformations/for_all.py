@@ -4,7 +4,7 @@ on arrays instead (vectorization), and can be used with :func:`jax.vmap`."""
 from dataclasses import dataclass
 from typing import Callable, Optional, Sequence
 
-from spekk import Spec, util
+from spekk import Spec, trees, util
 from spekk.transformations import Transformation, common
 
 T_in_axes = Sequence[Optional[int]]
@@ -80,13 +80,26 @@ def python_vmap(f, in_axes):
     def wrapped(*args):
         sizes = [util.shape(arg)[a] for arg, a in zip(args, in_axes) if a is not None]
         size = sizes[0]
-        results = []
-        for i in range(size):
-            args_i = [
-                common.getitem_along_axis(arg, a, i) if a is not None else arg
-                for arg, a in zip(args, in_axes)
-            ]
-            results.append(f(*args_i))
-        return results
+        if not all(s == size for s in sizes):
+            raise ValueError(
+                f"Cannot apply python_vmap to arguments with different sizes over the \
+in_axes: {sizes=}, {in_axes=}"
+            )
+
+        # The result for each item in the dimension.
+        all_results = [
+            f(*common.get_args_for_index(args, in_axes, i)) for i in range(size)
+        ]
+        result0 = all_results[0]
+
+        # Combine the results such that the returned object has the same shape as each
+        # individual result.
+        combined_result = result0
+        for leaf in trees.leaves(
+            result0, lambda x: isinstance(x, list) or not trees.has_treedef(x)
+        ):
+            values = [trees.get(_result, leaf.path) for _result in all_results]
+            combined_result = trees.set(combined_result, values, leaf.path)
+        return combined_result
 
     return wrapped
