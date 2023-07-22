@@ -1,4 +1,4 @@
-"""The base classes and abstract classes for working with :class:`Transformation`s."""
+"""The base classes and abstract classes for working with :class:`Transformation`."""
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -213,7 +213,7 @@ class TransformedFunction(Buildable):
             raise TransformedFunctionError(e, self, self) from e
 
     def traverse(self, *, depth_first: bool = False):
-        """Recursively yield the potentially nested :class:`TransformedFunction`s.
+        """Recursively yield the potentially nested :class:`TransformedFunction`.
 
         >>> from spekk.transformations import ForAll, compose, TransformedFunction
         >>> tf = compose(abs, ForAll("x"), ForAll("y"))
@@ -301,7 +301,7 @@ class Transformation(ABC):
 class PartialTransformation(Transformation):
     """A partially applied transformation.
 
-    :class:`PartialTransformation`s lets us compose transformations such that they can
+    :class:`PartialTransformation` lets us compose transformations such that they can
     be re-used as building blocks. For example, in the below code, ``tf_partial`` and
     ``tf_full`` are equivalent:
 

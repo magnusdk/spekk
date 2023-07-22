@@ -1,3 +1,5 @@
+"Generalized :func:`np.shape` that works on nested Python sequences."
+
 from typing import Sequence
 
 

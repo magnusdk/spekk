@@ -44,9 +44,10 @@ def slice_data(
     are the indices to slice along that dimension. Returns the sliced data and the
     (possibly modified) spec.
 
-    The data may have an arbitrary tree-like shape (nested ``dict``, `list`, `tuple`, 
-    etc.), but the leaves must support numpy indexing. The returned sliced data has the 
-    same shape as the input data. The spec argument describes the shape of the data.
+    The data may have an arbitrary tree-like shape (nested ``dict``, ``list``, 
+    ``tuple``, etc.), but the leaves must support numpy indexing. The returned sliced 
+    data has the same shape as the input data. The spec argument describes the shape of 
+    the data.
 
     If the indices for a dimension in ``slice_definitions`` is just an integer, said
     dimension is removed from the returned spec.

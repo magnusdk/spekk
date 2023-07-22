@@ -20,7 +20,7 @@ class Wrap(Transformation):
         >>> wrapped_fn1 = Wrap(jax.jit)(my_fn)
         >>> wrapped_fn2 = jax.jit(my_fn)
 
-        wrapped_fn1 and wrapped_fn2 are equivalent, but wrapped_fn1 will propagate 
+        `wrapped_fn1` and `wrapped_fn2` are equivalent, but `wrapped_fn1` will propagate 
         information about the spec (if applicable) to nested :class:`Transformation`.
     """
     def __init__(self, f: callable, *args, **kwargs):
