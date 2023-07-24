@@ -1,4 +1,6 @@
 # spekk is a tool for working with named dimensions for arrays
+![spekk logo](docs/_static/spekk_logo.png)
+
 `spekk` lets you declare specifications of the shapes of your arrays.
 
 A common problem with multidimensional arrays is that it can be hard to keep track of the dimensions of the data over time. Additionally, dimensions may be "shared" across different arrays. For example, two different arguments to a function may share a dimension, like the positions of receiving elements in an ultrasound array and their corresponding recorded signals.
@@ -38,8 +40,10 @@ python3 -m pip install spekk
 import numpy as np
 from spekk import Spec
 
-data = np.ones([4, 5, 6])  # A 3D array with shape (2, 3, 4)
-spec = Spec(["transmits", "receivers", "samples"])  # <- The names of the dimensions
+data = np.ones([4, 5, 6])  # A 3D array with shape [4, 5, 6].
+spec = Spec(["transmits", "receivers", "samples"])  # <- The names of the dimensions, 
+                                                    #    each name corresponding to an 
+                                                    #    axis in the array ([4, 5, 6]).
 ```
 
 It also lets you specify the dimensions of nested data structures of arrays:
@@ -86,7 +90,7 @@ assert f(x=1, y=2, c=3) == specced_f(x=1, y=2, c=3)
 assert specced_f.output_spec == Spec({"circle": [], "hyperbola": ["axes"]})
 ```
 
-You can spec what happens to the spec of a function when you transform the function, for example when transforming it to loop over the arguments:
+You can describe what happens to the spec of a function when you transform the function, for example when transforming it to loop over the arguments:
 
 ```python
 from spekk.transformations import ForAll, compose
@@ -117,10 +121,11 @@ You may use more powerful frameworks when transforming functions using `ForAll`:
 from functools import partial
 import jax
 
+# Use JAX's vmap to vectorize the function in order to run in parallel on GPUs:
 ForAll_jax = partial(ForAll, vmap_impl=jax.vmap)
 ```
 
-In many cases, Numpy broadcasting will be enough to get the desired result when working with multidimensional data. However, broadcasting can sometimes be difficult or inefficient to get right, and it can be hard to keep track of the dimensions of the arrays over time. `ForAll` makes it easier to write code that loops over arbitrary dimensions and — if used in conjunction with for example JAX and `jax.vmap` — it can be very efficient as well.
+In most cases, Numpy broadcasting will be enough to get the desired result when working with multidimensional data. However, broadcasting can sometimes be difficult or inefficient to get right, and it can be hard to keep track of the dimensions of the arrays over time. `ForAll` makes it easier to write code that loops over arbitrary dimensions and — if used in conjunction with for example JAX and `jax.vmap` — it can be very efficient as well.
 
 [Read the documentation](https://spekk.readthedocs.io/) for more details.
 
