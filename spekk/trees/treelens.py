@@ -3,7 +3,7 @@
 from functools import reduce
 from typing import Any, Callable, Optional, Sequence, Tuple, TypeVar, Union
 
-from spekk.trees.core import filter, remove, set, update, update_leaves
+from spekk.trees.core import filter, remove, set, traverse, update, update_leaves
 from spekk.trees.registry import Tree, treedef
 
 TSelf = TypeVar("TSelf", bound="TreeLens")
@@ -17,6 +17,10 @@ class TreeLens:
     """
 
     def __init__(self, tree: Tree = ()):
+        # Ensure that there are no nested TreeLens objects:
+        for t in traverse(tree, self.is_leaf):
+            if isinstance(t.value, TreeLens):
+                tree = set(tree, t.value.tree, t.path)
         self.tree = tree
 
     def __getitem__(self: TSelf, path: Union[Any, Tuple[Any]]) -> TSelf:
