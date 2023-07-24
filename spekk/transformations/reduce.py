@@ -13,6 +13,7 @@ from typing import Any, Callable, Iterable, Optional, TypeVar
 from spekk import Spec, util
 from spekk.transformations import Transformation, common
 
+T_reduce_cls = TypeVar("T_reduce_cls", bound="Reduce")
 T_f_result = TypeVar("T_f_result")
 T_reduction_result = TypeVar("T_reduction_result")
 T_reduce_fn = Callable[[T_reduction_result, T_f_result], T_reduction_result]
@@ -43,10 +44,7 @@ class Reduce(Transformation):
     ] = None  #: The ``reduce`` implementation to use. Defaults to Python's built-in :func:`functools.reduce`.
 
     def __post_init__(self):
-        if self.reduce_impl is None:
-            import functools
-
-            self.reduce_impl = functools.reduce
+        "Sub-classes may override this method to perform additional initialization."
 
     def transform_function(
         self, to_be_transformed: callable, input_spec: Spec, output_spec: Spec
@@ -78,27 +76,34 @@ class Reduce(Transformation):
         return spec
 
     def __repr__(self) -> str:
-        return f'Reduce("{self.dimension}", {self.reduce_fn}, {self.initial_value})'
+        return (
+            f"{self.__class__.__name__}("
+            + f'"{self.dimension}", '
+            + f"{self.reduce_fn}, "
+            + f"{self.initial_value})"
+        )
 
-    @staticmethod
+    @classmethod
     def Sum(
+        cls: T_reduce_cls,
         dimension: str,
         initial_value: Optional[T_reduction_result] = None,
         reduce_impl: T_reduce = None,
-    ) -> "Reduce":
-        """Transformation that iteratively adds the results of the wrapped function for 
+    ) -> T_reduce_cls:
+        """Transformation that iteratively adds the results of the wrapped function for
         each item in the given dimension."""
-        return Reduce(dimension, operator.add, initial_value, reduce_impl)
+        return cls(dimension, operator.add, initial_value, reduce_impl)
 
-    @staticmethod
+    @classmethod
     def Product(
+        cls: T_reduce_cls,
         dimension: str,
         initial_value: Optional[T_reduction_result] = None,
         reduce_impl: T_reduce = None,
-    ) -> "Reduce":
-        """Transformation that iteratively multiplies the results of the wrapped 
+    ) -> T_reduce_cls:
+        """Transformation that iteratively multiplies the results of the wrapped
         function for each item in the given dimension."""
-        return Reduce(dimension, operator.mul, initial_value, reduce_impl)
+        return cls(dimension, operator.mul, initial_value, reduce_impl)
 
 
 def specced_map_reduce(

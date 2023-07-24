@@ -22,6 +22,9 @@ class ForAll(Transformation):
         T_vmap
     ] = None  #: The ``vmap`` implementation to use. Defaults to a simple Python implementation, but can also (for example) be set to :func:`jax.vmap`.
 
+    def __post_init__(self):
+        "Sub-classes may override this method to perform additional initialization."
+
     def transform_function(
         self, to_be_transformed: callable, input_spec: Spec, output_spec: Spec
     ) -> callable:
