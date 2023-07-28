@@ -129,6 +129,9 @@ class TreeLens:
             pruned_tree = self.copy_with(pruned_tree)
         return pruned_tree
 
+    def __iter__(self):
+        return iter([self.copy_with(t) for t in self.tree])
+
     def copy_with(self: TSelf, tree: Tree) -> TSelf:
         "Return a copy of this object with the given tree."
         return self.__class__(tree)
