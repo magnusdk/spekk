@@ -22,6 +22,18 @@ class ForAll(Transformation):
         T_vmap
     ] = None  #: The ``vmap`` implementation to use. Defaults to a simple Python implementation, but can also (for example) be set to :func:`jax.vmap`.
 
+    def __new__(cls, *args, **kwargs):
+        # Syntactic sugar for defining multiple ForAll transformations at once:
+        # `ForAll(["a", "b", "c"])` is the same as
+        # `compose(ForAll("a"), ForAll("b"), ForAll("c"))`
+        # This means that the constructor of ForAll may return a PartialTransformation 
+        # of ForAll-transformations
+        dimension = kwargs.get("dimension", args[0])
+        if isinstance(dimension, (list, tuple)):
+            return common.compose(*[ForAll(d) for d in dimension])
+        else:
+            return super().__new__(cls)
+
     def __post_init__(self):
         "Sub-classes may override this method to perform additional initialization."
 
