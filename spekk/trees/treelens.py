@@ -55,7 +55,7 @@ class TreeLens:
         """
         tree = self.tree
         for k in path:
-            if k not in tree:
+            if k not in treedef(tree).keys():
                 return self.copy_with(None)  # Return with None tree
             tree = tree[k]
         return self.copy_with(tree)
@@ -71,7 +71,7 @@ class TreeLens:
         """
         tree = self.tree
         for k in path:
-            if k in tree:
+            if k in treedef(tree).keys():
                 tree = tree[k]
             else:
                 return False
