@@ -263,7 +263,9 @@ class Transformation(ABC):
 
     def __call__(self, wrapped_fn: callable) -> TransformedFunction:
         "Transform the wrapped function."
-        if isinstance(wrapped_fn, Transformation):
+        if isinstance(wrapped_fn, PartialTransformation):
+            return PartialTransformation([*wrapped_fn.partial_transformations, self])
+        elif isinstance(wrapped_fn, Transformation):
             # Handle partial application of transformations.
             return PartialTransformation([wrapped_fn, self])
         return TransformedFunction(wrapped_fn, self)
