@@ -81,15 +81,30 @@ class Spec(TreeLens):
         else:
             return _is_spec_leaf(tree)
 
-    def remove_dimension(self, dimension: str, path: Sequence = ()) -> "Spec":
+    def remove_dimension(
+        self,
+        dimension: Union[str, Sequence[str]],
+        path: Sequence = (),
+    ) -> "Spec":
         """Remove the given dimension from everywhere in the spec.
 
         >>> spec = Spec({"signal": ["transmits", "receivers"],
         ...              "receiver": {"position": ["receivers"], "direction": []}})
         >>> spec.remove_dimension("receivers")
         Spec({'signal': ['transmits'], 'receiver': {'position': [], 'direction': []}})
+
+        You can also remove multiple dimensions at once:
+
+        >>> spec.remove_dimension(["transmits", "receivers"])
+        Spec({'signal': [], 'receiver': {'position': [], 'direction': []}})
         """
         state = self.get(path)
+
+        if isinstance(dimension, (list, tuple)):
+            for dim in dimension:
+                state = state.remove_dimension(dim, path)
+            return state
+
         for leaf in leaves(state.tree, self.is_leaf):
             if dimension in leaf.value:
                 state = state.set([x for x in leaf.value if x != dimension], leaf.path)
