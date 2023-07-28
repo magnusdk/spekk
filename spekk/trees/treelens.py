@@ -1,6 +1,5 @@
 ":class:`TreeLens` is a functional interface to a tree-like data structure."
 
-from functools import reduce
 from typing import Any, Callable, Optional, Sequence, Tuple, TypeVar, Union
 
 from spekk.trees.core import filter, remove, set, traverse, update, update_leaves
@@ -54,7 +53,12 @@ class TreeLens:
         >>> tree.get(["a", "b", 1])
         TreeLens(2)
         """
-        return self.copy_with(reduce(lambda tree, k: tree[k], path, self.tree))
+        tree = self.tree
+        for k in path:
+            if k not in tree:
+                return self.copy_with(None)  # Return with None tree
+            tree = tree[k]
+        return self.copy_with(tree)
 
     def has_subtree(self, path: Sequence[Any]) -> bool:
         """Return True if the given path exists in the tree.
@@ -65,11 +69,13 @@ class TreeLens:
         >>> tree.has_subtree(["a", "c"])
         False
         """
-        try:
-            self.get(path)
-            return True
-        except (KeyError, TypeError):
-            return False
+        tree = self.tree
+        for k in path:
+            if k in tree:
+                tree = tree[k]
+            else:
+                return False
+        return True
 
     def set(self: TSelf, value: Any, path: Sequence[Any]) -> TSelf:
         """Set the value or subtree at the given path.
