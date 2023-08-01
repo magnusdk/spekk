@@ -6,6 +6,8 @@ from typing import Any, Callable, Generator, Sequence
 
 from spekk.trees.registry import Tree, treedef
 
+_NO_DEFAULT = object()
+
 
 def update(tree: Tree, f: Callable[[Tree], Tree], path: tuple):
     """Update the subtree at the given path.
@@ -26,7 +28,7 @@ def update(tree: Tree, f: Callable[[Tree], Tree], path: tuple):
     return td.create(td.keys(), values)
 
 
-def get(tree: Tree, path: tuple):
+def get(tree: Tree, path: tuple, default: Any = _NO_DEFAULT):
     """Get the subtree at the given path.
 
     >>> tree = {"a": [1, {"b": 2}, 3], "c": 4}
@@ -38,6 +40,9 @@ def get(tree: Tree, path: tuple):
 
     key, *remaining_path = path
     td = treedef(tree)
+    if default is not _NO_DEFAULT:
+        if key not in td.keys():
+            return default
     return get(td.get(key), remaining_path)
 
 
@@ -121,7 +126,7 @@ def traverse(
     is_leaf: Callable[[Tree], bool],
     path: tuple = (),
 ) -> Generator[TraversalItem, None, None]:
-    """Traverse a tree and yield all nodes (subtrees and leaves) as 
+    """Traverse a tree and yield all nodes (subtrees and leaves) as
     :class:`TraversalItem` objects. The traversal is depth-first, left-to-right.
 
     >>> tree = {"a": [1, {"b": 2}, 3], "c": 4}
@@ -153,7 +158,7 @@ def leaves(
     is_leaf: Callable[[Tree], bool],
     path: tuple = (),
 ) -> Generator[TraversalItem, None, None]:
-    """Traverse a tree and yield all leaves as :class:`TraversalItem` objects. The 
+    """Traverse a tree and yield all leaves as :class:`TraversalItem` objects. The
     traversal is depth-first, left-to-right.
 
     >>> tree = {"a": [1, {"b": 2}, 3], "c": 4}
