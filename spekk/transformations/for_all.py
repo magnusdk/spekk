@@ -1,7 +1,6 @@
 """:class:`ForAll` transforms a function that works on scalar inputs such that it works 
 on arrays instead (vectorization), and can be used with :func:`jax.vmap`."""
 
-from dataclasses import dataclass
 from typing import Callable, Optional, Sequence
 
 from spekk import Spec, trees, util
@@ -11,52 +10,72 @@ T_in_axes = Sequence[Optional[int]]
 T_vmap = Callable[[callable, T_in_axes], callable]
 
 
-@dataclass
 class ForAll(Transformation):
     """Vectorize/"make looped" a function such that it works on arrays instead of
     scalars.
-    """
 
-    dimension: str  #: The dimension to vectorize/loop over.
-    vmap_impl: Optional[
-        T_vmap
-    ] = None  #: The ``vmap`` implementation to use. Defaults to a simple Python implementation, but can also (for example) be set to :func:`jax.vmap`.
+    >>> from spekk.transformations import ForAll, compose
+    >>> f = lambda x, y: x + y
+    >>> data =       {"x": range(2), "y": range(3)}
+    >>> spec = Spec( {"x": ["dim1"], "y": ["dim2"]} )
 
-    def __new__(cls, *args, **kwargs):
-        # Syntactic sugar for defining multiple ForAll transformations at once:
-        # `ForAll(["a", "b", "c"])` is the same as
-        # `compose(ForAll("a"), ForAll("b"), ForAll("c"))`
-        # This means that the constructor of ForAll may return a PartialTransformation 
-        # of ForAll-transformations
-        dimension = kwargs.get("dimension", args[0])
-        if isinstance(dimension, (list, tuple)):
-            return common.compose(*[ForAll(d) for d in dimension])
-        else:
-            return super().__new__(cls)
+    Transform f to run on a grid defined by the "dim1" and "dim2" dimensions:
 
-    def __post_init__(self):
-        "Sub-classes may override this method to perform additional initialization."
+    >>> tf = compose(f, ForAll("dim2"), ForAll("dim1")).build(spec)
+    >>> tf.output_spec
+    Spec(['dim1', 'dim2'])
+    >>> result = tf(**data)
+    >>> util.shape(result)
+    (2, 3)
+    >>> result
+    [[0, 1, 2], [1, 2, 3]]
+
+    You can also use vmap over multiple dimensions at once. Note that the order of the 
+    dimensions in ``ForAll("dim2"), ForAll("dim1")`` and ``ForAll("dim1", "dim2")`` is 
+    reversed:
+
+    >>> tf = compose(f, ForAll("dim1", "dim2")).build(spec)
+    >>> tf(**data)  # This results in the same as in the previous example
+    [[0, 1, 2], [1, 2, 3]]"""
+
+    def __init__(
+        self,
+        dimension: str,
+        *additional_dimensions: str,
+        vmap_impl: Optional[T_vmap] = None,
+    ):
+        self.dimensions = [dimension, *additional_dimensions]
+        self.vmap_impl = vmap_impl
 
     def transform_function(
         self, to_be_transformed: callable, input_spec: Spec, output_spec: Spec
     ) -> callable:
-        if not input_spec.has_dimension(self.dimension):
-            raise ValueError(f"Spec does not contain the dimension {self.dimension}.")
-        return specced_vmap(
-            to_be_transformed, input_spec, self.dimension, self.vmap_impl
-        )
+        transformed = to_be_transformed
+        remaining_dimensions = set(self.dimensions)
+        for dimension in reversed(self.dimensions):
+            if not input_spec.has_dimension(dimension):
+                raise ValueError(f"Spec does not contain the dimension {dimension}.")
+            remaining_dimensions.remove(dimension)
+            transformed = specced_vmap(
+                transformed,
+                input_spec.remove_dimension(remaining_dimensions),
+                dimension,
+                self.vmap_impl,
+            )
+        return transformed
 
     def transform_input_spec(self, spec: Spec) -> Spec:
         # The returned function works on 1 element of the dimension at a time, so it has
         # one less dimension.
-        return spec.remove_dimension(self.dimension)
+        return spec.remove_dimension(self.dimensions)
 
     def transform_output_spec(self, spec: Spec) -> Spec:
-        # We re-add the dimension after the function has been applied to each element.
-        return spec.update_leaves(lambda dimensions: [self.dimension, *dimensions])
+        # The dimensions are re-added after vmapping the wrapped function.
+        return spec.update_leaves(lambda dimensions: [*self.dimensions, *dimensions])
 
     def __repr__(self) -> str:
-        return f'ForAll("{self.dimension}")'
+        dimensions_str = ", ".join([repr(dim) for dim in self.dimensions])
+        return f"ForAll({dimensions_str})"
 
 
 def specced_vmap(
@@ -118,3 +137,9 @@ in_axes: {sizes=}, {in_axes=}"
         return combined_result
 
     return wrapped
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()
