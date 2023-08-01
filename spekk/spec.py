@@ -140,7 +140,7 @@ class Spec(TreeLens):
         ['points', 'receivers', 'transmits']
         """
         return reduce(
-            lambda dims, leaf: dims.union(leaf.value),
+            lambda dims, leaf: dims.union(leaf.value if leaf.value is not None else []),
             leaves(self.tree, self.is_leaf),
             set(),
         )
@@ -221,7 +221,7 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
             if replacement.value is None:
                 state = trees.remove(state, replacement.path)
             elif replacement.is_leaf or self.is_leaf(
-                trees.get(state, replacement.path)
+                trees.get(state, replacement.path, None)
             ):
                 state = trees.set(state, replacement.value, replacement.path)
             else:
