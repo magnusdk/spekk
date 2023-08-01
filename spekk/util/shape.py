@@ -21,7 +21,7 @@ def shape(x) -> Sequence[int]:
         return ()
     elif hasattr(x, "shape"):
         return x.shape
-    elif isinstance(x, (list, tuple)):
+    elif isinstance(x, (list, tuple, range)):
         # Assume each item in x has the same shape.
         return (len(x), *shape(x[0]))
     raise ValueError(f"Cannot get shape of object with type {type(x)}")
