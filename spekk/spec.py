@@ -100,7 +100,7 @@ class Spec(TreeLens):
         """
         state = self.get(path)
 
-        if isinstance(dimension, (list, tuple)):
+        if isinstance(dimension, (list, tuple, set)):
             for dim in dimension:
                 state = state.remove_dimension(dim, path)
             return state
