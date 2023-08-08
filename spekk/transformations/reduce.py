@@ -5,13 +5,13 @@ followed by an ``Apply(np.sum, "dimension")`` transformation, but will potential
 less memory because it sums the partial results iteratively isntead of trying to 
 parallelize over the dimension first (in the case of using GPU-backends such as JAX).
 """
-
 import operator
-from dataclasses import dataclass
-from typing import Any, Callable, Iterable, Optional, TypeVar
+from dataclasses import dataclass, field
+from typing import Any, Callable, Dict, Iterable, Optional, Sequence, TypeVar
 
-from spekk import Spec, util
+from spekk import Spec, trees, util
 from spekk.transformations import Transformation, common
+from spekk.transformations.axis import Axis, concretize_axes
 
 T_reduce_cls = TypeVar("T_reduce_cls", bound="Reduce")
 T_f_result = TypeVar("T_f_result")
@@ -39,6 +39,13 @@ class Reduce(Transformation):
     initial_value: Optional[
         T_reduction_result
     ] = None  #: The initial value for the reduction. For example 0 for summation.
+    enumerate: bool = False  #: If True, each item is a tuple of (index, value), similar to Python's built-in :func:`enumerate`.
+    extra_args: Sequence[Any] = field(
+        default_factory=tuple
+    )  #: Extra arguments to pass to the reduce function.
+    extra_kwargs: Dict[str, Any] = field(
+        default_factory=dict
+    )  #: Extra keyword arguments to pass to the reduce function.
     reduce_impl: Optional[
         T_reduce
     ] = None  #: The ``reduce`` implementation to use. Defaults to Python's built-in :func:`functools.reduce`.
@@ -57,13 +64,20 @@ class Reduce(Transformation):
                 raise ValueError(
                     "Positional arguments are not supported when using Reduce. Use keyword arguments when calling the transformed function instead."
                 )
+            extra_args, extra_kwargs = concretize_axes(
+                output_spec, self.extra_args, self.extra_kwargs
+            )
+            reduce_fn = lambda *args, **kwargs: self.reduce_fn(
+                *args, *extra_args, **kwargs, **extra_kwargs
+            )
             return specced_map_reduce(
                 to_be_transformed,
-                self.reduce_fn,
+                reduce_fn,
                 kwargs,
                 input_spec,
                 self.dimension,
                 self.initial_value,
+                self.enumerate,
                 self.reduce_impl,
             )
 
@@ -73,6 +87,12 @@ class Reduce(Transformation):
         return spec.remove_dimension(self.dimension)
 
     def transform_output_spec(self, spec: Spec) -> Spec:
+        tree = (self.extra_args, self.extra_kwargs)
+        for leaf in trees.leaves(
+            tree, lambda x: isinstance(x, Axis) or not trees.has_treedef(x)
+        ):
+            if isinstance(leaf.value, Axis):
+                spec = spec.update_leaves(leaf.value.new_dimensions)
         return spec
 
     def __repr__(self) -> str:
@@ -92,7 +112,7 @@ class Reduce(Transformation):
     ) -> T_reduce_cls:
         """Transformation that iteratively adds the results of the wrapped function for
         each item in the given dimension."""
-        return cls(dimension, operator.add, initial_value, reduce_impl)
+        return cls(dimension, operator.add, initial_value, reduce_impl=reduce_impl)
 
     @classmethod
     def Product(
@@ -103,7 +123,7 @@ class Reduce(Transformation):
     ) -> T_reduce_cls:
         """Transformation that iteratively multiplies the results of the wrapped
         function for each item in the given dimension."""
-        return cls(dimension, operator.mul, initial_value, reduce_impl)
+        return cls(dimension, operator.mul, initial_value, reduce_impl=reduce_impl)
 
 
 def specced_map_reduce(
@@ -113,6 +133,7 @@ def specced_map_reduce(
     spec: Spec,
     dimension: str,
     initial_value: Optional[Any] = None,
+    enumerate: bool = False,
     reduce_impl: Optional[T_reduce] = None,
 ):
     # Flatten the data so that we can iterate over it without worrying about the
@@ -128,13 +149,15 @@ def specced_map_reduce(
     carry = common.map_1_flattened(map_f, flattened_args, in_axes, unflatten, 0)
     # Use the first mapped value as the initial value if no initial value was given.
     if initial_value is not None:
-        carry = reduce_f(initial_value, carry)
+        x = (0, carry) if enumerate else carry
+        carry = reduce_f(initial_value, x)
 
     # `wrapped` puts everything together and makes it work with `reduce_impl`.
     # It gets the arguments indexed at `i` for the given dimension, and applies the
     # mapping function to them before performing a reduction step.
     def wrapped(carry, i):
         x = common.map_1_flattened(map_f, flattened_args, in_axes, unflatten, i)
+        x = (i, x) if enumerate else x
         return reduce_f(carry, x)
 
     # Default `reduce_impl` is Python's built-in `functools.reduce`.
