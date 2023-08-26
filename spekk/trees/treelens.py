@@ -1,5 +1,6 @@
 ":class:`TreeLens` is a functional interface to a tree-like data structure."
 
+from dataclasses import dataclass
 from typing import Any, Callable, Optional, Sequence, Tuple, TypeVar, Union
 
 from spekk.trees.core import filter, remove, set, traverse, update, update_leaves
@@ -135,6 +136,24 @@ class TreeLens:
             pruned_tree = self.copy_with(pruned_tree)
         return pruned_tree
 
+    @property
+    def at(self) -> "_TreeNavigator":
+        """Interface for working on subtrees. This is a convenience method that
+        provides the same functionality as set(…) and update_subtree(…), but with a 
+        (potentially) more readable syntax.
+
+        >>> tree = TreeLens({"a": {"b": [1, 2, 3]}, "d": [3]})
+
+        It can be used to set the value at the given path:
+        >>> tree.at["a", "b", 1].set(5)
+        TreeLens({'a': {'b': [1, 5, 3]}, 'd': [3]})
+
+        Or update it, given a function:
+        >>> tree.at["a", "b", 1].update(lambda x: x+10)
+        TreeLens({'a': {'b': [1, 12, 3]}, 'd': [3]})
+        """
+        return _TreeNavigator(self)
+
     def __iter__(self):
         return iter([self.copy_with(t) for t in self.tree])
 
@@ -144,6 +163,33 @@ class TreeLens:
 
     def __repr__(self):
         return f"TreeLens({self.tree})"
+
+
+@dataclass
+class _TreeNavigator:
+    """Object that can modify a :class:`TreeLens` at a given path.
+    
+    See :attr:`TreeLens.at` for more information."""
+
+    tree: TreeLens
+    path: tuple = ()
+
+    def set(self, value: Any) -> TreeLens:
+        return self.tree.set(value, self.path)
+
+    def update(self, f: Callable, *args, **kwargs) -> TreeLens:
+        partial_f = lambda x: f(x, *args, **kwargs)
+        return self.tree.update_subtree(partial_f, self.path)
+
+    def __getitem__(self, path) -> "_TreeNavigator":
+        "(Further) index the tree at the given path."
+        if not isinstance(path, tuple):
+            # NOTE: A quirk of Python's __getitem__ causes surprising behavior if users
+            # try to index by a tuple. For example, tree.at[(1,2)] will be treated as
+            # tree.at[1,2], which is likely not what the user wants. As a workaround,
+            # the user should add a comma after the tuple: tree.at[(1,2),]
+            path = (path,)
+        return _TreeNavigator(self.tree, self.path + path)
 
 
 if __name__ == "__main__":
