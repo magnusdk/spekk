@@ -21,11 +21,19 @@ def update(tree: Tree, f: Callable[[Tree], Tree], path: tuple):
 
     key, *remaining_path = path
     td = treedef(tree)
-    values = [
-        update(td.get(k), f, remaining_path) if k == key else td.get(k)
-        for k in td.keys()
-    ]
-    return td.create(td.keys(), values)
+    keys = td.keys()
+    if key in keys:
+        values = [
+            update(td.get(k), f, remaining_path) if k == key else td.get(k)
+            for k in td.keys()
+        ]
+    else:
+        # If the tree does not have the key at the current the path, insert an empty
+        # dict at the key.
+        val = update({}, f, remaining_path)
+        keys = [*keys, key]
+        values = [*td.values(), val]
+    return td.create(keys, values)
 
 
 def get(tree: Tree, path: tuple, default: Any = _NO_DEFAULT):
@@ -52,6 +60,8 @@ def set(tree: Tree, value: Any, path: tuple):
     >>> tree = {"a": [1, {"b": 2}, 3], "c": 4}
     >>> set(tree, 42, ("a", 1, "b"))
     {'a': [1, {'b': 42}, 3], 'c': 4}
+    >>> set(tree, 42, ("new_key",))
+    {'a': [1, {'b': 2}, 3], 'c': 4, 'new_key': 42}
     """
     return update(tree, lambda _: value, path)
 
