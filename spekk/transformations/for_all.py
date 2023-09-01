@@ -30,8 +30,8 @@ class ForAll(Transformation):
     >>> result
     [[0, 1, 2], [1, 2, 3]]
 
-    You can also use vmap over multiple dimensions at once. Note that the order of the 
-    dimensions in ``ForAll("dim2"), ForAll("dim1")`` and ``ForAll("dim1", "dim2")`` is 
+    You can also use vmap over multiple dimensions at once. Note that the order of the
+    dimensions in ``ForAll("dim2"), ForAll("dim1")`` and ``ForAll("dim1", "dim2")`` is
     reversed:
 
     >>> tf = compose(f, ForAll("dim1", "dim2")).build(spec)
@@ -46,6 +46,10 @@ class ForAll(Transformation):
     ):
         self.dimensions = [dimension, *additional_dimensions]
         self.vmap_impl = vmap_impl
+        self.__post_init__()
+
+    def __post_init__(self):
+        "Sub-classes may override this method to perform additional initialization."
 
     def transform_function(
         self, to_be_transformed: callable, input_spec: Spec, output_spec: Spec
