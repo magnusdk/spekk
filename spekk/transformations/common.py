@@ -100,7 +100,11 @@ def map_1_flattened(
             arg = trees.update_leaves(
                 arg,
                 lambda x: not trees.has_treedef(x),
-                lambda x: common.getitem_along_axis(x, axis, i),
+                lambda x: (
+                    common.getitem_along_axis(x, axis, i)
+                    if hasattr(x, "__getitem__")
+                    else x
+                ),
             )
         args.append(arg)
 
