@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.abspath(".."))
 project = "spekk"
 copyright = "2023, Magnus Dalen Kvalevåg"
 author = "Magnus Dalen Kvalevåg"
-release = "1.0.5"
+release = "1.0.6"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
