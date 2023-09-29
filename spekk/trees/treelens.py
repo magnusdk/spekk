@@ -3,7 +3,15 @@
 from dataclasses import dataclass
 from typing import Any, Callable, Optional, Sequence, Tuple, TypeVar, Union
 
-from spekk.trees.core import filter, remove, set, traverse, update, update_leaves
+from spekk.trees.core import (
+    filter,
+    has_path,
+    remove,
+    set,
+    traverse,
+    update,
+    update_leaves,
+)
 from spekk.trees.registry import Tree, treedef
 
 TSelf = TypeVar("TSelf", bound="TreeLens")
@@ -70,13 +78,7 @@ class TreeLens:
         >>> tree.has_subtree(["a", "c"])
         False
         """
-        tree = self.tree
-        for k in path:
-            if k in treedef(tree).keys():
-                tree = tree[k]
-            else:
-                return False
-        return True
+        return has_path(self.tree, path)
 
     def set(self: TSelf, value: Any, path: Sequence[Any]) -> TSelf:
         """Set the value or subtree at the given path.
@@ -139,7 +141,7 @@ class TreeLens:
     @property
     def at(self) -> "_TreeNavigator":
         """Interface for working on subtrees. This is a convenience method that
-        provides the same functionality as set(…) and update_subtree(…), but with a 
+        provides the same functionality as set(…) and update_subtree(…), but with a
         (potentially) more readable syntax.
 
         >>> tree = TreeLens({"a": {"b": [1, 2, 3]}, "d": [3]})
@@ -168,7 +170,7 @@ class TreeLens:
 @dataclass
 class _TreeNavigator:
     """Object that can modify a :class:`TreeLens` at a given path.
-    
+
     See :attr:`TreeLens.at` for more information."""
 
     tree: TreeLens

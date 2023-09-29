@@ -36,6 +36,23 @@ def update(tree: Tree, f: Callable[[Tree], Tree], path: tuple):
     return td.create(keys, values)
 
 
+def has_path(tree: Tree, path: tuple) -> bool:
+    """Return True if the given path exists in the tree.
+
+    >>> tree = {"a": {"b": [1, 2, 3]}}
+    >>> has_path(tree, ("a", "b", 1))
+    True
+    >>> has_path(tree, ("a", "c"))
+    False
+    """
+    for k in path:
+        if k in treedef(tree).keys():
+            tree = tree[k]
+        else:
+            return False
+    return True
+
+
 def get(tree: Tree, path: tuple, default: Any = _NO_DEFAULT):
     """Get the subtree at the given path.
 
