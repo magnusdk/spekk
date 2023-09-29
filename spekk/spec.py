@@ -281,7 +281,7 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
 
         indices_tree = self.index_for(dimension)
         for leaf in leaves(indices_tree, lambda x: isinstance(x, int) or x is None):
-            if leaf.value is not None:
+            if leaf.value is not None and trees.has_path(data, leaf.path):
                 # Assume that all data with the same dimension has the same size, so we
                 # just return the first one we find.
                 return util.shape(trees.get(data, leaf.path))[leaf.value]
