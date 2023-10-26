@@ -151,6 +151,9 @@ def specced_map_reduce(
     if initial_value is not None:
         x = (0, carry) if enumerate else carry
         carry = reduce_f(initial_value, x)
+    # Don't reduce further if there was only one value
+    if size == 1:
+        return carry
 
     # `wrapped` puts everything together and makes it work with `reduce_impl`.
     # It gets the arguments indexed at `i` for the given dimension, and applies the
