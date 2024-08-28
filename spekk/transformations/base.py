@@ -378,6 +378,10 @@ class Specced(Buildable):
         [Spec], Spec
     ]  #: A function that transforms the spec, returning the spec of the return-value of ``f``.
 
+    def __post_init__(self):
+        if isinstance(self.transform_spec, Spec):
+            self.transform_spec = lambda _: self.transform_spec
+
     def build(self, input_spec: Spec) -> "Specced":
         output_spec = self.transform_spec(input_spec)
         if not isinstance(output_spec, Spec):
