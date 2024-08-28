@@ -10,12 +10,13 @@ from spekk.transformations.base import Transformation
 
 class Apply(Transformation):
     """Transform a function such that ``f`` is applied to the output of it.
-    
+
     Attributes:
         f: The function to apply to the result of the wrapped function.
         args: Optional extra positional arguments to pass to ``f``.
         kwargs: Optional extra keyword arguments to pass to ``f``.
     """
+
     def __init__(self, f: Callable, *args, **kwargs):
         self.f = f
         self.args = args
@@ -41,7 +42,15 @@ class Apply(Transformation):
         ):
             if isinstance(leaf.value, Axis):
                 spec = spec.update_leaves(leaf.value.new_dimensions)
+        extra_output_spec_transform = getattr(self, "extra_output_spec_transform", None)
+        if extra_output_spec_transform:
+            spec = extra_output_spec_transform(spec)
         return spec
+
+    def with_extra_output_spec_transform(self, t: Callable[[Spec], Spec]):
+        copy = Apply(self.function, *self.args, **self.kwargs)
+        copy.extra_output_spec_transform = t
+        return copy
 
     def __repr__(self) -> str:
         args_str = ", ".join([str(arg) for arg in self.args])

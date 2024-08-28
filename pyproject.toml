@@ -16,7 +16,7 @@ description = "Named dimensions of nested arrays, independent of array implement
 name = "spekk"
 readme = "README.md"
 requires-python = ">=3.9"
-version = "1.0.6"
+version = "1.0.7"
 
 [project.urls]
 "Homepage" = "https://github.com/magnusdk/spekk/"
