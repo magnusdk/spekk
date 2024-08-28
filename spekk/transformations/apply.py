@@ -48,7 +48,7 @@ class Apply(Transformation):
         return spec
 
     def with_extra_output_spec_transform(self, t: Callable[[Spec], Spec]):
-        copy = Apply(self.function, *self.args, **self.kwargs)
+        copy = Apply(self.f, *self.args, **self.kwargs)
         copy.extra_output_spec_transform = t
         return copy
 
