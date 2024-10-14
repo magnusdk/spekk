@@ -4,6 +4,8 @@ is tree-like can be represented as a mapping of keys and values."""
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Mapping, Sequence, Union
 
+import fastmath
+
 Tree = Union[Mapping[Any, "Tree"], Sequence["Tree"], Any]
 
 
@@ -58,15 +60,16 @@ class TreeDef(ABC):
                 return create_fn(keys, values)
 
         return _TreeDef
-    
+
     def items(self):
         return zip(self.keys(), self.values())
 
 
 class DuckTypedTreeDef(TreeDef):
-    """An object can be a :class:`TreeDef` if it has the dunder-methods: 
-    ``__spekk_treedef_keys__``, ``__spekk_treedef_get__``, and 
+    """An object can be a :class:`TreeDef` if it has the dunder-methods:
+    ``__spekk_treedef_keys__``, ``__spekk_treedef_get__``, and
     ``__spekk_treedef_create__``."""
+
     def __init__(self, obj: Any):
         if not (
             hasattr(obj, "__spekk_treedef_keys__")
@@ -99,7 +102,7 @@ def dispatch_treedef(tree: Tree):
 
 
 def dispatch_by_type(tree: Tree):
-    """Given a tree, return the :class:`TreeDef` for its type (through the 
+    """Given a tree, return the :class:`TreeDef` for its type (through the
     ``type_registry``)."""
     t = type(tree)
     if t in type_registry:
@@ -107,7 +110,7 @@ def dispatch_by_type(tree: Tree):
 
 
 def dispatch_by_duck_type(tree: Tree):
-    """Given a tree, return a :class:`TreeDef` if it has the required dunder-methods. 
+    """Given a tree, return a :class:`TreeDef` if it has the required dunder-methods.
     See :class:`DuckTypedTreeDef` for more details."""
     try:
         return DuckTypedTreeDef(tree)
@@ -129,14 +132,14 @@ def register_dispatch_fn(dispatch_fn: Callable[[Tree], Union[TreeDef, None]]):
     """Register a new :class:`TreeDef` by dispatch function.
 
     Multiple dispatch functions may be registered, in which case they will be tried in
-    order until one of them returns a :class:`TreeDef`. Note that 
-    :func:`dispatch_by_type` and :func:`dispatch_treedef` always comes first and takes 
+    order until one of them returns a :class:`TreeDef`. Note that
+    :func:`dispatch_by_type` and :func:`dispatch_treedef` always comes first and takes
     precendence."""
     dispatch_fn_registry.append(dispatch_fn)
 
 
 def treedef(tree: Tree) -> TreeDef:
-    """Return the :class:`TreeDef` (if registered) for the given tree (``dict``, 
+    """Return the :class:`TreeDef` (if registered) for the given tree (``dict``,
     ``list``, and ``tuple`` are registered by default)."""
     for dispatch_fn in dispatch_fn_registry:
         td = dispatch_fn(tree)
@@ -181,6 +184,14 @@ register_type(
         lambda keys, values: tuple(values),
     ),
 )
+
+
+@register_dispatch_fn
+def dispatch_fastmath_module(obj):
+    if isinstance(obj, fastmath.Module):
+        tree = fastmath.Tree(obj)
+        return TreeDef.new_class(Tree.keys, Tree.get, tree.recreate)(tree)
+
 
 if __name__ == "__main__":
     import doctest
