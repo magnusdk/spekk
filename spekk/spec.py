@@ -286,6 +286,15 @@ Dimensions must be a list of strings, but got {current_dims} at the path {path}.
                 # just return the first one we find.
                 return util.shape(trees.get(data, leaf.path))[leaf.value]
 
+    def __fastmath_keys__(self):
+        return trees.treedef(self.tree).keys()
+
+    def __fastmath_children__(self):
+        return trees.treedef(self.tree).values()
+
+    def __fastmath_create__(self, keys: Sequence, children: Sequence):
+        return Spec(trees.treedef(self.tree).create(keys, children))
+
     def __hash__(self):
         return hash(self.tree)
 

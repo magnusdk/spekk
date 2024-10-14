@@ -190,7 +190,11 @@ register_type(
 def dispatch_fastmath_module(obj):
     if isinstance(obj, fastmath.Module):
         tree = fastmath.Tree(obj)
-        return TreeDef.new_class(Tree.keys, Tree.get, tree.recreate)(tree)
+        return TreeDef.new_class(
+            fastmath.Tree.keys,
+            fastmath.Tree.get,
+            tree.recreate,
+        )(tree)
 
 
 if __name__ == "__main__":
