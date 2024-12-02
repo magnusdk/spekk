@@ -77,7 +77,8 @@ class DuckTypedTreeDef(TreeDef):
             and hasattr(obj, "__spekk_treedef_create__")
         ):
             raise ValueError(
-                f"Object {obj} does not have the required dunder-methods to be a treedef."
+                f"Object with type {obj.__class__} does not have the required "
+                "dunder-methods to be a treedef."
             )
         self.obj = obj
 
@@ -146,7 +147,8 @@ def treedef(tree: Tree) -> TreeDef:
         if td:
             return td
     raise ValueError(
-        f"No TreeDef found for {repr(tree)}. Perhaps you need to register one?"
+        f"No TreeDef found for object with type {tree.__class__}. Perhaps you need to "
+        "register one?"
     )
 
 
