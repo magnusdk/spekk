@@ -4,8 +4,6 @@ is tree-like can be represented as a mapping of keys and values."""
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Mapping, Sequence, Union
 
-import fastmath
-
 Tree = Union[Mapping[Any, "Tree"], Sequence["Tree"], Any]
 
 
@@ -188,15 +186,21 @@ register_type(
 )
 
 
-@register_dispatch_fn
-def dispatch_fastmath_module(obj):
-    if isinstance(obj, fastmath.Module):
-        tree = fastmath.Tree(obj)
-        return TreeDef.new_class(
-            fastmath.Tree.keys,
-            fastmath.Tree.get,
-            tree.recreate,
-        )(tree)
+try:
+    import fastmath
+
+    @register_dispatch_fn
+    def dispatch_fastmath_module(obj):
+        if isinstance(obj, fastmath.Module):
+            tree = fastmath.Tree(obj)
+            return TreeDef.new_class(
+                fastmath.Tree.keys,
+                fastmath.Tree.get,
+                tree.recreate,
+            )(tree)
+
+except ImportError:
+    pass
 
 
 if __name__ == "__main__":
