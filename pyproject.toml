@@ -11,12 +11,12 @@ classifiers = [
   "License :: OSI Approved :: Apache Software License",
   "Operating System :: OS Independent",
 ]
-dependencies = ["numpy"]
+dependencies = ["numpy", "array-api-compat", "typing_extensions"]
 description = "Named dimensions of nested arrays, independent of array implementation (Numpy, JAX, etc)"
 name = "spekk"
 readme = "README.md"
 requires-python = ">=3.9"
-version = "1.0.6"
+version = "2.0.0"
 
 [project.urls]
 "Homepage" = "https://github.com/magnusdk/spekk/"

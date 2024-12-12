@@ -1,9 +1,9 @@
-from spekk.spec import Spec
+import spekk.array as array
+from spekk.module import Module, field
 
 __all__ = [
-    "transformations",
-    "trees",
-    "util",
-    "Spec",
+    "array",
+    "Module",
+    "field",
 ]
-__version__ = "1.0.6"
+__version__ = "2.0.0"
