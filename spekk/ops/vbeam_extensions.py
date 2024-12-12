@@ -1,8 +1,8 @@
-from spekk.array._backend import backend
-from spekk.array._types import Dim
-from spekk.array.array_object import array
-from spekk.array.data_type_functions import astype
-from spekk.array.manipulation_functions import moveaxis
+from spekk.ops._backend import backend
+from spekk.ops._types import Dim
+from spekk.ops.array_object import array
+from spekk.ops.data_type_functions import astype
+from spekk.ops.manipulation_functions import moveaxis
 
 
 def int32(x: array, copy: bool = True) -> array:

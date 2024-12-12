@@ -1,9 +1,9 @@
 __all__ = ["argsort", "sort"]
 
 
-from spekk.array._types import Dim
-from spekk.array.array_object import array
-from spekk.array._backend import backend
+from spekk.ops._types import Dim
+from spekk.ops.array_object import array
+from spekk.ops._backend import backend
 
 
 def argsort(

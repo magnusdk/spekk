@@ -18,7 +18,7 @@ __all__ = [
 ]
 from typing import List, Optional, Tuple, Union
 
-from spekk.array._types import (
+from spekk.ops._types import (
     Dim,
     Dims,
     NestedSequence,
@@ -27,8 +27,8 @@ from spekk.array._types import (
     device,
     dtype,
 )
-from spekk.array.array_object import array
-from spekk.array._backend import backend
+from spekk.ops.array_object import array
+from spekk.ops._backend import backend
 
 
 def arange(

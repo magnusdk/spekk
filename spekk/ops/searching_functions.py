@@ -1,11 +1,11 @@
 __all__ = ["argmax", "argmin", "nonzero", "searchsorted", "where"]
 
 from typing import Literal
-from spekk.array._types import Dim, Optional, Tuple, UndefinedDim
-from spekk.array.array_object import array
-from spekk.array._backend import backend
-from spekk.array.exceptions import MismatchedDimensionsError
-from spekk.array.manipulation_functions import broadcast_arrays
+from spekk.ops._types import Dim, Optional, Tuple, UndefinedDim
+from spekk.ops.array_object import array
+from spekk.ops._backend import backend
+from spekk.ops.exceptions import MismatchedDimensionsError
+from spekk.ops.manipulation_functions import broadcast_arrays
 
 
 def argmax(x: array, /, *, axis: Optional[Dim] = None, keepdims: bool = False) -> array:

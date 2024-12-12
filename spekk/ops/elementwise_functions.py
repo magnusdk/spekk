@@ -67,11 +67,11 @@ __all__ = [
 ]
 
 
-from spekk.array._backend import backend
-from spekk.array._types import Optional, Union
-from spekk.array._util import ensure_array
-from spekk.array.array_object import array
-from spekk.array.manipulation_functions import broadcast_arrays
+from spekk.ops._backend import backend
+from spekk.ops._types import Optional, Union
+from spekk.ops._util import ensure_array
+from spekk.ops.array_object import array
+from spekk.ops.manipulation_functions import broadcast_arrays
 
 
 def abs(x: array, /) -> array:

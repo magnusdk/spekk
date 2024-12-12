@@ -17,8 +17,8 @@ __all__ = [
 
 from collections import defaultdict
 
-from spekk.array._backend import backend
-from spekk.array._types import (
+from spekk.ops._backend import backend
+from spekk.ops._types import (
     ArrayLike,
     Dim,
     Dims,
@@ -28,8 +28,8 @@ from spekk.array._types import (
     UndefinedDim,
     Union,
 )
-from spekk.array._util import ensure_array
-from spekk.array.array_object import array
+from spekk.ops._util import ensure_array
+from spekk.ops.array_object import array
 
 
 def broadcast_arrays(*arrays: array) -> List[array]:

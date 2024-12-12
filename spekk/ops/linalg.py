@@ -26,8 +26,8 @@ __all__ = [
 from typing import Literal
 
 from spekk.array import linear_algebra_functions
-from spekk.array._backend import backend
-from spekk.array._types import (
+from spekk.ops._backend import backend
+from spekk.ops._types import (
     Dim,
     Optional,
     Sequence,
@@ -36,9 +36,9 @@ from spekk.array._types import (
     Union,
     dtype,
 )
-from spekk.array.array_object import array
-from spekk.array.constants import inf
-from spekk.array.manipulation_functions import broadcast_arrays
+from spekk.ops.array_object import array
+from spekk.ops.constants import inf
+from spekk.ops.manipulation_functions import broadcast_arrays
 
 
 def cholesky(x: array, /, *, upper: bool = False) -> array:

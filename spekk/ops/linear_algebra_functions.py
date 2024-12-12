@@ -1,11 +1,11 @@
 __all__ = ["matmul", "matrix_transpose", "tensordot", "vecdot"]
 
 
-from spekk.array._types import Dim, Sequence, Tuple, Union
-from spekk.array.array_object import array
-from spekk.array._backend import backend
-from spekk.array.exceptions import MismatchedDimensionsError
-from spekk.array.manipulation_functions import broadcast_arrays
+from spekk.ops._types import Dim, Sequence, Tuple, Union
+from spekk.ops.array_object import array
+from spekk.ops._backend import backend
+from spekk.ops.exceptions import MismatchedDimensionsError
+from spekk.ops.manipulation_functions import broadcast_arrays
 
 
 def matmul(x1: array, x2: array, /) -> array:

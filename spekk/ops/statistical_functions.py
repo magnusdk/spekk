@@ -1,10 +1,10 @@
 __all__ = ["cumulative_sum", "max", "mean", "min", "prod", "std", "sum", "var"]
 
 
-from spekk.array._backend import backend
-from spekk.array._types import Dim, Optional, Tuple, Union, dtype
-from spekk.array._util import ensure_array, get_reduction_axes_and_resulting_dims
-from spekk.array.array_object import array
+from spekk.ops._backend import backend
+from spekk.ops._types import Dim, Optional, Tuple, Union, dtype
+from spekk.ops._util import ensure_array, get_reduction_axes_and_resulting_dims
+from spekk.ops.array_object import array
 
 
 def cumulative_sum(

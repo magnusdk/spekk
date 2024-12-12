@@ -1,8 +1,8 @@
 from typing import Optional, Sequence, Tuple, Union
 
-from spekk.array._backend import backend
-from spekk.array._types import ArrayLike, Dim, Dims, UndefinedDim
-from spekk.array.array_object import array
+from spekk.ops._backend import backend
+from spekk.ops._types import ArrayLike, Dim, Dims, UndefinedDim
+from spekk.ops.array_object import array
 
 
 def get_reduction_axes_and_resulting_dims(

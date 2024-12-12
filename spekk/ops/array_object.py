@@ -5,12 +5,12 @@ import numpy as np
 __all__ = ["array"]
 from typing import Any, Dict, Optional, Tuple, Union
 
-from spekk.array._backend import backend
-from spekk.array._types import ArrayLike, Dims, Enum, PyCapsule, UndefinedDim, ellipsis, Dim
-from spekk.array._types import (
+from spekk.ops._backend import backend
+from spekk.ops._types import ArrayLike, Dims, Enum, PyCapsule, UndefinedDim, ellipsis, Dim
+from spekk.ops._types import (
     device as Device,
 )
-from spekk.array._types import (
+from spekk.ops._types import (
     dtype as Dtype,
 )
 

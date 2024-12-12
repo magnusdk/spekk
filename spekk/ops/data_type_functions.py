@@ -1,7 +1,7 @@
 __all__ = ["astype", "can_cast", "finfo", "iinfo", "isdtype", "result_type"]
 
-from spekk.array._backend import backend
-from spekk.array._types import (
+from spekk.ops._backend import backend
+from spekk.ops._types import (
     Optional,
     Tuple,
     Union,
@@ -10,7 +10,7 @@ from spekk.array._types import (
     finfo_object,
     iinfo_object,
 )
-from spekk.array.array_object import array
+from spekk.ops.array_object import array
 
 
 def astype(

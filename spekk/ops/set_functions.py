@@ -3,8 +3,8 @@ __all__ = ["unique_all", "unique_counts", "unique_inverse", "unique_values"]
 
 from typing import Tuple
 
-from spekk.array._backend import backend
-from spekk.array.array_object import array
+from spekk.ops._backend import backend
+from spekk.ops.array_object import array
 
 
 def unique_all(x: array, /) -> Tuple[array, array, array, array]:

@@ -10,8 +10,8 @@ __all__ = [
 ]
 from typing import List, Optional, Tuple, Union
 
-from spekk.array._backend import backend
-from spekk.array._types import Capabilities, DataTypes, DefaultDataTypes, Info, device
+from spekk.ops._backend import backend
+from spekk.ops._types import Capabilities, DataTypes, DefaultDataTypes, Info, device
 
 
 def __array_namespace_info__() -> Info:

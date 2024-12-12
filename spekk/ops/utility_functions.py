@@ -3,9 +3,9 @@ __all__ = ["all", "any"]
 
 from typing import Optional, Tuple, Union
 
-from spekk.array._util import get_reduction_axes_and_resulting_dims
-from spekk.array.array_object import array
-from spekk.array._backend import backend
+from spekk.ops._util import get_reduction_axes_and_resulting_dims
+from spekk.ops.array_object import array
+from spekk.ops._backend import backend
 
 
 def all(

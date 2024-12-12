@@ -16,8 +16,8 @@ __all__ = [
 ]
 from typing import Literal
 
-from spekk.array._backend import backend
-from spekk.array._types import (
+from spekk.ops._backend import backend
+from spekk.ops._types import (
     Dim,
     Dims,
     Optional,
@@ -26,7 +26,7 @@ from spekk.array._types import (
     Union,
     device,
 )
-from spekk.array.array_object import array
+from spekk.ops.array_object import array
 
 
 def fft(

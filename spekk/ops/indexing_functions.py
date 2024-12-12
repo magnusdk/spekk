@@ -2,9 +2,9 @@ __all__ = ["take"]
 
 from typing import Union
 
-from spekk.array._backend import backend
-from spekk.array._types import Dim, Optional
-from spekk.array.array_object import array
+from spekk.ops._backend import backend
+from spekk.ops._types import Dim, Optional
+from spekk.ops.array_object import array
 
 
 def take(

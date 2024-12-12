@@ -156,7 +156,7 @@ Capabilities = TypedDict(
 )
 
 if TYPE_CHECKING:
-    from spekk.array.array_object import array
+    from spekk.ops.array_object import array
 ArrayLike = Union[
     "array", bool, int, float, complex, NestedSequence, SupportsBufferProtocol
 ]
