@@ -188,6 +188,8 @@ class Tree:
 
     @staticmethod
     def infer(node: T) -> "Tree":
+        from spekk.ops.array_object import array
+
         if isinstance(node, Tree):
             return node
         # Handle lists, tuples, and dicts
@@ -234,18 +236,31 @@ class Tree:
                 ),
                 is_marked_as_static=is_marked_as_static,
             )
+        elif isinstance(node, array):
+            keys_fn = lambda: ["data", "dims"]
+            children_fn = lambda: [node.data, node.dims]
+            recreate_fn = lambda keys, children: array(*children)
+            is_marked_as_static = lambda key: key == "dims"
+            return Tree(
+                node,
+                keys_fn=keys_fn,
+                children_fn=children_fn,
+                recreate_fn=recreate_fn,
+                is_marked_as_static=is_marked_as_static,
+            )
+        # Handle duck-typed
         elif (
-            hasattr(node, "__fastmath_keys__")
-            and hasattr(node, "__fastmath_children__")
-            and hasattr(node, "__fastmath_create__")
+            hasattr(node, "__spekk_keys__")
+            and hasattr(node, "__spekk_children__")
+            and hasattr(node, "__spekk_create__")
         ):
             return Tree(
                 node,
-                keys_fn=getattr(node, "__fastmath_keys__"),
-                children_fn=getattr(node, "__fastmath_children__"),
-                recreate_fn=getattr(node, "__fastmath_create__"),
+                keys_fn=getattr(node, "__spekk_keys__"),
+                children_fn=getattr(node, "__spekk_children__"),
+                recreate_fn=getattr(node, "__spekk_create__"),
                 is_marked_as_static=getattr(
-                    node, "__fastmath_is_marked_as_static_", lambda _: False
+                    node, "__spekk_is_marked_as_static_", lambda _: False
                 ),
             )
         else:
@@ -407,9 +422,9 @@ class FlattenedResult:
 
 
 def is_array_like(x):
-    from fastmath import ops
+    from spekk import ops
 
-    return isinstance(x, (ops.array, float, int, complex)) or ops.is_array(x)
+    return isinstance(x, (float, int, complex)) or ops.backend._is_backend_array(x)
 
 
 def is_not_array_like(x):
