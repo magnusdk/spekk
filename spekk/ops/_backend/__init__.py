@@ -45,12 +45,13 @@ class Backend:
 
     def __getattr__(self, name: str):
         if self.backend_name == "numpy":
-            from array_api_compat import numpy as ops
+            import spekk.ops._backend.included_backends.numpy as ops
         elif self.backend_name == "jax":
-            import jax.numpy as ops
+            import spekk.ops._backend.included_backends.jax as ops
         elif self.backend_name == "torch":
-            from array_api_compat import torch as ops
+            import spekk.ops._backend.included_backends.torch as ops
         return getattr(ops, name)
+        
 
     def __repr__(self):
         return f"Backend('{self.backend_name}')"

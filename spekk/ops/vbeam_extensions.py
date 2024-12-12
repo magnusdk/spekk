@@ -27,3 +27,7 @@ def take_along_dim(x: array, i: array, dim: Dim) -> array:
     data = x._data[tuple(slices)]
     dims = i._dims + [d for d in x._dims if d not in i._dims and d != dim]
     return array(data, dims)
+
+
+def jit(f):
+    return backend.jit(f)
