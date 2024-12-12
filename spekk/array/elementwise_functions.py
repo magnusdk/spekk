@@ -67,7 +67,11 @@ __all__ = [
 ]
 
 
-from ._types import Optional, Union, array
+from spekk.array._backend import backend
+from spekk.array._types import Optional, Union
+from spekk.array._util import ensure_array
+from spekk.array.array_object import array
+from spekk.array.manipulation_functions import broadcast_arrays
 
 
 def abs(x: array, /) -> array:
@@ -125,6 +129,8 @@ def abs(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.abs(x._data), x._dims)
 
 
 def acos(x: array, /) -> array:
@@ -194,6 +200,8 @@ def acos(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.acos(x._data), x._dims)
 
 
 def acosh(x: array, /) -> array:
@@ -268,6 +276,8 @@ def acosh(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.acosh(x._data), x._dims)
 
 
 def add(x1: array, x2: array, /) -> array:
@@ -336,6 +346,8 @@ def add(x1: array, x2: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.add(x1._data, x2._data), x1._dims)
 
 
 def asin(x: array, /) -> array:
@@ -393,6 +405,8 @@ def asin(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.asin(x._data), x._dims)
 
 
 def asinh(x: array, /) -> array:
@@ -458,6 +472,8 @@ def asinh(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.asinh(x._data), x._dims)
 
 
 def atan(x: array, /) -> array:
@@ -510,6 +526,8 @@ def atan(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.atan(x._data), x._dims)
 
 
 def atan2(x1: array, x2: array, /) -> array:
@@ -566,6 +584,8 @@ def atan2(x1: array, x2: array, /) -> array:
     - If ``x1_i`` is ``-infinity`` and ``x2_i`` is ``+infinity``, the result is an implementation-dependent approximation to ``-π/4``.
     - If ``x1_i`` is ``-infinity`` and ``x2_i`` is ``-infinity``, the result is an implementation-dependent approximation to ``-3π/4``.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.atan2(x1._data, x2._data), x1._dims)
 
 
 def atanh(x: array, /) -> array:
@@ -635,6 +655,8 @@ def atanh(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.atanh(x._data), x._dims)
 
 
 def bitwise_and(x1: array, x2: array, /) -> array:
@@ -653,6 +675,8 @@ def bitwise_and(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type determined by :ref:`type-promotion`.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.bitwise_and(x1._data, x2._data), x1._dims)
 
 
 def bitwise_left_shift(x1: array, x2: array, /) -> array:
@@ -671,6 +695,8 @@ def bitwise_left_shift(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type determined by :ref:`type-promotion`.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.bitwise_left_shift(x1._data, x2._data), x1._dims)
 
 
 def bitwise_invert(x: array, /) -> array:
@@ -687,6 +713,8 @@ def bitwise_invert(x: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have the same data type as ``x``.
     """
+    x = ensure_array(x)
+    return array(backend.bitwise_invert(x._data), x._dims)
 
 
 def bitwise_or(x1: array, x2: array, /) -> array:
@@ -705,6 +733,8 @@ def bitwise_or(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type determined by :ref:`type-promotion`.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.bitwise_or(x1._data, x2._data), x1._dims)
 
 
 def bitwise_right_shift(x1: array, x2: array, /) -> array:
@@ -726,6 +756,8 @@ def bitwise_right_shift(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type determined by :ref:`type-promotion`.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.bitwise_right_shift(x1._data, x2._data), x1._dims)
 
 
 def bitwise_xor(x1: array, x2: array, /) -> array:
@@ -744,6 +776,8 @@ def bitwise_xor(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type determined by :ref:`type-promotion`.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.bitwise_xor(x1._data, x2._data), x1._dims)
 
 
 def ceil(x: array, /) -> array:
@@ -775,6 +809,8 @@ def ceil(x: array, /) -> array:
     - If ``x_i`` is ``-0``, the result is ``-0``.
     - If ``x_i`` is ``NaN``, the result is ``NaN``.
     """
+    x = ensure_array(x)
+    return array(backend.ceil(x._data), x._dims)
 
 
 def clip(
@@ -815,6 +851,8 @@ def clip(
 
     .. versionadded:: 2023.12
     """
+    x = ensure_array(x)
+    return array(backend.clip(x._data, min=min, max=max), x._dims)
 
 
 def conj(x: array, /) -> array:
@@ -848,6 +886,8 @@ def conj(x: array, /) -> array:
 
     .. versionadded:: 2022.12
     """
+    x = ensure_array(x)
+    return array(backend.conj(x._data), x._dims)
 
 
 def copysign(x1: array, x2: array, /) -> array:
@@ -889,6 +929,8 @@ def copysign(x1: array, x2: array, /) -> array:
 
     .. versionadded:: 2023.12
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.copysign(x1._data, x2._data), x1._dims)
 
 
 def cos(x: array, /) -> array:
@@ -936,6 +978,8 @@ def cos(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.cos(x._data), x._dims)
 
 
 def cosh(x: array, /) -> array:
@@ -999,6 +1043,8 @@ def cosh(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.cosh(x._data), x._dims)
 
 
 def divide(x1: array, x2: array, /) -> array:
@@ -1082,6 +1128,8 @@ def divide(x1: array, x2: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.divide(x1._data, x2._data), x1._dims)
 
 
 def equal(x1: array, x2: array, /) -> array:
@@ -1126,6 +1174,8 @@ def equal(x1: array, x2: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.equal(x1._data, x2._data), x1._dims)
 
 
 def exp(x: array, /) -> array:
@@ -1182,6 +1232,8 @@ def exp(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.exp(x._data), x._dims)
 
 
 def expm1(x: array, /) -> array:
@@ -1241,6 +1293,8 @@ def expm1(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.expm1(x._data), x._dims)
 
 
 def floor(x: array, /) -> array:
@@ -1272,6 +1326,8 @@ def floor(x: array, /) -> array:
     - If ``x_i`` is ``-0``, the result is ``-0``.
     - If ``x_i`` is ``NaN``, the result is ``NaN``.
     """
+    x = ensure_array(x)
+    return array(backend.floor(x._data), x._dims)
 
 
 def floor_divide(x1: array, x2: array, /) -> array:
@@ -1332,6 +1388,8 @@ def floor_divide(x1: array, x2: array, /) -> array:
     - If ``x1_i`` and ``x2_i`` have different mathematical signs and are both nonzero finite numbers, the result has a negative mathematical sign.
     - In the remaining cases, where neither ``-infinity``, ``+0``, ``-0``, nor ``NaN`` is involved, the quotient must be computed and rounded to the greatest (i.e., closest to `+infinity`) representable integer-value number that is not greater than the division result. If the magnitude is too large to represent, the operation overflows and the result is an ``infinity`` of appropriate mathematical sign. If the magnitude is too small to represent, the operation underflows and the result is a zero of appropriate mathematical sign.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.floor_divide(x1._data, x2._data), x1._dims)
 
 
 def greater(x1: array, x2: array, /) -> array:
@@ -1353,6 +1411,8 @@ def greater(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type of ``bool``.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.greater(x1._data, x2._data), x1._dims)
 
 
 def greater_equal(x1: array, x2: array, /) -> array:
@@ -1374,6 +1434,8 @@ def greater_equal(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type of ``bool``.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.greater_equal(x1._data, x2._data), x1._dims)
 
 
 def hypot(x1: array, x2: array, /) -> array:
@@ -1421,6 +1483,8 @@ def hypot(x1: array, x2: array, /) -> array:
 
     .. versionadded:: 2023.12
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.hypot(x1._data, x2._data), x1._dims)
 
 
 def imag(x: array, /) -> array:
@@ -1442,6 +1506,8 @@ def imag(x: array, /) -> array:
 
     .. versionadded:: 2022.12
     """
+    x = ensure_array(x)
+    return array(backend.imag(x._data), x._dims)
 
 
 def isfinite(x: array, /) -> array:
@@ -1479,6 +1545,8 @@ def isfinite(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.isfinite(x._data), x._dims)
 
 
 def isinf(x: array, /) -> array:
@@ -1514,6 +1582,8 @@ def isinf(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.isinf(x._data), x._dims)
 
 
 def isnan(x: array, /) -> array:
@@ -1548,6 +1618,8 @@ def isnan(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.isnan(x._data), x._dims)
 
 
 def less(x1: array, x2: array, /) -> array:
@@ -1569,6 +1641,8 @@ def less(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type of ``bool``.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.less(x1._data, x2._data), x1._dims)
 
 
 def less_equal(x1: array, x2: array, /) -> array:
@@ -1590,6 +1664,8 @@ def less_equal(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type of ``bool``.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.less_equal(x1._data, x2._data), x1._dims)
 
 
 def log(x: array, /) -> array:
@@ -1652,6 +1728,8 @@ def log(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.log(x._data), x._dims)
 
 
 def log1p(x: array, /) -> array:
@@ -1714,6 +1792,8 @@ def log1p(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.log1p(x._data), x._dims)
 
 
 def log2(x: array, /) -> array:
@@ -1756,6 +1836,8 @@ def log2(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.log2(x._data), x._dims)
 
 
 def log10(x: array, /) -> array:
@@ -1798,6 +1880,8 @@ def log10(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.log10(x._data), x._dims)
 
 
 def logaddexp(x1: array, x2: array, /) -> array:
@@ -1827,6 +1911,8 @@ def logaddexp(x1: array, x2: array, /) -> array:
     - If ``x1_i`` is ``+infinity`` and ``x2_i`` is not ``NaN``, the result is ``+infinity``.
     - If ``x1_i`` is not ``NaN`` and ``x2_i`` is ``+infinity``, the result is ``+infinity``.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.logaddexp(x1._data, x2._data), x1._dims)
 
 
 def logical_and(x1: array, x2: array, /) -> array:
@@ -1848,6 +1934,8 @@ def logical_and(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type of `bool`.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.logical_and(x1._data, x2._data), x1._dims)
 
 
 def logical_not(x: array, /) -> array:
@@ -1867,6 +1955,8 @@ def logical_not(x: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type of ``bool``.
     """
+    x = ensure_array(x)
+    return array(backend.logical_not(x._data), x._dims)
 
 
 def logical_or(x1: array, x2: array, /) -> array:
@@ -1888,6 +1978,8 @@ def logical_or(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type of ``bool``.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.logical_not(x1._data, x2._data), x1._dims)
 
 
 def logical_xor(x1: array, x2: array, /) -> array:
@@ -1909,6 +2001,8 @@ def logical_xor(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type of ``bool``.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.logical_xor(x1._data, x2._data), x1._dims)
 
 
 def maximum(x1: array, x2: array, /) -> array:
@@ -1942,6 +2036,8 @@ def maximum(x1: array, x2: array, /) -> array:
 
     .. versionadded:: 2023.12
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.maximum(x1._data, x2._data), x1._dims)
 
 
 def minimum(x1: array, x2: array, /) -> array:
@@ -1975,6 +2071,8 @@ def minimum(x1: array, x2: array, /) -> array:
 
     .. versionadded:: 2023.12
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.minimum(x1._data, x2._data), x1._dims)
 
 
 def multiply(x1: array, x2: array, /) -> array:
@@ -2043,6 +2141,8 @@ def multiply(x1: array, x2: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.multiply(x1._data, x2._data), x1._dims)
 
 
 def negative(x: array, /) -> array:
@@ -2071,6 +2171,8 @@ def negative(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.negative(x._data), x._dims)
 
 
 def not_equal(x1: array, x2: array, /) -> array:
@@ -2113,6 +2215,8 @@ def not_equal(x1: array, x2: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.not_equal(x1._data, x2._data), x1._dims)
 
 
 def positive(x: array, /) -> array:
@@ -2135,6 +2239,8 @@ def positive(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.positive(x._data), x._dims)
 
 
 def pow(x1: array, x2: array, /) -> array:
@@ -2205,6 +2311,8 @@ def pow(x1: array, x2: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.pow(x1._data, x2._data), x1._dims)
 
 
 def real(x: array, /) -> array:
@@ -2226,6 +2334,8 @@ def real(x: array, /) -> array:
 
     .. versionadded:: 2022.12
     """
+    x = ensure_array(x)
+    return array(backend.real(x._data), x._dims)
 
 
 def remainder(x1: array, x2: array, /) -> array:
@@ -2281,6 +2391,8 @@ def remainder(x1: array, x2: array, /) -> array:
     - If ``x1_i`` is a negative (i.e., less than ``0``) finite number and ``x2_i`` is ``-infinity``, the result is ``x1_i``. (**note**: this result matches Python behavior.)
     - In the remaining cases, the result must match that of the Python ``%`` operator.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.remainder(x1._data, x2._data), x1._dims)
 
 
 def round(x: array, /) -> array:
@@ -2324,6 +2436,8 @@ def round(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.round(x._data), x._dims)
 
 
 def sign(x: array, /) -> array:
@@ -2371,6 +2485,8 @@ def sign(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.sign(x._data), x._dims)
 
 
 def signbit(x: array, /) -> array:
@@ -2407,6 +2523,8 @@ def signbit(x: array, /) -> array:
 
     .. versionadded:: 2023.12
     """
+    x = ensure_array(x)
+    return array(backend.signbit(x._data), x._dims)
 
 
 def sin(x: array, /) -> array:
@@ -2453,6 +2571,8 @@ def sin(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.sin(x._data), x._dims)
 
 
 def sinh(x: array, /) -> array:
@@ -2516,6 +2636,8 @@ def sinh(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.sinh(x._data), x._dims)
 
 
 def square(x: array, /) -> array:
@@ -2547,6 +2669,8 @@ def square(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.square(x._data), x._dims)
 
 
 def sqrt(x: array, /) -> array:
@@ -2606,6 +2730,8 @@ def sqrt(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.sqrt(x._data), x._dims)
 
 
 def subtract(x1: array, x2: array, /) -> array:
@@ -2632,6 +2758,8 @@ def subtract(x1: array, x2: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    return array(backend.subtract(x1._data, x2._data), x1._dims)
 
 
 def tan(x: array, /) -> array:
@@ -2678,6 +2806,8 @@ def tan(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.tan(x._data), x._dims)
 
 
 def tanh(x: array, /) -> array:
@@ -2745,6 +2875,8 @@ def tanh(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    return array(backend.tanh(x._data), x._dims)
 
 
 def trunc(x: array, /) -> array:
@@ -2776,3 +2908,5 @@ def trunc(x: array, /) -> array:
     - If ``x_i`` is ``-0``, the result is ``-0``.
     - If ``x_i`` is ``NaN``, the result is ``NaN``.
     """
+    x = ensure_array(x)
+    return array(backend.trunc(x._data), x._dims)

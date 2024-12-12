@@ -1,10 +1,14 @@
 __all__ = ["argmax", "argmin", "nonzero", "searchsorted", "where"]
 
+from typing import Literal
+from spekk.array._types import Dim, Optional, Tuple, UndefinedDim
+from spekk.array.array_object import array
+from spekk.array._backend import backend
+from spekk.array.exceptions import MismatchedDimensionsError
+from spekk.array.manipulation_functions import broadcast_arrays
 
-from ._types import Optional, Tuple, Literal, array
 
-
-def argmax(x: array, /, *, axis: Optional[int] = None, keepdims: bool = False) -> array:
+def argmax(x: array, /, *, axis: Optional[Dim] = None, keepdims: bool = False) -> array:
     """
     Returns the indices of the maximum values along a specified axis.
 
@@ -27,6 +31,11 @@ def argmax(x: array, /, *, axis: Optional[int] = None, keepdims: bool = False) -
     out: array
         if ``axis`` is ``None``, a zero-dimensional array containing the index of the first occurrence of the maximum value; otherwise, a non-zero-dimensional array containing the indices of the maximum values. The returned array must have be the default array index data type.
     """
+    dims = list(x._dims)
+    if not keepdims:
+        dims.remove(axis)
+    axis = x._dims.index(axis)
+    return array(backend.argmax(x._data, axis=axis, keepdims=keepdims), dims)
 
 
 def argmin(x: array, /, *, axis: Optional[int] = None, keepdims: bool = False) -> array:
@@ -52,6 +61,11 @@ def argmin(x: array, /, *, axis: Optional[int] = None, keepdims: bool = False) -
     out: array
         if ``axis`` is ``None``, a zero-dimensional array containing the index of the first occurrence of the minimum value; otherwise, a non-zero-dimensional array containing the indices of the minimum values. The returned array must have the default array index data type.
     """
+    dims = list(x._dims)
+    if not keepdims:
+        dims.remove(axis)
+    axis = x._dims.index(axis)
+    return array(backend.argmin(x._data, axis=axis, keepdims=keepdims), dims)
 
 
 def nonzero(x: array, /) -> Tuple[array, ...]:
@@ -85,6 +99,7 @@ def nonzero(x: array, /) -> Tuple[array, ...]:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    return tuple(array(result, [UndefinedDim()]) for result in backend.nonzero(x._data))
 
 
 def searchsorted(
@@ -137,6 +152,16 @@ def searchsorted(
 
     .. versionadded:: 2023.12
     """
+    if sorter is not None:
+        sorter = sorter._data
+        if sorter.shape != x1._data.shape:
+            raise MismatchedDimensionsError(
+                f"sorter must have the same shape as x1, but received sorter.shape={sorter.shape} and x1.shape={x1.shape}."
+            )
+    return array(
+        backend.searchsorted(x1._data, x2._data, side=side, sorter=sorter),
+        x2._dims,
+    )
 
 
 def where(condition: array, x1: array, x2: array, /) -> array:
@@ -157,3 +182,5 @@ def where(condition: array, x1: array, x2: array, /) -> array:
     out: array
         an array with elements from ``x1`` where ``condition`` is ``True``, and elements from ``x2`` elsewhere. The returned array must have a data type determined by :ref:`type-promotion` rules with the arrays ``x1`` and ``x2``.
     """
+    condition, x1, x2 = broadcast_arrays(condition, x1, x2)
+    return array(backend.where(condition._data, x1._data, x2._data), condition._dims)

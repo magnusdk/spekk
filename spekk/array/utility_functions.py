@@ -1,7 +1,11 @@
 __all__ = ["all", "any"]
 
 
-from ._types import Optional, Tuple, Union, array
+from typing import Optional, Tuple, Union
+
+from spekk.array._util import get_reduction_axes_and_resulting_dims
+from spekk.array.array_object import array
+from spekk.array._backend import backend
 
 
 def all(
@@ -43,6 +47,9 @@ def all(
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    axis, dims = get_reduction_axes_and_resulting_dims(axis, x._dims, keepdims)
+    data = backend.all(x._data, axis=axis, keepdims=keepdims)
+    return array(data, dims)
 
 
 def any(
@@ -84,3 +91,6 @@ def any(
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    axis, dims = get_reduction_axes_and_resulting_dims(axis, x._dims, keepdims)
+    data = backend.any(x._data, axis=axis, keepdims=keepdims)
+    return array(data, dims)

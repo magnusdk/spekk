@@ -1,7 +1,9 @@
 __all__ = ["argsort", "sort"]
 
 
-from ._types import array
+from spekk.array._types import Dim
+from spekk.array.array_object import array
+from spekk.array._backend import backend
 
 
 def argsort(
@@ -29,6 +31,11 @@ def argsort(
     out : array
         an array of indices. The returned array must have the same shape as ``x``. The returned array must have the default array index data type.
     """
+    axis = x._dims.index(axis) if isinstance(axis, Dim) else axis
+    return array(
+        backend.argsort(x._data, axis=axis, descending=descending, sgtable=stable),
+        x._dims,
+    )
 
 
 def sort(
@@ -56,3 +63,8 @@ def sort(
     out : array
         a sorted array. The returned array must have the same data type and shape as ``x``.
     """
+    axis = x._dims.index(axis) if isinstance(axis, Dim) else axis
+    return array(
+        backend.sort(x._data, axis=axis, descending=descending, sgtable=stable),
+        x._dims,
+    )

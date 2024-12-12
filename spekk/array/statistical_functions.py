@@ -1,14 +1,17 @@
 __all__ = ["cumulative_sum", "max", "mean", "min", "prod", "std", "sum", "var"]
 
 
-from ._types import Optional, Tuple, Union, array, dtype
+from spekk.array._backend import backend
+from spekk.array._types import Dim, Optional, Tuple, Union, dtype
+from spekk.array._util import ensure_array, get_reduction_axes_and_resulting_dims
+from spekk.array.array_object import array
 
 
 def cumulative_sum(
     x: array,
     /,
     *,
-    axis: Optional[int] = None,
+    axis: Optional[Union[int, Dim]] = None,
     dtype: Optional[dtype] = None,
     include_initial: bool = False,
 ) -> array:
@@ -54,13 +57,24 @@ def cumulative_sum(
 
     .. versionadded:: 2023.12
     """
+    x = ensure_array(x)
+    if axis is None and x.ndim != 1:
+        raise ValueError("dim must be provided when x has more than one dimension.")
+
+    axis = x._dims.index(axis)
+    data = backend.cumulative_sum(
+        x._data, axis=axis, dtype=dtype, include_initial=include_initial
+    )
+    dims = list(x._dims)
+    dims.remove(axis)
+    return array(data, dims)
 
 
 def max(
     x: array,
     /,
     *,
-    axis: Optional[Union[int, Tuple[int, ...]]] = None,
+    axis: Optional[Union[Dim, Tuple[Dim, ...], int, Tuple[int, ...]]] = None,
     keepdims: bool = False,
 ) -> array:
     """
@@ -98,13 +112,17 @@ def max(
     .. versionchanged:: 2023.12
        Clarified that the order of signed zeros is implementation-defined.
     """
+    x = ensure_array(x)
+    axis, dims = get_reduction_axes_and_resulting_dims(axis, x._dims, keepdims)
+    data = backend.max(x._data, axis=axis, keepdims=keepdims)
+    return array(data, dims)
 
 
 def mean(
     x: array,
     /,
     *,
-    axis: Optional[Union[int, Tuple[int, ...]]] = None,
+    axis: Optional[Union[Dim, Tuple[Dim, ...], int, Tuple[int, ...]]] = None,
     keepdims: bool = False,
 ) -> array:
     """
@@ -137,13 +155,17 @@ def mean(
     -   If ``N`` is ``0``, the arithmetic mean is ``NaN``.
     -   If ``x_i`` is ``NaN``, the arithmetic mean is ``NaN`` (i.e., ``NaN`` values propagate).
     """
+    x = ensure_array(x)
+    axis, dims = get_reduction_axes_and_resulting_dims(axis, x._dims, keepdims)
+    data = backend.mean(x._data, axis=axis, keepdims=keepdims)
+    return array(data, dims)
 
 
 def min(
     x: array,
     /,
     *,
-    axis: Optional[Union[int, Tuple[int, ...]]] = None,
+    axis: Optional[Union[Dim, Tuple[Dim, ...], int, Tuple[int, ...]]] = None,
     keepdims: bool = False,
 ) -> array:
     """
@@ -181,13 +203,17 @@ def min(
     .. versionchanged:: 2023.12
        Clarified that the order of signed zeros is implementation-defined.
     """
+    x = ensure_array(x)
+    axis, dims = get_reduction_axes_and_resulting_dims(axis, x._dims, keepdims)
+    data = backend.min(x._data, axis=axis, keepdims=keepdims)
+    return array(data, dims)
 
 
 def prod(
     x: array,
     /,
     *,
-    axis: Optional[Union[int, Tuple[int, ...]]] = None,
+    axis: Optional[Union[Dim, Tuple[Dim, ...], int, Tuple[int, ...]]] = None,
     dtype: Optional[dtype] = None,
     keepdims: bool = False,
 ) -> array:
@@ -234,13 +260,17 @@ def prod(
     .. versionchanged:: 2023.12
        Required the function to return a floating-point array having the same data type as the input array when provided a floating-point array.
     """
+    x = ensure_array(x)
+    axis, dims = get_reduction_axes_and_resulting_dims(axis, x._dims, keepdims)
+    data = backend.prod(x._data, axis=axis, dtype=dtype, keepdims=keepdims)
+    return array(data, dims)
 
 
 def std(
     x: array,
     /,
     *,
-    axis: Optional[Union[int, Tuple[int, ...]]] = None,
+    axis: Optional[Union[Dim, Tuple[Dim, ...], int, Tuple[int, ...]]] = None,
     correction: Union[int, float] = 0.0,
     keepdims: bool = False,
 ) -> array:
@@ -276,13 +306,17 @@ def std(
     -   If ``N - correction`` is less than or equal to ``0``, the standard deviation is ``NaN``.
     -   If ``x_i`` is ``NaN``, the standard deviation is ``NaN`` (i.e., ``NaN`` values propagate).
     """
+    x = ensure_array(x)
+    axis, dims = get_reduction_axes_and_resulting_dims(axis, x._dims, keepdims)
+    data = backend.std(x._data, axis=axis, correction=correction, keepdims=keepdims)
+    return array(data, dims)
 
 
 def sum(
     x: array,
     /,
     *,
-    axis: Optional[Union[int, Tuple[int, ...]]] = None,
+    axis: Optional[Union[Dim, Tuple[Dim, ...], int, Tuple[int, ...]]] = None,
     dtype: Optional[dtype] = None,
     keepdims: bool = False,
 ) -> array:
@@ -329,13 +363,17 @@ def sum(
     .. versionchanged:: 2023.12
        Required the function to return a floating-point array having the same data type as the input array when provided a floating-point array.
     """
+    x = ensure_array(x)
+    axis, dims = get_reduction_axes_and_resulting_dims(axis, x._dims, keepdims)
+    data = backend.sum(x._data, axis=axis, dtype=dtype, keepdims=keepdims)
+    return array(data, dims)
 
 
 def var(
     x: array,
     /,
     *,
-    axis: Optional[Union[int, Tuple[int, ...]]] = None,
+    axis: Optional[Union[Dim, Tuple[Dim, ...], int, Tuple[int, ...]]] = None,
     correction: Union[int, float] = 0.0,
     keepdims: bool = False,
 ) -> array:
@@ -372,3 +410,7 @@ def var(
     -   If ``N - correction`` is less than or equal to ``0``, the variance is ``NaN``.
     -   If ``x_i`` is ``NaN``, the variance is ``NaN`` (i.e., ``NaN`` values propagate).
     """
+    x = ensure_array(x)
+    axis, dims = get_reduction_axes_and_resulting_dims(axis, x._dims, keepdims)
+    data = backend.var(x._data, axis=axis, correction=correction, keepdims=keepdims)
+    return array(data, dims)

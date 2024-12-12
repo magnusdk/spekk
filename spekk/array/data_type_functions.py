@@ -1,15 +1,16 @@
 __all__ = ["astype", "can_cast", "finfo", "iinfo", "isdtype", "result_type"]
 
-from ._types import (
-    Union,
+from spekk.array._backend import backend
+from spekk.array._types import (
+    Optional,
     Tuple,
-    array,
+    Union,
+    device,
     dtype,
     finfo_object,
     iinfo_object,
-    device,
-    Optional,
 )
+from spekk.array.array_object import array
 
 
 def astype(
@@ -61,6 +62,13 @@ def astype(
     .. versionchanged:: 2023.12
        Added device keyword argument support.
     """
+    # NOTE: Hack to make it work with Numpy. Remove this (and just pass copy and device 
+    # directly to backend.astype) when it has been fixed.
+    kwargs = dict(copy=copy)
+    if device is not None:
+        kwargs["device"] = device
+    data = backend.astype(x._data, dtype, **kwargs)
+    return array(data, x._dims)
 
 
 def can_cast(from_: Union[dtype, array], to: dtype, /) -> bool:
@@ -79,6 +87,8 @@ def can_cast(from_: Union[dtype, array], to: dtype, /) -> bool:
     out: bool
         ``True`` if the cast can occur according to :ref:`type-promotion` rules; otherwise, ``False``.
     """
+    from_ = from_._data if isinstance(from_, array) else from_
+    return backend.can_cast(from_, to)
 
 
 def finfo(type: Union[dtype, array], /) -> finfo_object:
@@ -130,6 +140,8 @@ def finfo(type: Union[dtype, array], /) -> finfo_object:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    type = type._data if isinstance(type, array) else type
+    return backend.finfo(type)
 
 
 def iinfo(type: Union[dtype, array], /) -> iinfo_object:
@@ -164,6 +176,8 @@ def iinfo(type: Union[dtype, array], /) -> iinfo_object:
 
           .. versionadded:: 2022.12
     """
+    type = type._data if isinstance(type, array) else type
+    return backend.iinfo(type)
 
 
 def isdtype(
@@ -207,6 +221,7 @@ def isdtype(
 
     .. versionadded:: 2022.12
     """
+    return backend.isdtype(dtype, kind)
 
 
 def result_type(*arrays_and_dtypes: Union[array, dtype]) -> dtype:
@@ -226,3 +241,7 @@ def result_type(*arrays_and_dtypes: Union[array, dtype]) -> dtype:
     out: dtype
         the dtype resulting from an operation involving the input arrays and dtypes.
     """
+    arrays_and_dtypes = [
+        x._data if isinstance(x, array) else x for x in arrays_and_dtypes
+    ]
+    return backend.result_type(*arrays_and_dtypes)

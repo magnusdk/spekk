@@ -1,3 +1,5 @@
+# TODO
+
 __all__ = [
     "__array_namespace_info__",
     "capabilities",
@@ -6,19 +8,10 @@ __all__ = [
     "devices",
     "dtypes",
 ]
+from typing import List, Optional, Tuple, Union
 
-from ._types import (
-    Optional,
-    Union,
-    Tuple,
-    List,
-    device,
-    dtype,
-    DefaultDataTypes,
-    DataTypes,
-    Capabilities,
-    Info,
-)
+from spekk.array._backend import backend
+from spekk.array._types import Capabilities, DataTypes, DefaultDataTypes, Info, device
 
 
 def __array_namespace_info__() -> Info:
@@ -48,6 +41,7 @@ def __array_namespace_info__() -> Info:
 
     .. versionadded: 2023.12
     """
+    return backend.__array_namespace_info__()
 
 
 def capabilities() -> Capabilities:
@@ -69,6 +63,8 @@ def capabilities() -> Capabilities:
 
     .. versionadded: 2023.12
     """
+    # NOTE: I don't think this is needed? It is part of the object returned from __array_namespace_info__() (I think).
+    return backend.capabilities()
 
 
 def default_device() -> device:
@@ -85,6 +81,8 @@ def default_device() -> device:
 
     .. versionadded: 2023.12
     """
+    # NOTE: I don't think this is needed? It is part of the object returned from __array_namespace_info__() (I think).
+    return backend.default_device()
 
 
 def default_dtypes(
@@ -121,6 +119,8 @@ def default_dtypes(
 
     .. versionadded: 2023.12
     """
+    # NOTE: I don't think this is needed? It is part of the object returned from __array_namespace_info__() (I think).
+    return backend.default_dtypes(device=device)
 
 
 def dtypes(
@@ -176,6 +176,8 @@ def dtypes(
 
     .. versionadded: 2023.12
     """
+    # NOTE: I don't think this is needed? It is part of the object returned from __array_namespace_info__() (I think).
+    return backend.dtypes(device=device, kind=kind)
 
 
 def devices() -> List[device]:
@@ -197,3 +199,5 @@ def devices() -> List[device]:
 
     .. versionadded: 2023.12
     """
+    # NOTE: I don't think this is needed? It is part of the object returned from __array_namespace_info__() (I think).
+    return backend.devices()

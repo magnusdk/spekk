@@ -23,10 +23,22 @@ __all__ = [
     "vecdot",
     "vector_norm",
 ]
+from typing import Literal
 
-
-from ._types import Literal, Optional, Tuple, Union, Sequence, array, dtype
-from .constants import inf
+from spekk.array import linear_algebra_functions
+from spekk.array._backend import backend
+from spekk.array._types import (
+    Dim,
+    Optional,
+    Sequence,
+    Tuple,
+    UndefinedDim,
+    Union,
+    dtype,
+)
+from spekk.array.array_object import array
+from spekk.array.constants import inf
+from spekk.array.manipulation_functions import broadcast_arrays
 
 
 def cholesky(x: array, /, *, upper: bool = False) -> array:
@@ -72,6 +84,7 @@ def cholesky(x: array, /, *, upper: bool = False) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    return array(backend.linalg.cholesky(x._data, upper=upper), x._dims)
 
 
 def cross(x1: array, x2: array, /, *, axis: int = -1) -> array:
@@ -115,6 +128,10 @@ def cross(x1: array, x2: array, /, *, axis: int = -1) -> array:
     .. versionchanged:: 2023.12
        Restricted broadcasting to only non-compute axes and required that ``axis`` be a negative integer.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    if isinstance(axis, Dim):
+        axis = x1._dims.index(axis)
+    return array(backend.linalg.cross(x1._data, x2._data, axis=axis), x1._dims)
 
 
 def det(x: array, /) -> array:
@@ -137,9 +154,19 @@ def det(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    data = backend.linalg.det(x._data)
+    # linalg.det doesn't take in 'axes' argument, and requires the square matrix as the last two axes.
+    dims = x._dims[:-2]
+    return array(data, dims)
 
 
-def diagonal(x: array, /, *, offset: int = 0) -> array:
+def diagonal(
+    x: array,
+    /,
+    *,
+    offset: int = 0,
+    new_dim: Optional[Dim] = None,
+) -> array:
     """
     Returns the specified diagonals of a matrix (or a stack of matrices) ``x``.
 
@@ -161,6 +188,15 @@ def diagonal(x: array, /, *, offset: int = 0) -> array:
     out: array
         an array containing the diagonals and whose shape is determined by removing the last two dimensions and appending a dimension equal to the size of the resulting diagonals. The returned array must have the same data type as ``x``.
     """
+    if new_dim is None:
+        new_dim = UndefinedDim()
+    data = backend.linalg.det(x._data, offset=offset)
+    dims = x._dims[:-2] + [new_dim]
+    return array(data, dims)
+
+
+# dims.append(new_dimension_name)
+# return array(data, dims)
 
 
 def eigh(x: array, /) -> Tuple[array]:
@@ -212,7 +248,7 @@ def eigh(x: array, /) -> Tuple[array]:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
-
+    raise NotImplementedError("Please help me implement this!")
 
 def eigvalsh(x: array, /) -> array:
     r"""
@@ -255,6 +291,7 @@ def eigvalsh(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    raise NotImplementedError("Please help me implement this!")
 
 
 def inv(x: array, /) -> array:
@@ -290,10 +327,12 @@ def inv(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    raise NotImplementedError("Please help me implement this!")
 
 
 def matmul(x1: array, x2: array, /) -> array:
     """Alias for :func:`~array_api.matmul`."""
+    return linear_algebra_functions.matmul(x1, x2)
 
 
 def matrix_norm(
@@ -360,6 +399,7 @@ def matrix_norm(
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    raise NotImplementedError("Please help me implement this!")
 
 
 def matrix_power(x: array, n: int, /) -> array:
@@ -384,6 +424,7 @@ def matrix_power(x: array, n: int, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    raise NotImplementedError("Please help me implement this!")
 
 
 def matrix_rank(x: array, /, *, rtol: Optional[Union[float, array]] = None) -> array:
@@ -410,10 +451,12 @@ def matrix_rank(x: array, /, *, rtol: Optional[Union[float, array]] = None) -> a
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    raise NotImplementedError("Please help me implement this!")
 
 
 def matrix_transpose(x: array, /) -> array:
     """Alias for :func:`~array_api.matrix_transpose`."""
+    return linear_algebra_functions.matrix_transpose(x)
 
 
 def outer(x1: array, x2: array, /) -> array:
@@ -438,6 +481,7 @@ def outer(x1: array, x2: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    raise NotImplementedError("Please help me implement this!")
 
 
 def pinv(x: array, /, *, rtol: Optional[Union[float, array]] = None) -> array:
@@ -478,6 +522,7 @@ def pinv(x: array, /, *, rtol: Optional[Union[float, array]] = None) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    raise NotImplementedError("Please help me implement this!")
 
 
 def qr(
@@ -543,6 +588,7 @@ def qr(
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    raise NotImplementedError("Please help me implement this!")
 
 
 def slogdet(x: array, /) -> Tuple[array, array]:
@@ -598,6 +644,7 @@ def slogdet(x: array, /) -> Tuple[array, array]:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    raise NotImplementedError("Please help me implement this!")
 
 
 def solve(x1: array, x2: array, /) -> array:
@@ -636,6 +683,7 @@ def solve(x1: array, x2: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    raise NotImplementedError("Please help me implement this!")
 
 
 def svd(x: array, /, *, full_matrices: bool = True) -> Tuple[array, array, array]:
@@ -691,6 +739,7 @@ def svd(x: array, /, *, full_matrices: bool = True) -> Tuple[array, array, array
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    raise NotImplementedError("Please help me implement this!")
 
 
 def svdvals(x: array, /) -> array:
@@ -715,6 +764,7 @@ def svdvals(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    raise NotImplementedError("Please help me implement this!")
 
 
 def tensordot(
@@ -725,6 +775,7 @@ def tensordot(
     axes: Union[int, Tuple[Sequence[int], Sequence[int]]] = 2,
 ) -> array:
     """Alias for :func:`~array_api.tensordot`."""
+    return linear_algebra_functions.tensordot(x1, x2, axes=axes)
 
 
 def trace(x: array, /, *, offset: int = 0, dtype: Optional[dtype] = None) -> array:
@@ -779,10 +830,12 @@ def trace(x: array, /, *, offset: int = 0, dtype: Optional[dtype] = None) -> arr
     .. versionchanged:: 2023.12
        Required the function to return a floating-point array having the same data type as the input array when provided a floating-point array.
     """
+    raise NotImplementedError("Please help me implement this!")
 
 
 def vecdot(x1: array, x2: array, /, *, axis: int = None) -> array:
     """Alias for :func:`~array_api.vecdot`."""
+    return linear_algebra_functions.vecdot(x1, x2, axis=axis)
 
 
 def vector_norm(
@@ -848,3 +901,4 @@ def vector_norm(
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    raise NotImplementedError("Please help me implement this!")

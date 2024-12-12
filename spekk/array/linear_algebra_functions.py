@@ -1,7 +1,11 @@
 __all__ = ["matmul", "matrix_transpose", "tensordot", "vecdot"]
 
 
-from ._types import Tuple, Union, Sequence, array
+from spekk.array._types import Dim, Sequence, Tuple, Union
+from spekk.array.array_object import array
+from spekk.array._backend import backend
+from spekk.array.exceptions import MismatchedDimensionsError
+from spekk.array.manipulation_functions import broadcast_arrays
 
 
 def matmul(x1: array, x2: array, /) -> array:
@@ -50,6 +54,50 @@ def matmul(x1: array, x2: array, /) -> array:
     -   if ``x1`` is an array having shape ``(..., M, K)``, ``x2`` is an array having shape ``(..., L, N)``, and ``K != L``.
 
     """
+    general_error_message = (
+        f"Incorrect axes for matmul: x1.shape={x1.shape}, x2.shape={x2.shape}"
+    )
+
+    if x1.ndim == 0 or x2.ndim == 0:
+        raise ValueError(general_error_message)
+
+    # Both are one-dimensional -> inner product
+    if x1.ndim == 1 and x2.ndim == 1:
+        if x1._dims != x2._dims:
+            raise MismatchedDimensionsError(general_error_message)
+        return array(backend.matmul(x1._data, x2._data), [])
+
+    # Both are two-dimensional
+    if x1.ndim == 2 and x2.ndim == 2:
+        if x1._dims[1] != x2._dims[0]:
+            raise MismatchedDimensionsError(general_error_message)
+        return array(
+            backend.matmul(x1._data, x2._data),
+            [x1._dims[0], x2._dims[1]],
+        )
+
+    # x1 is one-dimensional, x2 isn't
+    if x1.ndim == 1 and x2.ndim != 1:
+        if x1._dims[0] != x2._dims[-2]:
+            raise MismatchedDimensionsError(general_error_message)
+        dims = list(x2._dims)
+        dims.pop(-2)
+        return array(backend.matmul(x1._data, x2._data), dims)
+
+    # x1 isn't one-dimensional, x2 is
+    if x1.ndim != 1 and x2.ndim == 1:
+        if x1._dims[-2] != x2._dims[0]:
+            raise MismatchedDimensionsError(general_error_message)
+        dims = list(x1._dims)
+        dims.pop(-2)
+        return array(backend.matmul(x1._data, x2._data), dims)
+
+    # Else, stacked matmul
+    if (x1._dims[-1] != x2._dims[-2]) or (x1._dims[:-2] != x2._dims[:-2]):
+        raise MismatchedDimensionsError(general_error_message)
+    dims = list(x1._dims)[:-1]
+    dims.append(x2._dims[-1])
+    return array(backend.matmul(x1._data, x2._data), dims)
 
 
 def matrix_transpose(x: array, /) -> array:
@@ -66,6 +114,9 @@ def matrix_transpose(x: array, /) -> array:
     out: array
         an array containing the transpose for each matrix and having shape ``(..., N, M)``. The returned array must have the same data type as ``x``.
     """
+    # Reverse the last two dimensions
+    dims = [*x._dims[:-2], x._dims[-1], x._dims[-2]]
+    return array(backend.matrix_transpose(x._data), dims)
 
 
 def tensordot(
@@ -73,7 +124,7 @@ def tensordot(
     x2: array,
     /,
     *,
-    axes: Union[int, Tuple[Sequence[int], Sequence[int]]] = 2,
+    axes: Union[None, int, Tuple[Sequence[Dim], Sequence[Dim]]] = 2,
 ) -> array:
     """
     Returns a tensor contraction of ``x1`` and ``x2`` over specific axes.
@@ -120,6 +171,25 @@ def tensordot(
     .. versionchanged:: 2023.12
        Allow negative axes.
     """
+    general_error_message = f"Incorrect axes for tensordor: x1.shape={x1.shape}, x2.shape={x2.shape}, axes={axes}"
+
+    if isinstance(axes, int):
+        if len(set(x1._dims) & set(x2._dims)) != axes:
+            raise MismatchedDimensionsError(general_error_message)
+        if x1._dims[-axes:] != x2._dims[:axes]:
+            raise MismatchedDimensionsError(general_error_message)
+        dims = x1._dims[:-axes] + x2._dims[axes:]
+        return array(backend.tensordot(x1, x2, axes=axes), dims)
+
+    # xarray semantics (assumes named dimensions): sum over all common dimensions.
+    if axes is None:
+        common_dims = set(x1._dims) & set(x2._dims)
+        axes = [
+            [x1._dims.index(dim) for dim in common_dims],
+            [x2._dims.index(dim) for dim in common_dims],
+        ]
+        dims = [dim for dim in (x1._dims + x2._dims) if dim not in common_dims]
+        return array(backend.tensordot(x1, x2, axes=axes), dims)
 
 
 def vecdot(x1: array, x2: array, /, *, axis: int = -1) -> array:
@@ -164,3 +234,7 @@ def vecdot(x1: array, x2: array, /, *, axis: int = -1) -> array:
     .. versionchanged:: 2023.12
        Restricted ``axis`` to only negative integers.
     """
+    x1, x2 = broadcast_arrays(x1, x2)
+    if isinstance(axis, Dim):
+        axis = x1._dims.index(axis)
+    return array(backend.vecdot(x1, x2, axis=axis))

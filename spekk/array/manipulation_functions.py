@@ -15,8 +15,21 @@ __all__ = [
     "unstack",
 ]
 
+from collections import defaultdict
 
-from ._types import List, Optional, Tuple, Union, array
+from spekk.array._backend import backend
+from spekk.array._types import (
+    ArrayLike,
+    Dim,
+    Dims,
+    List,
+    Optional,
+    Tuple,
+    UndefinedDim,
+    Union,
+)
+from spekk.array._util import ensure_array
+from spekk.array.array_object import array
 
 
 def broadcast_arrays(*arrays: array) -> List[array]:
@@ -33,9 +46,48 @@ def broadcast_arrays(*arrays: array) -> List[array]:
     out: List[array]
         a list of broadcasted arrays. Each array must have the same shape. Each array must have the same dtype as its corresponding input array.
     """
+    arrays = [ensure_array(x) for x in arrays]
+    # TODO: How to handle UndefinedDim?
+    if any(isinstance(dim, UndefinedDim) for x in arrays for dim in x._dims):
+        raise NotImplementedError()
+
+    # Get the output dimension list of each array after broadcasting. Ordering of output dimensions are determined by the ordering of input arrays and their dimensions.
+    output_dims = defaultdict(set)
+    for arr in arrays:
+        for size, dim in zip(arr.shape, arr._dims):
+            if dim not in output_dims:
+                output_dims[dim].add(size)
+
+    output_dims = {dim: sizes.pop() for dim, sizes in output_dims.items()}
+
+    # Expand dimensions if needed (using reshape) and place dimensions in the correct order using permute_dims.
+    resulting_arrays = []
+    for arr in arrays:
+        # Find the dimensions that need to be added to the array in order to be broadcastable with all other arrays. missing_dims is a dictionary from the name of the dimension to the size of that dimension.
+        missing_dims = {
+            dim: size for dim, size in output_dims.items() if dim not in arr._dims
+        }
+
+        # Add the new dimensions to the array's data, making it broadcastable.
+        new_shape_broadcastable = arr._data.shape + (1,) * len(missing_dims)
+        new_data = backend.reshape(arr._data, new_shape_broadcastable)
+
+        # Add the correct sizes to the corresponding dimensions
+        new_shape = (*arr._data.shape, *missing_dims.values())
+        new_data = backend.broadcast_to(new_data, new_shape)
+        # Also add them to the dimensions list
+        new_dims = [*arr._dims, *missing_dims.keys()]
+
+        # Put the dimensions in the correct order (same as all other arrays)
+        arr = permute_dims(array(new_data, new_dims), list(output_dims.keys()))
+        resulting_arrays.append(arr)
+
+    return resulting_arrays
 
 
-def broadcast_to(x: array, /, shape: Tuple[int, ...]) -> array:
+def broadcast_to(
+    x: array, /, shape: Tuple[int, ...], dims: Optional[Dims] = None
+) -> array:
     """
     Broadcasts an array to a specified shape.
 
@@ -45,16 +97,32 @@ def broadcast_to(x: array, /, shape: Tuple[int, ...]) -> array:
         array to broadcast.
     shape: Tuple[int, ...]
         array shape. Must be compatible with ``x`` (see :ref:`broadcasting`). If the array is incompatible with the specified shape, the function should raise an exception.
+    dims: Sequence[Hashable]
+        the new list of dimension names. It must have the same length as shape.
 
     Returns
     -------
     out: array
         an array having a specified shape. Must have the same data type as ``x``.
+
+    Raises
+    ------
+    ValueError
+        If shape and dims do not contain the same number of arguments, a "ValueError" is raised.
     """
+    x = ensure_array(x)
+    if dims is not None and len(dims) != len(shape):
+        raise ValueError(
+            "The number of dimensions must equal the number of axes when broadcasting."
+        )
+    return array(backend.broadcast_to(x, shape), dims)
 
 
 def concat(
-    arrays: Union[Tuple[array, ...], List[array]], /, *, axis: Optional[int] = 0
+    arrays: Union[Tuple[array, ...], List[array]],
+    /,
+    *,
+    axis: Dim,
 ) -> array:
     """
     Joins a sequence of arrays along an existing axis.
@@ -62,9 +130,9 @@ def concat(
     Parameters
     ----------
     arrays: Union[Tuple[array, ...], List[array]]
-        input arrays to join. The arrays must have the same shape, except in the dimension specified by ``axis``.
-    axis: Optional[int]
-        axis along which the arrays will be joined. If ``axis`` is ``None``, arrays must be flattened before concatenation. If ``axis`` is negative, the function must determine the axis along which to join by counting from the last dimension. Default: ``0``.
+        input arrays to join.
+    dim: Dim
+        dimension along which the arrays will be joined.
 
     Returns
     -------
@@ -74,9 +142,17 @@ def concat(
         .. note::
            This specification leaves type promotion between data type families (i.e., ``intxx`` and ``floatxx``) unspecified.
     """
+    arrays = broadcast_arrays(*arrays)
+    if isinstance(axis, Dim):
+        axis = arrays[0]._dims.index(axis)
+    elif isinstance(axis, tuple):
+        axis = tuple(arrays[0]._dims.index(dim1) for dim1 in axis)
+    dims = arrays[0]._dims
+    data = backend.concat([arr._data for arr in arrays], axis=dims.index(axis))
+    return array(data, dims)
 
 
-def expand_dims(x: array, /, *, axis: int = 0) -> array:
+def expand_dims(x: array, /, *, axis: Union[Dim, int] = 0) -> array:
     """
     Expands the shape of an array by inserting a new axis (dimension) of size one at the position specified by ``axis``.
 
@@ -84,6 +160,8 @@ def expand_dims(x: array, /, *, axis: int = 0) -> array:
     ----------
     x: array
         input array.
+    dim: Dim
+        the name of the new dimension being added.
     axis: int
         axis position (zero-based). If ``x`` has rank (i.e, number of dimensions) ``N``, a valid ``axis`` must reside on the closed-interval ``[-N-1, N]``. If provided a negative ``axis``, the axis position at which to insert a singleton dimension must be computed as ``N + axis + 1``. Hence, if provided ``-1``, the resolved axis position must be ``N`` (i.e., a singleton dimension must be appended to the input array ``x``). If provided ``-N-1``, the resolved axis position must be ``0`` (i.e., a singleton dimension must be prepended to the input array ``x``).
 
@@ -96,10 +174,23 @@ def expand_dims(x: array, /, *, axis: int = 0) -> array:
     ------
     IndexError
         If provided an invalid ``axis`` position, an ``IndexError`` should be raised.
+    ValueError
+        If the new dimension already exists.
     """
+    x = ensure_array(x)
+
+    if isinstance(axis, Dim):
+        dim = axis
+        axis = 0
+    else:
+        dim = UndefinedDim()
+    data = backend.expand_dims(x._data, axis)
+    dims = list(x._dims)
+    dims.insert(axis, dim)
+    return array(data, dims)
 
 
-def flip(x: array, /, *, axis: Optional[Union[int, Tuple[int, ...]]] = None) -> array:
+def flip(x: array, /, *, axis: Optional[Union[Dim, Tuple[Dim, ...]]] = None) -> array:
     """
     Reverses the order of elements in an array along the given axis. The shape of the array must be preserved.
 
@@ -115,12 +206,18 @@ def flip(x: array, /, *, axis: Optional[Union[int, Tuple[int, ...]]] = None) -> 
     out: array
         an output array having the same data type and shape as ``x`` and whose elements, relative to ``x``, are reordered.
     """
+    x = ensure_array(x)
+    if isinstance(axis, Dim):
+        axis = x._dims.index(axis)
+    elif isinstance(axis, tuple):
+        axis = tuple(x._dims.index(dim1) for dim1 in axis)
+    return array(backend.flip(x._data, axis=axis), x._dims)
 
 
 def moveaxis(
     x: array,
-    source: Union[int, Tuple[int, ...]],
-    destination: Union[int, Tuple[int, ...]],
+    source: Union[Dim, Tuple[Dim, ...]],
+    destination: Union[Dim, Tuple[Dim, ...]],
     /,
 ) -> array:
     """
@@ -145,9 +242,29 @@ def moveaxis(
 
     .. versionadded:: 2023.12
     """
+    x = ensure_array(x)
+
+    # Ensure a tuple of sources and a tuple of destinations
+    if not isinstance(source, tuple):
+        source = (source,)
+    if not isinstance(destination, tuple):
+        destination = (destination,)
+
+    # Convert all to integers (axes)
+    source = tuple(x._dims.index(d) if isinstance(d, Dim) else d for d in source)
+    destination = tuple(
+        x._dims.index(d) if isinstance(d, Dim) else d for d in destination
+    )
+
+    data = backend.moveaxis(x._data, source, destination)
+    dims = list(x._dims)
+    for src, dest in zip(source, destination):
+        dims.remove(x._dims[src])
+        dims.insert(dest, x._dims[src])
+    return array(data, dims)
 
 
-def permute_dims(x: array, /, axes: Tuple[int, ...]) -> array:
+def permute_dims(x: array, /, axes: Tuple[Dim, ...]) -> array:
     """
     Permutes the axes (dimensions) of an array ``x``.
 
@@ -163,14 +280,22 @@ def permute_dims(x: array, /, axes: Tuple[int, ...]) -> array:
     out: array
         an array containing the axes permutation. The returned array must have the same data type as ``x``.
     """
+    x = ensure_array(x)
+    if all(isinstance(axis, Dim) for axis in axes):
+        dims = axes
+        axes = [x._dims.index(dim) for dim in axes]
+    else:
+        dims = [x._dims[axis] for axis in axes]
+    data = backend.permute_dims(x._data, axes)
+    return array(data, dims)
 
 
 def repeat(
     x: array,
-    repeats: Union[int, array],
+    repeats: int,
     /,
     *,
-    axis: Optional[int] = None,
+    axis: Optional[Union[Dim, int]] = None,
 ) -> array:
     """
     Repeats each element of an array a specified number of times on a per-element basis.
@@ -215,10 +340,24 @@ def repeat(
 
     .. versionadded:: 2023.12
     """
+    x = ensure_array(x)
+    # How do we implement repeat with named dimensions?
+    raise NotImplementedError()
+    if not isinstance(repeats, int):
+        raise NotImplementedError()
+    if isinstance(axis, Dim):
+        axis = x._dims.index(axis)
+    data = backend.repeat(x._data, repeats=repeats, axis=axis)
+    return array(data, x._dims)
 
 
 def reshape(
-    x: array, /, shape: Tuple[int, ...], *, copy: Optional[bool] = None
+    x: array,
+    /,
+    shape: Tuple[int, ...],
+    dims: Optional[Dims] = None,
+    *,
+    copy: Optional[bool] = None,
 ) -> array:
     """
     Reshapes an array without changing its data.
@@ -229,6 +368,8 @@ def reshape(
         input array to reshape.
     shape: Tuple[int, ...]
         a new shape compatible with the original shape. One shape dimension is allowed to be ``-1``. When a shape dimension is ``-1``, the corresponding output array shape dimension must be inferred from the length of the array and the remaining dimensions.
+    dims: Sequence[Hashable]
+        the new list of dimension names. It must have the same length as shape.
     copy: Optional[bool]
         whether or not to copy the input array. If ``True``, the function must always copy. If ``False``, the function must never copy. If ``None``, the function must avoid copying, if possible, and may copy otherwise. Default: ``None``.
 
@@ -241,8 +382,17 @@ def reshape(
     ------
     ValueError
         If ``copy=False`` and a copy would be necessary, a ``ValueError``
-        should be raised.
+        should be raised. Also, if shape and dims do not contain the same number of
+        arguments, a "ValueError" is raised.
     """
+    x = ensure_array(x)
+    if len(dims) != len(shape):
+        raise ValueError(
+            "The number of dimensions must equal the number of axes when reshaping."
+        )
+    if dims is None:
+        dims = [UndefinedDim()] * len(shape)
+    return array(backend.reshape(x._data, shape, copy=copy), dims)
 
 
 def roll(
@@ -250,7 +400,7 @@ def roll(
     /,
     shift: Union[int, Tuple[int, ...]],
     *,
-    axis: Optional[Union[int, Tuple[int, ...]]] = None,
+    axis: Optional[Union[Dim, Tuple[Dim, ...]]] = None,
 ) -> array:
     """
     Rolls array elements along a specified axis. Array elements that roll beyond the last position are re-introduced at the first position. Array elements that roll beyond the first position are re-introduced at the last position.
@@ -269,9 +419,20 @@ def roll(
     out: array
         an output array having the same data type as ``x`` and whose elements, relative to ``x``, are shifted.
     """
+    x = ensure_array(x)
+    axis = (
+        x._dims.index(axis)
+        if isinstance(axis, Dim)
+        else tuple(x._dims.index(dim1) for dim1 in axis)
+    )
+    return array(backend.roll(x._data, shift=shift, axis=axis), x._dims)
 
 
-def squeeze(x: array, /, axis: Union[int, Tuple[int, ...]]) -> array:
+def squeeze(
+    x: ArrayLike,
+    /,
+    axis: Union[Dim, Tuple[Dim, ...], int, Tuple[int, ...]],
+) -> array:
     """
     Removes singleton dimensions (axes) from ``x``.
 
@@ -293,9 +454,30 @@ def squeeze(x: array, /, axis: Union[int, Tuple[int, ...]]) -> array:
         If a specified axis has a size greater than one (i.e., it is not a
         singleton dimension), a ``ValueError`` should be raised.
     """
+    x = ensure_array(x)
+
+    # Handle changes to dimensions and get actual axis (integer)
+    dims = list(x._dims)
+    if isinstance(axis, Dim):
+        axis = x._dims.index(axis)
+        del dims[axis]
+    elif isinstance(axis, int):
+        del dims[axis]
+    elif isinstance(axis, tuple):
+        axis = [x._dims.index(i) if isinstance(i, Dim) else i for i in axis]
+        for i in axis:
+            del dims[i]
+
+    data = backend.squeeze(x._data, axis)
+    return array(data, dims)
 
 
-def stack(arrays: Union[Tuple[array, ...], List[array]], /, *, axis: int = 0) -> array:
+def stack(
+    arrays: Union[Tuple[array, ...], List[array]],
+    /,
+    *,
+    axis: Union[int, Dim] = 0,
+) -> array:
     """
     Joins a sequence of arrays along a new axis.
 
@@ -314,6 +496,22 @@ def stack(arrays: Union[Tuple[array, ...], List[array]], /, *, axis: int = 0) ->
         .. note::
            This specification leaves type promotion between data type families (i.e., ``intxx`` and ``floatxx``) unspecified.
     """
+    arrays = broadcast_arrays(*arrays)
+
+    if isinstance(axis, Dim):
+        dim = axis
+        axis = 0
+    else:
+        dim = UndefinedDim()
+    data = backend.stack([arr._data for arr in arrays], axis=axis)
+    dims = list(arrays[0]._dims)
+    if axis < 0:
+        # Handle negative index for list.insert. We have to add an additional 1 to the
+        # axis, otherwise -1 refers to the second-to-last position when it should be
+        # the last position.
+        axis += len(dims) + 1
+    dims.insert(axis, dim)
+    return array(data, dims)
 
 
 def tile(x: array, repetitions: Tuple[int, ...], /) -> array:
@@ -343,9 +541,12 @@ def tile(x: array, repetitions: Tuple[int, ...], /) -> array:
 
     .. versionadded:: 2023.12
     """
+    x = ensure_array(x)
+    # How do we implement tile with named dimensions?
+    raise NotImplementedError()
 
 
-def unstack(x: array, /, *, axis: int = 0) -> Tuple[array, ...]:
+def unstack(x: array, /, *, axis: Union[int, Dim]) -> Tuple[array, ...]:
     """
     Splits an array into a sequence of arrays along the given axis.
 
@@ -366,3 +567,13 @@ def unstack(x: array, /, *, axis: int = 0) -> Tuple[array, ...]:
 
     .. versionadded:: 2023.12
     """
+    x = ensure_array(x)
+    if isinstance(axis, Dim):
+        dim = axis
+        axis = x._dims.index(axis)
+    else:
+        dim = x._dims[axis]
+    unstacked_data = backend.unstack(x._data, axis)
+    dims = list(x._dims)
+    dims.remove(dim)
+    return tuple(array(data, dims) for data in unstacked_data)

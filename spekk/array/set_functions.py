@@ -1,7 +1,10 @@
 __all__ = ["unique_all", "unique_counts", "unique_inverse", "unique_values"]
 
 
-from ._types import Tuple, array
+from typing import Tuple
+
+from spekk.array._backend import backend
+from spekk.array.array_object import array
 
 
 def unique_all(x: array, /) -> Tuple[array, array, array, array]:
@@ -51,6 +54,7 @@ def unique_all(x: array, /) -> Tuple[array, array, array, array]:
     .. versionchanged:: 2023.12
        Clarified flattening behavior and required the order of ``counts`` match the order of ``values``.
     """
+    raise NotImplementedError("Please help me implement this!")
 
 
 def unique_counts(x: array, /) -> Tuple[array, array]:
@@ -97,6 +101,8 @@ def unique_counts(x: array, /) -> Tuple[array, array]:
        Clarified flattening behavior and required the order of ``counts`` match the order of ``values``.
     """
 
+    raise NotImplementedError("Please help me implement this!")
+
 
 def unique_inverse(x: array, /) -> Tuple[array, array]:
     """
@@ -141,6 +147,7 @@ def unique_inverse(x: array, /) -> Tuple[array, array]:
     .. versionchanged:: 2023.12
        Clarified flattening behavior.
     """
+    raise NotImplementedError("Please help me implement this!")
 
 
 def unique_values(x: array, /) -> array:
@@ -181,3 +188,4 @@ def unique_values(x: array, /) -> array:
     .. versionchanged:: 2023.12
        Required that the output array must be one-dimensional.
     """
+    raise NotImplementedError("Please help me implement this!")

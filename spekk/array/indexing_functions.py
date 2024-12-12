@@ -1,9 +1,19 @@
 __all__ = ["take"]
 
-from ._types import Union, Optional, array
+from typing import Union
+
+from spekk.array._backend import backend
+from spekk.array._types import Dim, Optional
+from spekk.array.array_object import array
 
 
-def take(x: array, indices: array, /, *, axis: Optional[int] = None) -> array:
+def take(
+    x: array,
+    indices: array,
+    /,
+    *,
+    axis: Optional[Union[int, Dim]] = None,
+) -> array:
     """
     Returns elements of an array along an axis.
 
@@ -38,3 +48,8 @@ def take(x: array, indices: array, /, *, axis: Optional[int] = None) -> array:
     .. versionchanged:: 2023.12
        Out-of-bounds behavior is explicitly left unspecified.
     """
+    if indices.ndim != 1:
+        raise ValueError("Indices must be a one-dimensional array of integers.")
+    if isinstance(axis, Dim):
+        axis = x._dims.index(axis)
+    return array(backend.take(x._data, indices=indices._data, axis=axis), x._dims)

@@ -1,24 +1,56 @@
 from __future__ import annotations
 
-__all__ = ["array"]
+import numpy as np
 
+__all__ = ["array"]
+from typing import Any, Dict, Optional, Tuple, Union
+
+from spekk.array._backend import backend
+from spekk.array._types import ArrayLike, Dims, Enum, PyCapsule, UndefinedDim, ellipsis, Dim
 from spekk.array._types import (
-    array,
-    dtype as Dtype,
     device as Device,
-    Optional,
-    Tuple,
-    Union,
-    Any,
-    PyCapsule,
-    Enum,
-    ellipsis,
+)
+from spekk.array._types import (
+    dtype as Dtype,
 )
 
 
-class _array:
-    def __init__(self: array) -> None:
-        """Initialize the attributes for the array object class."""
+class array:
+    def __init__(
+        self: array,
+        data: ArrayLike,
+        /,
+        dims: Optional[Dims] = None,
+        *,
+        dtype: Optional[dtype] = None,
+        device: Optional[device] = None,
+    ):
+        if isinstance(data, array):
+            if dims is None:
+                dims = data._dims
+            data = data._data
+        elif not backend._is_backend_array(data):
+            data = backend.asarray(data)
+
+        if dims is None:
+            dims = [UndefinedDim()] * data.ndim
+        elif data.ndim != len(dims):
+            raise ValueError(
+                "The number of dimensions must equal the number of axes in the data "
+                f"(got ndim={data.ndim} and {len(dims)=})."
+            )
+
+        # Set the dtype and device (if given)
+        args, kwargs = [], {}
+        if dtype is not None:
+            args.append(dtype)
+        if device is not None:
+            kwargs["device"] = device
+        if args or kwargs:
+            data = backend.astype(data, *args, **kwargs)
+
+        self._data = data
+        self._dims = dims
 
     @property
     def dtype(self: array) -> Dtype:
@@ -30,6 +62,7 @@ class _array:
         out: dtype
             array data type.
         """
+        return self._data.dtype
 
     @property
     def device(self: array) -> Device:
@@ -41,6 +74,7 @@ class _array:
         out: device
             a ``device`` object (see :ref:`device-support`).
         """
+        return self._data.device
 
     @property
     def mT(self: array) -> array:
@@ -54,6 +88,9 @@ class _array:
         out: array
             array whose last two dimensions (axes) are permuted in reverse order relative to original array (i.e., for an array instance having shape ``(..., M, N)``, the returned array must have shape ``(..., N, M)``). The returned array must have the same data type as the original array.
         """
+        from spekk.array import matrix_transpose
+
+        return matrix_transpose(self)
 
     @property
     def ndim(self: array) -> int:
@@ -65,6 +102,7 @@ class _array:
         out: int
             number of array dimensions (axes).
         """
+        return self._data.ndim
 
     @property
     def shape(self: array) -> Tuple[Optional[int], ...]:
@@ -83,6 +121,7 @@ class _array:
         .. note::
            The returned value should be a tuple; however, where warranted, an array library may choose to return a custom shape object. If an array library returns a custom shape object, the object must be immutable, must support indexing for dimension retrieval, and must behave similarly to a tuple.
         """
+        return self._data.shape
 
     @property
     def size(self: array) -> Optional[int]:
@@ -101,6 +140,7 @@ class _array:
         .. note::
            For array libraries having graph-based computational models, an array may have unknown dimensions due to data-dependent operations.
         """
+        return self._data.size
 
     @property
     def T(self: array) -> array:
@@ -118,6 +158,12 @@ class _array:
         .. note::
            Limiting the transpose to two-dimensional arrays (matrices) deviates from the NumPy et al practice of reversing all axes for arrays having more than two-dimensions. This is intentional, as reversing all axes was found to be problematic (e.g., conflicting with the mathematical definition of a transpose which is limited to matrices; not operating on batches of matrices; et cetera). In order to reverse all axes, one is recommended to use the functional ``permute_dims`` interface found in this specification.
         """
+        if self.ndim != 2:
+            raise ValueError(
+                "Transpose is only defined for arrays with two dimensions. See permute_dims instead."
+            )
+        dims = self._dims[::-1]
+        return array(self._data.T, dims)
 
     def __abs__(self: array, /) -> array:
         """
@@ -147,6 +193,9 @@ class _array:
         .. versionchanged:: 2022.12
             Added complex data type support.
         """
+        from spekk.array import abs
+
+        return abs(self)
 
     def __add__(self: array, other: Union[int, float, array], /) -> array:
         """
@@ -173,6 +222,9 @@ class _array:
         .. versionchanged:: 2022.12
             Added complex data type support.
         """
+        from spekk.array import add
+
+        return add(self, other)
 
     def __and__(self: array, other: Union[int, bool, array], /) -> array:
         """
@@ -194,6 +246,9 @@ class _array:
         .. note::
            Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.bitwise_and`.
         """
+        from spekk.array import bitwise_and
+
+        return bitwise_and(self, other)
 
     def __array_namespace__(
         self: array, /, *, api_version: Optional[str] = None
@@ -213,6 +268,13 @@ class _array:
         out: Any
             an object representing the array API namespace. It should have every top-level function defined in the specification as an attribute. It may contain other public names as well, but it is recommended to only include those names that are part of the specification.
         """
+        if api_version != "2023.12" and api_version is not None:
+            raise NotImplementedError(
+                f"API version '{api_version}' not supported. Only array API version '2023.12' is supported."
+            )
+        import spekk.array
+
+        return spekk.array
 
     def __bool__(self: array, /) -> bool:
         """
@@ -251,6 +313,7 @@ class _array:
         .. versionchanged:: 2023.12
             Allowed lazy implementations to error.
         """
+        return self._data.__bool__()
 
     def __complex__(self: array, /) -> complex:
         """
@@ -292,6 +355,7 @@ class _array:
         .. versionchanged:: 2023.12
             Allowed lazy implementations to error.
         """
+        return self._data.__complex__()
 
     def __dlpack__(
         self: array,
@@ -465,6 +529,9 @@ class _array:
         .. versionchanged:: 2023.12
            Added recommendation for handling read-only arrays.
         """
+        return self._data.__dlpack__(
+            stream=stream, max_version=max_version, dl_device=dl_device, copy=copy
+        )
 
     def __dlpack_device__(self: array, /) -> Tuple[Enum, int]:
         """
@@ -493,6 +560,7 @@ class _array:
               CUDA_MANAGED = 13
               ONE_API = 14
         """
+        return self._data.__dlpack_device__()
 
     def __eq__(self: array, other: Union[int, float, bool, array], /) -> array:
         r"""
@@ -514,6 +582,9 @@ class _array:
         .. note::
            Element-wise results, including special cases, must equal the results returned by the equivalent element-wise function :func:`~array_api.equal`.
         """
+        from spekk.array import equal
+
+        return equal(self, other)
 
     def __float__(self: array, /) -> float:
         """
@@ -552,6 +623,7 @@ class _array:
         .. versionchanged:: 2023.12
             Allowed lazy implementations to error.
         """
+        return self._data.__float__()
 
     def __floordiv__(self: array, other: Union[int, float, array], /) -> array:
         """
@@ -576,6 +648,9 @@ class _array:
         .. note::
            Element-wise results, including special cases, must equal the results returned by the equivalent element-wise function :func:`~array_api.floor_divide`.
         """
+        from spekk.array import floor_divide
+
+        return floor_divide(self, other)
 
     def __ge__(self: array, other: Union[int, float, array], /) -> array:
         """
@@ -600,6 +675,9 @@ class _array:
         .. note::
            Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.greater_equal`.
         """
+        from spekk.array import greater_equal
+
+        return greater_equal(self, other)
 
     def __getitem__(
         self: array,
@@ -630,6 +708,64 @@ class _array:
         out: array
             an array containing the accessed value(s). The returned array must have the same data type as ``self``.
         """
+        # Handle changes to dimensions
+        if isinstance(key, int):
+            # Remove first dimension
+            dims = self._dims[1:]
+        elif isinstance(key, slice):
+            # slice can't remove any dimensions; do nothing
+            dims = self._dims
+        elif key is Ellipsis:  # Ellipsis is these three dots: '...'
+            # Ellipsis means 'keep everything'; do nothing
+            dims = self._dims
+        elif key is None:
+            # None means prepend a new dimension. We don't know what that dimension is, however
+            dims = [UndefinedDim(), *self._dims]
+        elif isinstance(key, tuple):
+            n_ellipses = sum(1 for k in key if k is Ellipsis)
+            n_single_axes = sum(1 for k in key if k is not None)
+            if n_ellipses == 0 and n_single_axes != len(self._dims):
+                # Modified error message from https://github.com/data-apis/array-api-strict/blob/main/array_api_strict/_array_object.py#L419
+                raise ValueError(
+                    f"{self.ndim=}, but the multi-axes index only specifies "
+                    f"{n_single_axes} dimensions. If this was intentional, add a "
+                    "trailing ellipsis (...) which expands into as many slices (:) as "
+                    "necessary."
+                )
+
+            dims = []
+            dim_i = 0
+            for key_i, k in enumerate(key):
+                if isinstance(k, int):
+                    # Don't include the dimension
+                    dim_i += 1
+                elif isinstance(k, slice):
+                    dims.append(self._dims[dim_i])
+                    dim_i += 1
+                elif k is Ellipsis:
+                    n_remaining_single_axes = sum(
+                        1 for k in key[key_i + 1 :] if k is not None
+                    )
+                    if n_remaining_single_axes == 0:
+                        dims.extend(self._dims[dim_i:])
+                    else:
+                        for dim in self._dims[dim_i:-n_remaining_single_axes]:
+                            dims.append(dim)
+                        dim_i = len(self._dims) - n_remaining_single_axes
+                elif k is None:
+                    dims.append(UndefinedDim())
+                elif isinstance(key, array):
+                    raise NotImplementedError(
+                        "Indexing by boolean array is not implemented."
+                    )
+                else:
+                    raise ValueError(f"Unknown indexing key type: '{k.__class__}'.")
+
+        elif isinstance(key, array):
+            raise NotImplementedError("Indexing by boolean array is not implemented.")
+        
+        data = self._data.__getitem__(key._data if isinstance(key, array) else key)
+        return array(data, dims)
 
     def __gt__(self: array, other: Union[int, float, array], /) -> array:
         """
@@ -654,6 +790,9 @@ class _array:
         .. note::
            Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.greater`.
         """
+        from spekk.array import greater
+
+        return greater(self, other)
 
     def __index__(self: array, /) -> int:
         """
@@ -682,6 +821,7 @@ class _array:
         .. versionchanged:: 2023.12
             Allowed lazy implementations to error.
         """
+        return self._data.__index__()
 
     def __int__(self: array, /) -> int:
         """
@@ -732,6 +872,7 @@ class _array:
         .. versionchanged:: 2023.12
             Allowed lazy implementations to error.
         """
+        return self._data.__int__()
 
     def __invert__(self: array, /) -> array:
         """
@@ -751,6 +892,9 @@ class _array:
         .. note::
            Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.bitwise_invert`.
         """
+        from spekk.array import bitwise_invert
+
+        return bitwise_invert(self)
 
     def __le__(self: array, other: Union[int, float, array], /) -> array:
         """
@@ -775,6 +919,9 @@ class _array:
         .. note::
            Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.less_equal`.
         """
+        from spekk.array import less_equal
+
+        return less_equal(self, other)
 
     def __lshift__(self: array, other: Union[int, array], /) -> array:
         """
@@ -796,6 +943,9 @@ class _array:
         .. note::
            Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.bitwise_left_shift`.
         """
+        from spekk.array import bitwise_left_shift
+
+        return bitwise_left_shift(self, other)
 
     def __lt__(self: array, other: Union[int, float, array], /) -> array:
         """
@@ -820,6 +970,9 @@ class _array:
         .. note::
            Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.less`.
         """
+        from spekk.array import less
+
+        return less(self, other)
 
     def __matmul__(self: array, other: array, /) -> array:
         """
@@ -868,6 +1021,9 @@ class _array:
         .. versionchanged:: 2022.12
             Added complex data type support.
         """
+        from spekk.array import matmul
+
+        return matmul(self, other)
 
     def __mod__(self: array, other: Union[int, float, array], /) -> array:
         """
@@ -892,6 +1048,9 @@ class _array:
         .. note::
            Element-wise results, including special cases, must equal the results returned by the equivalent element-wise function :func:`~array_api.remainder`.
         """
+        from spekk.array import remainder
+
+        return remainder(self, other)
 
     def __mul__(self: array, other: Union[int, float, array], /) -> array:
         r"""
@@ -921,6 +1080,9 @@ class _array:
         .. versionchanged:: 2022.12
             Added complex data type support.
         """
+        from spekk.array import multiply
+
+        return multiply(self, other)
 
     def __ne__(self: array, other: Union[int, float, bool, array], /) -> array:
         """
@@ -948,6 +1110,9 @@ class _array:
         .. versionchanged:: 2022.12
             Added complex data type support.
         """
+        from spekk.array import not_equal
+
+        return not_equal(self, other)
 
     def __neg__(self: array, /) -> array:
         """
@@ -978,6 +1143,9 @@ class _array:
         .. versionchanged:: 2022.12
             Added complex data type support.
         """
+        from spekk.array import negative
+
+        return negative(self)
 
     def __or__(self: array, other: Union[int, bool, array], /) -> array:
         """
@@ -999,6 +1167,9 @@ class _array:
         .. note::
            Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.bitwise_or`.
         """
+        from spekk.array import bitwise_or
+
+        return bitwise_or(self, other)
 
     def __pos__(self: array, /) -> array:
         """
@@ -1023,6 +1194,9 @@ class _array:
         .. versionchanged:: 2022.12
             Added complex data type support.
         """
+        from spekk.array import positive
+
+        return positive(self)
 
     def __pow__(self: array, other: Union[int, float, array], /) -> array:
         r"""
@@ -1054,6 +1228,9 @@ class _array:
         .. versionchanged:: 2022.12
             Added complex data type support.
         """
+        from spekk.array import pow
+
+        return pow(self, other)
 
     def __rshift__(self: array, other: Union[int, array], /) -> array:
         """
@@ -1075,6 +1252,9 @@ class _array:
         .. note::
            Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.bitwise_right_shift`.
         """
+        from spekk.array import bitwise_right_shift
+
+        return bitwise_right_shift(self, other)
 
     def __setitem__(
         self: array,
@@ -1107,6 +1287,7 @@ class _array:
 
            When ``value`` is an ``array`` of a different data type than ``self``, how values are cast to the data type of ``self`` is implementation defined.
         """
+        self._data = backend._setitem_impl(self._data, key, value)
 
     def __sub__(self: array, other: Union[int, float, array], /) -> array:
         """
@@ -1135,6 +1316,9 @@ class _array:
         .. versionchanged:: 2022.12
             Added complex data type support.
         """
+        from spekk.array import subtract
+
+        return subtract(self, other)
 
     def __truediv__(self: array, other: Union[int, float, array], /) -> array:
         r"""
@@ -1166,6 +1350,9 @@ class _array:
         .. versionchanged:: 2022.12
             Added complex data type support.
         """
+        from spekk.array import divide
+
+        return divide(self, other)
 
     def __xor__(self: array, other: Union[int, bool, array], /) -> array:
         """
@@ -1187,6 +1374,48 @@ class _array:
         .. note::
            Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.bitwise_xor`.
         """
+        from spekk.array import bitwise_xor
+
+        return bitwise_xor(self, other)
+
+    def __radd__(self, other):
+        return self.__add__(other)
+
+    def __rsub__(self, other):
+        return -self.__sub__(other)  # Reverse subtraction
+
+    def __rmul__(self, other):
+        return self.__mul__(other)
+
+    def __rtruediv__(self, other):
+        return 1 / self.__truediv__(other)  # Reverse division
+
+    def __rfloordiv__(self, other):
+        return other // self.__floordiv__(other)
+
+    def __rmod__(self, other):
+        return other % self.__mod__(other)
+
+    def __rpow__(self, other):
+        return other ** self.__pow__(other)
+
+    def __rmatmul__(self, other):
+        return self.__matmul__(other)
+
+    def __rand__(self, other):
+        return self.__and__(other)
+
+    def __ror__(self, other):
+        return self.__or__(other)
+
+    def __rxor__(self, other):
+        return self.__xor__(other)
+
+    def __rlshift__(self, other):
+        return self.__lshift__(other)
+
+    def __rrshift__(self, other):
+        return self.__rshift__(other)
 
     def to_device(
         self: array, device: Device, /, *, stream: Optional[Union[int, Any]] = None
@@ -1218,6 +1447,22 @@ class _array:
         .. versionchanged:: 2023.12
            Clarified behavior when a provided ``device`` object corresponds to the device on which an array instance resides.
         """
+        return array(self._data.to_device(device, stream=stream), self._dims)
 
+    def __array__(self, dtype=None, copy=None) -> np.ndarray:
+        return self._data.__array__(dtype=dtype, copy=copy)
 
-array = _array
+    @property
+    def data(self):
+        return self._data
+
+    @property
+    def dims(self):
+        return self._dims
+    
+    @property
+    def dim_sizes(self) -> Dict[Dim, int]:
+        return {d:s for d,s in zip(self.dims, self.shape)}
+
+    def __repr__(self):
+        return f"array(shape={self.shape}, dims={self.dims}, dtype={self.dtype})"

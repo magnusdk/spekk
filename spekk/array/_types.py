@@ -4,6 +4,7 @@ Types for type annotations used in the array API standard.
 The type variables should be replaced with the actual types for a given
 library, e.g., for NumPy TypeVar('array') would be replaced with ndarray.
 """
+
 from __future__ import annotations
 
 __all__ = [
@@ -18,7 +19,6 @@ __all__ = [
     "Tuple",
     "Union",
     "Sequence",
-    "array",
     "device",
     "dtype",
     "ellipsis",
@@ -32,21 +32,40 @@ __all__ = [
 ]
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import (
+    TYPE_CHECKING,
     Any,
     List,
     Literal,
     Optional,
+    Protocol,
     Sequence,
     Tuple,
+    TypeAlias,
     TypedDict,
     TypeVar,
     Union,
-    Protocol,
 )
-from enum import Enum
 
-array = TypeVar("array")
+
+class UndefinedDim:
+    def __eq__(self, other):
+        # Like NaN, an undefined dim can't be said to equal anything else, since we
+        # can't know what it represents.
+        return False
+
+    def __repr__(self):
+        return "?"
+
+
+Dim: TypeAlias = Union[str, UndefinedDim]
+Dims: TypeAlias = Sequence[Dim]
+
+
+class BackendArray(Protocol): ...
+
+
 device = TypeVar("device")
 dtype = TypeVar("dtype")
 SupportsDLPack = TypeVar("SupportsDLPack")
@@ -83,32 +102,25 @@ _T_co = TypeVar("_T_co", covariant=True)
 
 
 class NestedSequence(Protocol[_T_co]):
-    def __getitem__(self, key: int, /) -> Union[_T_co, NestedSequence[_T_co]]:
-        ...
+    def __getitem__(self, key: int, /) -> Union[_T_co, NestedSequence[_T_co]]: ...
 
-    def __len__(self, /) -> int:
-        ...
+    def __len__(self, /) -> int: ...
 
 
 class Info(Protocol):
     """Namespace returned by `__array_namespace_info__`."""
 
-    def capabilities(self) -> Capabilities:
-        ...
+    def capabilities(self) -> Capabilities: ...
 
-    def default_device(self) -> device:
-        ...
+    def default_device(self) -> device: ...
 
-    def default_dtypes(self, *, device: Optional[device]) -> DefaultDataTypes:
-        ...
+    def default_dtypes(self, *, device: Optional[device]) -> DefaultDataTypes: ...
 
-    def devices(self) -> List[device]:
-        ...
+    def devices(self) -> List[device]: ...
 
     def dtypes(
         self, *, device: Optional[device], kind: Optional[Union[str, Tuple[str, ...]]]
-    ) -> DataTypes:
-        ...
+    ) -> DataTypes: ...
 
 
 DefaultDataTypes = TypedDict(
@@ -142,3 +154,9 @@ DataTypes = TypedDict(
 Capabilities = TypedDict(
     "Capabilities", {"boolean indexing": bool, "data-dependent shapes": bool}
 )
+
+if TYPE_CHECKING:
+    from spekk.array.array_object import array
+ArrayLike = Union[
+    "array", bool, int, float, complex, NestedSequence, SupportsBufferProtocol
+]

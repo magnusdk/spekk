@@ -1,7 +1,7 @@
 __all__ = ["__eq__"]
 
 
-from ._types import dtype
+from spekk.array._types import dtype
 
 
 def __eq__(self: dtype, other: dtype, /) -> bool:
@@ -20,3 +20,4 @@ def __eq__(self: dtype, other: dtype, /) -> bool:
     out: bool
         a boolean indicating whether the data type objects are equal.
     """
+    return self == other

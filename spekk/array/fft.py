@@ -14,8 +14,19 @@ __all__ = [
     "fftshift",
     "ifftshift",
 ]
+from typing import Literal
 
-from ._types import Tuple, Union, Sequence, array, Optional, Literal, device
+from spekk.array._backend import backend
+from spekk.array._types import (
+    Dim,
+    Dims,
+    Optional,
+    Sequence,
+    UndefinedDim,
+    Union,
+    device,
+)
+from spekk.array.array_object import array
 
 
 def fft(
@@ -23,8 +34,9 @@ def fft(
     /,
     *,
     n: Optional[int] = None,
-    axis: int = -1,
+    axis: Union[int, Dim] = -1,
     norm: Literal["backward", "ortho", "forward"] = "backward",
+    rename_dim: Dim = None,
 ) -> array:
     """
     Computes the one-dimensional discrete Fourier transform.
@@ -68,6 +80,12 @@ def fft(
     .. versionchanged:: 2023.12
        Required the input array have a complex floating-point data type and required that the output array have the same data type as the input array.
     """
+    if isinstance(axis, Dim):
+        axis = x._dims.index(axis)
+    dims = list(x._dims)
+    if rename_dim is not None:
+        dims[axis] = rename_dim
+    return array(backend.fft.fft(x, n=n, axis=axis, norm=norm), dims)
 
 
 def ifft(
@@ -77,6 +95,7 @@ def ifft(
     n: Optional[int] = None,
     axis: int = -1,
     norm: Literal["backward", "ortho", "forward"] = "backward",
+    rename_dim: Dim = None,
 ) -> array:
     """
     Computes the one-dimensional inverse discrete Fourier transform.
@@ -120,6 +139,12 @@ def ifft(
     .. versionchanged:: 2023.12
        Required the input array have a complex floating-point data type and required that the output array have the same data type as the input array.
     """
+    if isinstance(axis, Dim):
+        axis = x._dims.index(axis)
+    dims = list(x._dims)
+    if rename_dim is not None:
+        dims[axis] = rename_dim
+    return array(backend.fft.ifft(x, n=n, axis=axis, norm=norm), dims)
 
 
 def fftn(
@@ -129,6 +154,7 @@ def fftn(
     s: Optional[Sequence[int]] = None,
     axes: Optional[Sequence[int]] = None,
     norm: Literal["backward", "ortho", "forward"] = "backward",
+    rename_dims: Dims = None,
 ) -> array:
     """
     Computes the n-dimensional discrete Fourier transform.
@@ -178,6 +204,13 @@ def fftn(
     .. versionchanged:: 2023.12
        Required the input array have a complex floating-point data type and required that the output array have the same data type as the input array.
     """
+    if isinstance(axes, Sequence[Dim]):
+        axes = [x._dims.index(dim) for dim in axes]
+    dims = list(x._dims)
+    if rename_dims is not None:
+        for axis, rename_dim in zip(axes, rename_dims):
+            dims[axis] = rename_dim
+    return array(backend.fft.fftn(x, s=s, axes=axes, norm=norm), dims)
 
 
 def ifftn(
@@ -187,6 +220,7 @@ def ifftn(
     s: Optional[Sequence[int]] = None,
     axes: Optional[Sequence[int]] = None,
     norm: Literal["backward", "ortho", "forward"] = "backward",
+    rename_dims: Dims = None,
 ) -> array:
     """
     Computes the n-dimensional inverse discrete Fourier transform.
@@ -236,6 +270,13 @@ def ifftn(
     .. versionchanged:: 2023.12
        Required the input array have a complex floating-point data type and required that the output array have the same data type as the input array.
     """
+    if isinstance(axes, Sequence[Dim]):
+        axes = [x._dims.index(dim) for dim in axes]
+    dims = list(x._dims)
+    if rename_dims is not None:
+        for axis, rename_dim in zip(axes, rename_dims):
+            dims[axis] = rename_dim
+    return array(backend.fft.ifftn(x, s=s, axes=axes, norm=norm), dims)
 
 
 def rfft(
@@ -245,6 +286,7 @@ def rfft(
     n: Optional[int] = None,
     axis: int = -1,
     norm: Literal["backward", "ortho", "forward"] = "backward",
+    rename_dim: Dim = None,
 ) -> array:
     """
     Computes the one-dimensional discrete Fourier transform for real-valued input.
@@ -285,6 +327,12 @@ def rfft(
 
     .. versionadded:: 2022.12
     """
+    if isinstance(axis, Dim):
+        axis = x._dims.index(axis)
+    dims = list(x._dims)
+    if rename_dim is not None:
+        dims[axis] = rename_dim
+    return array(backend.fft.rfft(x, n=n, axes=axis, norm=norm), dims)
 
 
 def irfft(
@@ -294,6 +342,7 @@ def irfft(
     n: Optional[int] = None,
     axis: int = -1,
     norm: Literal["backward", "ortho", "forward"] = "backward",
+    rename_dim: Dim = None,
 ) -> array:
     """
     Computes the one-dimensional inverse of ``rfft`` for complex-valued input.
@@ -339,6 +388,12 @@ def irfft(
     .. versionchanged:: 2023.12
        Required the output array have a real-valued floating-point data type having the same precision as the input array.
     """
+    if isinstance(axis, Dim):
+        axis = x._dims.index(axis)
+    dims = list(x._dims)
+    if rename_dim is not None:
+        dims[axis] = rename_dim
+    return array(backend.fft.irfft(x, n=n, axes=axis, norm=norm), dims)
 
 
 def rfftn(
@@ -348,6 +403,7 @@ def rfftn(
     s: Optional[Sequence[int]] = None,
     axes: Optional[Sequence[int]] = None,
     norm: Literal["backward", "ortho", "forward"] = "backward",
+    rename_dims: Dims = None,
 ) -> array:
     """
     Computes the n-dimensional discrete Fourier transform for real-valued input.
@@ -394,6 +450,13 @@ def rfftn(
 
     .. versionadded:: 2022.12
     """
+    if isinstance(axes, Sequence[Dim]):
+        axes = [x._dims.index(dim) for dim in axes]
+    dims = list(x._dims)
+    if rename_dims is not None:
+        for axis, rename_dim in zip(axes, rename_dims):
+            dims[axis] = rename_dim
+    return array(backend.fft.rfftn(x, s=s, axes=axes, norm=norm), dims)
 
 
 def irfftn(
@@ -403,6 +466,7 @@ def irfftn(
     s: Optional[Sequence[int]] = None,
     axes: Optional[Sequence[int]] = None,
     norm: Literal["backward", "ortho", "forward"] = "backward",
+    rename_dims: Dims = None,
 ) -> array:
     """
     Computes the n-dimensional inverse of ``rfftn`` for complex-valued input.
@@ -454,6 +518,13 @@ def irfftn(
     .. versionchanged:: 2023.12
        Required the output array have a real-valued floating-point data type having the same precision as the input array.
     """
+    if isinstance(axes, Sequence[Dim]):
+        axes = [x._dims.index(dim) for dim in axes]
+    dims = list(x._dims)
+    if rename_dims is not None:
+        for axis, rename_dim in zip(axes, rename_dims):
+            dims[axis] = rename_dim
+    return array(backend.fft.irfftn(x, s=s, axes=axes, norm=norm), dims)
 
 
 def hfft(
@@ -463,6 +534,7 @@ def hfft(
     n: Optional[int] = None,
     axis: int = -1,
     norm: Literal["backward", "ortho", "forward"] = "backward",
+    rename_dim: Dim = None,
 ) -> array:
     """
     Computes the one-dimensional discrete Fourier transform of a signal with Hermitian symmetry.
@@ -503,6 +575,12 @@ def hfft(
     .. versionchanged:: 2023.12
        Required the input array to have a complex floating-point data type and required that the output array have a real-valued data type having the same precision as the input array.
     """
+    if isinstance(axis, Dim):
+        axis = x._dims.index(axis)
+    dims = list(x._dims)
+    if rename_dim is not None:
+        dims[axis] = rename_dim
+    return array(backend.fft.hfft(x, n=n, axes=axis, norm=norm), dims)
 
 
 def ihfft(
@@ -512,6 +590,7 @@ def ihfft(
     n: Optional[int] = None,
     axis: int = -1,
     norm: Literal["backward", "ortho", "forward"] = "backward",
+    rename_dim: Dim = None,
 ) -> array:
     """
     Computes the one-dimensional inverse discrete Fourier transform of a signal with Hermitian symmetry.
@@ -549,9 +628,22 @@ def ihfft(
 
     .. versionadded:: 2022.12
     """
+    if isinstance(axis, Dim):
+        axis = x._dims.index(axis)
+    dims = list(x._dims)
+    if rename_dim is not None:
+        dims[axis] = rename_dim
+    return array(backend.fft.ihfft(x, n=n, axes=axis, norm=norm), dims)
 
 
-def fftfreq(n: int, /, *, d: float = 1.0, device: Optional[device] = None) -> array:
+def fftfreq(
+    n: int,
+    /,
+    *,
+    d: float = 1.0,
+    device: Optional[device] = None,
+    dim: Dim = None,
+) -> array:
     """
     Computes the discrete Fourier transform sample frequencies.
 
@@ -584,9 +676,19 @@ def fftfreq(n: int, /, *, d: float = 1.0, device: Optional[device] = None) -> ar
     .. versionchanged:: 2023.12
        Required the output array have the default real-valued floating-point data type.
     """
+    if dim is None:
+        dim = UndefinedDim()
+    return array(backend.fftfreq(n, d=d, device=device), [dim])
 
 
-def rfftfreq(n: int, /, *, d: float = 1.0, device: Optional[device] = None) -> array:
+def rfftfreq(
+    n: int,
+    /,
+    *,
+    d: float = 1.0,
+    device: Optional[device] = None,
+    dim: Dim = None,
+) -> array:
     """
     Computes the discrete Fourier transform sample frequencies (for ``rfft`` and ``irfft``).
 
@@ -621,9 +723,18 @@ def rfftfreq(n: int, /, *, d: float = 1.0, device: Optional[device] = None) -> a
     .. versionchanged:: 2023.12
        Required the output array have the default real-valued floating-point data type.
     """
+    if dim is None:
+        dim = UndefinedDim()
+    return array(backend.rfftfreq(n, d=d, device=device), [dim])
 
 
-def fftshift(x: array, /, *, axes: Optional[Union[int, Sequence[int]]] = None) -> array:
+def fftshift(
+    x: array,
+    /,
+    *,
+    axes: Optional[Union[int, Sequence[int]]] = None,
+    rename_dims: Dims = None,
+) -> array:
     """
     Shifts the zero-frequency component to the center of the spectrum.
 
@@ -651,10 +762,23 @@ def fftshift(x: array, /, *, axes: Optional[Union[int, Sequence[int]]] = None) -
 
     .. versionadded:: 2022.12
     """
+    if isinstance(axes, Dim):
+        axes = x._dims.index(axes)
+    elif isinstance(axes, Sequence[Dim]):
+        axes = [x._dims.index(dim) for dim in axes]
+    dims = list(x._dims)
+    if rename_dims is not None:
+        for axis, rename_dim in zip(axes, rename_dims):
+            dims[axis] = rename_dim
+    return array(backend.fft.fftshift(x, axes=axes), dims)
 
 
 def ifftshift(
-    x: array, /, *, axes: Optional[Union[int, Sequence[int]]] = None
+    x: array,
+    /,
+    *,
+    axes: Optional[Union[int, Sequence[int]]] = None,
+    rename_dims: Dims = None,
 ) -> array:
     """
     Inverse of ``fftshift``.
@@ -681,3 +805,12 @@ def ifftshift(
 
     .. versionadded:: 2022.12
     """
+    if isinstance(axes, Dim):
+        axes = x._dims.index(axes)
+    elif isinstance(axes, Sequence[Dim]):
+        axes = [x._dims.index(dim) for dim in axes]
+    dims = list(x._dims)
+    if rename_dims is not None:
+        for axis, rename_dim in zip(axes, rename_dims):
+            dims[axis] = rename_dim
+    return array(backend.fft.ifftshift(x, axes=axes), dims)

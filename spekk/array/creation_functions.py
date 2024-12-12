@@ -16,19 +16,19 @@ __all__ = [
     "zeros",
     "zeros_like",
 ]
+from typing import List, Optional, Tuple, Union
 
-
-from ._types import (
-    List,
+from spekk.array._types import (
+    Dim,
+    Dims,
     NestedSequence,
-    Optional,
     SupportsBufferProtocol,
-    Tuple,
-    Union,
-    array,
+    UndefinedDim,
     device,
     dtype,
 )
+from spekk.array.array_object import array
+from spekk.array._backend import backend
 
 
 def arange(
@@ -39,6 +39,7 @@ def arange(
     *,
     dtype: Optional[dtype] = None,
     device: Optional[device] = None,
+    dim: Optional[Dim] = None,
 ) -> array:
     """
     Returns evenly spaced values within the half-open interval ``[start, stop)`` as a one-dimensional array.
@@ -65,6 +66,12 @@ def arange(
     out: array
         a one-dimensional array containing evenly spaced values. The length of the output array must be ``ceil((stop-start)/step)`` if ``stop - start`` and ``step`` have the same sign, and length ``0`` otherwise.
     """
+    if dim is None:
+        dim = UndefinedDim()
+    return array(
+        backend.arange(start, stop, step, dtype=dtype, device=device),
+        [dim],
+    )
 
 
 def asarray(
@@ -76,6 +83,7 @@ def asarray(
     dtype: Optional[dtype] = None,
     device: Optional[device] = None,
     copy: Optional[bool] = None,
+    dims: Optional[Dims] = None,
 ) -> array:
     r"""
     Convert the input to an array.
@@ -124,6 +132,18 @@ def asarray(
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    if isinstance(obj, array):
+        if dims is None:
+            dims = obj._dims
+        return array(
+            backend.asarray(obj._data, dtype=dtype, device=device, copy=copy),
+            dims,
+        )
+
+    data = backend.asarray(obj, dtype=dtype, device=device, copy=copy)
+    if dims is None:
+        dims = [UndefinedDim()] * data.ndim
+    return array(data, dims)
 
 
 def empty(
@@ -131,6 +151,7 @@ def empty(
     *,
     dtype: Optional[dtype] = None,
     device: Optional[device] = None,
+    dims: Optional[Dims] = None,
 ) -> array:
     """
     Returns an uninitialized array having a specified `shape`.
@@ -149,10 +170,17 @@ def empty(
     out: array
         an array containing uninitialized data.
     """
+    if dims is None:
+        dims = [UndefinedDim()] * (1 if isinstance(shape, int) else len(shape))
+    return array(backend.empty(shape, dtype=dtype, device=device), dims)
 
 
 def empty_like(
-    x: array, /, *, dtype: Optional[dtype] = None, device: Optional[device] = None
+    x: array,
+    /,
+    *,
+    dtype: Optional[dtype] = None,
+    device: Optional[device] = None,
 ) -> array:
     """
     Returns an uninitialized array with the same ``shape`` as an input array ``x``.
@@ -171,6 +199,7 @@ def empty_like(
     out: array
         an array having the same shape as ``x`` and containing uninitialized data.
     """
+    return array(backend.empty_like(x._data, dtype=dtype, device=device), x._dims)
 
 
 def eye(
@@ -181,6 +210,7 @@ def eye(
     k: int = 0,
     dtype: Optional[dtype] = None,
     device: Optional[device] = None,
+    dims: Optional[Dims] = None,
 ) -> array:
     r"""
     Returns a two-dimensional array with ones on the ``k``\th diagonal and zeros elsewhere.
@@ -212,6 +242,12 @@ def eye(
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    if dims is None:
+        dims = [UndefinedDim(), UndefinedDim()]
+    return array(
+        backend.eye(n_rows=n_rows, n_cols=n_cols, k=k, dtype=dtype, device=device),
+        dims,
+    )
 
 
 def from_dlpack(
@@ -220,6 +256,7 @@ def from_dlpack(
     *,
     device: Optional[device] = None,
     copy: Optional[bool] = None,
+    dims: Optional[Dims] = None,
 ) -> array:
     """
     Returns a new array containing the data from another (array) object with a ``__dlpack__`` method.
@@ -295,6 +332,10 @@ def from_dlpack(
     .. versionchanged:: 2023.12
        Added device and copy support.
     """
+    data = backend.from_dlpack(x, device=device, copy=copy)
+    if dims is None:
+        dims = [UndefinedDim()] * data.ndim
+    return array(data, dims)
 
 
 def full(
@@ -303,6 +344,7 @@ def full(
     *,
     dtype: Optional[dtype] = None,
     device: Optional[device] = None,
+    dims: Optional[Dims] = None,
 ) -> array:
     """
     Returns a new array having a specified ``shape`` and filled with ``fill_value``.
@@ -338,6 +380,9 @@ def full(
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    if dims is None:
+        dims = [UndefinedDim()] * (1 if isinstance(shape, int) else len(shape))
+    return array(backend.empty(shape, fill_value, dtype=dtype, device=device), dims)
 
 
 def full_like(
@@ -380,6 +425,10 @@ def full_like(
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    return array(
+        backend.empty_like(x._data, fill_value, dtype=dtype, device=device),
+        x._dims,
+    )
 
 
 def linspace(
@@ -391,6 +440,7 @@ def linspace(
     dtype: Optional[dtype] = None,
     device: Optional[device] = None,
     endpoint: bool = True,
+    dim: Optional[Dim] = None,
 ) -> array:
     r"""
     Returns evenly spaced numbers over a specified interval.
@@ -452,6 +502,14 @@ def linspace(
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    if dim is None:
+        dim = UndefinedDim()
+    return array(
+        backend.linspace(
+            start, stop, num, dtype=dtype, device=device, endpoint=endpoint
+        ),
+        [dim],
+    )
 
 
 def meshgrid(*arrays: array, indexing: str = "xy") -> List[array]:
@@ -485,6 +543,15 @@ def meshgrid(*arrays: array, indexing: str = "xy") -> List[array]:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    if any(a.ndim != 1 for a in arrays):
+        shapes = [a.shape for a in arrays]
+        raise ValueError(f"All arrays must be one-dimensional, got shapes {shapes}.")
+    dims = [a._dims[0] for a in arrays]
+    if len(arrays) > 1 and indexing == "xy":
+        # Transpose first two dimensions, as is "xy" convention.
+        dims = [dims[1], dims[0], *dims[2:]]
+    result = backend.meshgrid(*[a._data for a in arrays], indexing=indexing)
+    return tuple(array(data, dims) for data in result)
 
 
 def ones(
@@ -492,6 +559,7 @@ def ones(
     *,
     dtype: Optional[dtype] = None,
     device: Optional[device] = None,
+    dims: Optional[Dims] = None,
 ) -> array:
     """
     Returns a new array having a specified ``shape`` and filled with ones.
@@ -519,6 +587,9 @@ def ones(
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    if dims is None:
+        dims = [UndefinedDim()] * (1 if isinstance(shape, int) else len(shape))
+    return array(backend.ones(shape, dtype=dtype, device=device), dims)
 
 
 def ones_like(
@@ -550,6 +621,7 @@ def ones_like(
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    return array(backend.ones_like(x._data, dtype=dtype, device=device), x._dims)
 
 
 def tril(x: array, /, *, k: int = 0) -> array:
@@ -574,6 +646,7 @@ def tril(x: array, /, *, k: int = 0) -> array:
     out: array
         an array containing the lower triangular part(s). The returned array must have the same shape and data type as ``x``. All elements above the specified diagonal ``k`` must be zeroed. The returned array should be allocated on the same device as ``x``.
     """
+    return array(backend.tril(x._data, k=k), x._dims)
 
 
 def triu(x: array, /, *, k: int = 0) -> array:
@@ -598,6 +671,7 @@ def triu(x: array, /, *, k: int = 0) -> array:
     out: array
         an array containing the upper triangular part(s). The returned array must have the same shape and data type as ``x``. All elements below the specified diagonal ``k`` must be zeroed. The returned array should be allocated on the same device as ``x``.
     """
+    return array(backend.triu(x._data, k=k), x._dims)
 
 
 def zeros(
@@ -605,6 +679,7 @@ def zeros(
     *,
     dtype: Optional[dtype] = None,
     device: Optional[device] = None,
+    dims: Optional[Dims] = None,
 ) -> array:
     """
     Returns a new array having a specified ``shape`` and filled with zeros.
@@ -623,6 +698,9 @@ def zeros(
     out: array
         an array containing zeros.
     """
+    if dims is None:
+        dims = [UndefinedDim()] * (1 if isinstance(shape, int) else len(shape))
+    return array(backend.zeros(shape, dtype=dtype, device=device), dims)
 
 
 def zeros_like(
@@ -645,3 +723,4 @@ def zeros_like(
     out: array
         an array having the same shape as ``x`` and filled with zeros.
     """
+    return array(backend.zeros_like(x._data, dtype=dtype, device=device), x._dims)
