@@ -3,7 +3,7 @@ import random
 import numpy as np
 from tqdm import tqdm
 
-import spekk.array as ops
+import spekk.ops as ops
 
 ops.backend.set_backend("numpy")
 

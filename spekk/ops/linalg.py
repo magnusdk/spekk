@@ -25,7 +25,7 @@ __all__ = [
 ]
 from typing import Literal
 
-from spekk.array import linear_algebra_functions
+from spekk.ops import linear_algebra_functions
 from spekk.ops._backend import backend
 from spekk.ops._types import (
     Dim,

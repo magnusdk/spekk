@@ -1,7 +1,7 @@
 """Function stubs and API documentation for the array API standard."""
 
-from spekk.array import data_types as dtype
-from spekk.array import fft, linalg
+from spekk.ops import data_types as dtype
+from spekk.ops import fft, linalg
 from spekk.ops._backend import backend
 from spekk.ops.array_object import *
 from spekk.ops.constants import *

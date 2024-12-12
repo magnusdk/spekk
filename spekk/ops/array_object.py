@@ -88,7 +88,7 @@ class array:
         out: array
             array whose last two dimensions (axes) are permuted in reverse order relative to original array (i.e., for an array instance having shape ``(..., M, N)``, the returned array must have shape ``(..., N, M)``). The returned array must have the same data type as the original array.
         """
-        from spekk.array import matrix_transpose
+        from spekk.ops import matrix_transpose
 
         return matrix_transpose(self)
 
@@ -193,7 +193,7 @@ class array:
         .. versionchanged:: 2022.12
             Added complex data type support.
         """
-        from spekk.array import abs
+        from spekk.ops import abs
 
         return abs(self)
 
@@ -222,7 +222,7 @@ class array:
         .. versionchanged:: 2022.12
             Added complex data type support.
         """
-        from spekk.array import add
+        from spekk.ops import add
 
         return add(self, other)
 
@@ -246,7 +246,7 @@ class array:
         .. note::
            Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.bitwise_and`.
         """
-        from spekk.array import bitwise_and
+        from spekk.ops import bitwise_and
 
         return bitwise_and(self, other)
 
@@ -272,9 +272,9 @@ class array:
             raise NotImplementedError(
                 f"API version '{api_version}' not supported. Only array API version '2023.12' is supported."
             )
-        import spekk.array
+        import spekk.ops
 
-        return spekk.array
+        return spekk.ops
 
     def __bool__(self: array, /) -> bool:
         """
@@ -582,7 +582,7 @@ class array:
         .. note::
            Element-wise results, including special cases, must equal the results returned by the equivalent element-wise function :func:`~array_api.equal`.
         """
-        from spekk.array import equal
+        from spekk.ops import equal
 
         return equal(self, other)
 
@@ -648,7 +648,7 @@ class array:
         .. note::
            Element-wise results, including special cases, must equal the results returned by the equivalent element-wise function :func:`~array_api.floor_divide`.
         """
-        from spekk.array import floor_divide
+        from spekk.ops import floor_divide
 
         return floor_divide(self, other)
 
@@ -675,7 +675,7 @@ class array:
         .. note::
            Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.greater_equal`.
         """
-        from spekk.array import greater_equal
+        from spekk.ops import greater_equal
 
         return greater_equal(self, other)
 
@@ -790,7 +790,7 @@ class array:
         .. note::
            Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.greater`.
         """
-        from spekk.array import greater
+        from spekk.ops import greater
 
         return greater(self, other)
 
@@ -892,7 +892,7 @@ class array:
         .. note::
            Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.bitwise_invert`.
         """
-        from spekk.array import bitwise_invert
+        from spekk.ops import bitwise_invert
 
         return bitwise_invert(self)
 
@@ -919,7 +919,7 @@ class array:
         .. note::
            Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.less_equal`.
         """
-        from spekk.array import less_equal
+        from spekk.ops import less_equal
 
         return less_equal(self, other)
 
@@ -943,7 +943,7 @@ class array:
         .. note::
            Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.bitwise_left_shift`.
         """
-        from spekk.array import bitwise_left_shift
+        from spekk.ops import bitwise_left_shift
 
         return bitwise_left_shift(self, other)
 
@@ -970,7 +970,7 @@ class array:
         .. note::
            Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.less`.
         """
-        from spekk.array import less
+        from spekk.ops import less
 
         return less(self, other)
 
@@ -1021,7 +1021,7 @@ class array:
         .. versionchanged:: 2022.12
             Added complex data type support.
         """
-        from spekk.array import matmul
+        from spekk.ops import matmul
 
         return matmul(self, other)
 
@@ -1048,7 +1048,7 @@ class array:
         .. note::
            Element-wise results, including special cases, must equal the results returned by the equivalent element-wise function :func:`~array_api.remainder`.
         """
-        from spekk.array import remainder
+        from spekk.ops import remainder
 
         return remainder(self, other)
 
@@ -1080,7 +1080,7 @@ class array:
         .. versionchanged:: 2022.12
             Added complex data type support.
         """
-        from spekk.array import multiply
+        from spekk.ops import multiply
 
         return multiply(self, other)
 
@@ -1110,7 +1110,7 @@ class array:
         .. versionchanged:: 2022.12
             Added complex data type support.
         """
-        from spekk.array import not_equal
+        from spekk.ops import not_equal
 
         return not_equal(self, other)
 
@@ -1143,7 +1143,7 @@ class array:
         .. versionchanged:: 2022.12
             Added complex data type support.
         """
-        from spekk.array import negative
+        from spekk.ops import negative
 
         return negative(self)
 
@@ -1167,7 +1167,7 @@ class array:
         .. note::
            Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.bitwise_or`.
         """
-        from spekk.array import bitwise_or
+        from spekk.ops import bitwise_or
 
         return bitwise_or(self, other)
 
@@ -1194,7 +1194,7 @@ class array:
         .. versionchanged:: 2022.12
             Added complex data type support.
         """
-        from spekk.array import positive
+        from spekk.ops import positive
 
         return positive(self)
 
@@ -1228,7 +1228,7 @@ class array:
         .. versionchanged:: 2022.12
             Added complex data type support.
         """
-        from spekk.array import pow
+        from spekk.ops import pow
 
         return pow(self, other)
 
@@ -1252,7 +1252,7 @@ class array:
         .. note::
            Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.bitwise_right_shift`.
         """
-        from spekk.array import bitwise_right_shift
+        from spekk.ops import bitwise_right_shift
 
         return bitwise_right_shift(self, other)
 
@@ -1316,7 +1316,7 @@ class array:
         .. versionchanged:: 2022.12
             Added complex data type support.
         """
-        from spekk.array import subtract
+        from spekk.ops import subtract
 
         return subtract(self, other)
 
@@ -1350,7 +1350,7 @@ class array:
         .. versionchanged:: 2022.12
             Added complex data type support.
         """
-        from spekk.array import divide
+        from spekk.ops import divide
 
         return divide(self, other)
 
@@ -1374,7 +1374,7 @@ class array:
         .. note::
            Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.bitwise_xor`.
         """
-        from spekk.array import bitwise_xor
+        from spekk.ops import bitwise_xor
 
         return bitwise_xor(self, other)
 
