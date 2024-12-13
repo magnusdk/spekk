@@ -6,7 +6,15 @@ __all__ = ["array"]
 from typing import Any, Dict, Optional, Tuple, Union
 
 from spekk.ops._backend import backend
-from spekk.ops._types import ArrayLike, Dims, Enum, PyCapsule, UndefinedDim, ellipsis, Dim
+from spekk.ops._types import (
+    ArrayLike,
+    Dims,
+    Enum,
+    PyCapsule,
+    UndefinedDim,
+    ellipsis,
+    Dim,
+)
 from spekk.ops._types import (
     device as Device,
 )
@@ -758,12 +766,17 @@ class array:
                     raise NotImplementedError(
                         "Indexing by boolean array is not implemented."
                     )
+                elif hasattr(k, "ndim"):
+                    if k.ndim != 0:
+                        raise NotImplementedError()
+                    # Don't include the dimension
+                    dim_i += 1
                 else:
                     raise ValueError(f"Unknown indexing key type: '{k.__class__}'.")
 
         elif isinstance(key, array):
             raise NotImplementedError("Indexing by boolean array is not implemented.")
-        
+
         data = self._data.__getitem__(key._data if isinstance(key, array) else key)
         return array(data, dims)
 
@@ -1459,10 +1472,10 @@ class array:
     @property
     def dims(self):
         return self._dims
-    
+
     @property
     def dim_sizes(self) -> Dict[Dim, int]:
-        return {d:s for d,s in zip(self.dims, self.shape)}
+        return {d: s for d, s in zip(self.dims, self.shape)}
 
     def __repr__(self):
         return f"array(shape={self.shape}, dims={self.dims}, dtype={self.dtype})"
