@@ -5,8 +5,7 @@ from typing import Any, Callable, Iterable, List, Optional, Sequence, TypeVar, U
 from spekk.module.base import Module
 
 _RAISE_KEY_ERROR = object()
-T = TypeVar("T")
-V = TypeVar("V")
+TreeLike = TypeVar("TreeLike")
 
 
 @dataclasses.dataclass
@@ -74,11 +73,13 @@ class Tree:
 
     def __init__(
         self,
-        value: T,
+        value: TreeLike,
         *,
         keys_fn: Optional[Callable[[], Iterable[Any]]] = None,
         children_fn: Optional[Callable[[], Iterable[Any]]] = None,
-        recreate_fn: Optional[Callable[[Sequence[Any], Sequence[Any]], T]] = None,
+        recreate_fn: Optional[
+            Callable[[Sequence[Any], Sequence[Any]], TreeLike]
+        ] = None,
         is_marked_as_static: Optional[Callable[[Any], bool]] = None,
     ):
         self.value = value
@@ -112,7 +113,7 @@ class Tree:
     def children(tree: "Tree") -> Sequence[Any]:
         return tree._children_fn()
 
-    def is_leaf(obj: T) -> bool:
+    def is_leaf(obj: TreeLike) -> bool:
         """The object is a leaf if it can't be inferred as a Tree."""
         try:
             Tree.infer(obj)
@@ -121,7 +122,9 @@ class Tree:
             return True
 
     @_inferring_staticmethod
-    def recreate(tree: "Tree", keys: Sequence[Any], children: Sequence[Any]) -> T:
+    def recreate(
+        tree: "Tree", keys: Sequence[Any], children: Sequence[Any]
+    ) -> TreeLike:
         "Recreate the object with the given keys and children."
         return tree._recreate_fn(keys, children)
 
@@ -132,7 +135,7 @@ class Tree:
         return tree._is_marked_as_static(key)
 
     @staticmethod
-    def is_tree_like(obj: T) -> bool:
+    def is_tree_like(obj: TreeLike) -> bool:
         "The object is Tree-like if it can be inferred as a Tree."
         try:
             Tree.infer(obj)
@@ -160,7 +163,7 @@ class Tree:
         """
         return TreeLens(tree).at(*path)
 
-    def get(tree: T, *path: Any, default: Any = _RAISE_KEY_ERROR) -> Any:
+    def get(tree: TreeLike, *path: Any, default: Any = _RAISE_KEY_ERROR) -> Any:
         # Base case
         if not path:
             return tree.value if isinstance(tree, Tree) else tree
@@ -183,11 +186,13 @@ class Tree:
             new_keys_and_children.keys(), new_keys_and_children.values()
         )
 
-    def update(tree: T, key: Any, f: Callable[[Any], Any], *args, **kwargs) -> T:
+    def update(
+        tree: TreeLike, key: Any, f: Callable[[Any], Any], *args, **kwargs
+    ) -> TreeLike:
         return Tree.set(tree, key, f(Tree.get(tree, key), *args, **kwargs))
 
     @staticmethod
-    def infer(node: T) -> "Tree":
+    def infer(node: TreeLike) -> "Tree":
         from spekk.ops.array_object import array
 
         if isinstance(node, Tree):
@@ -278,11 +283,11 @@ class Tree:
 
 
 def traverse(
-    f: Callable[..., T],
-    main_tree: T,
-    *other_trees: T,
+    f: Callable[..., TreeLike],
+    main_tree: TreeLike,
+    *other_trees: TreeLike,
     should_stop: Callable[..., bool] = None,
-) -> T:
+) -> TreeLike:
     """Traverse a tree depth-first, left-to-right, optionally along with other Tree
     objects (presumably with similar shape), applying f to each leaf and each node.
 
@@ -318,7 +323,9 @@ def traverse(
     )
 
 
-def traverse_iter(tree: T, *other: T, should_stop: Callable[..., bool] = None):
+def traverse_iter(
+    tree: TreeLike, *other: TreeLike, should_stop: Callable[..., bool] = None
+):
     """Yield all leaves and nodes by traversing the tree(s) depth-first, left-to-right.
 
     Stops recursively traversing children if a non-tree-like tree is encountered or when
@@ -349,9 +356,9 @@ def traverse_iter(tree: T, *other: T, should_stop: Callable[..., bool] = None):
 
 
 def traverse_leaves(
-    f: Callable[..., T],
-    main_tree: T,
-    *other_trees: T,
+    f: Callable[..., TreeLike],
+    main_tree: TreeLike,
+    *other_trees: TreeLike,
     is_leaf: Callable[..., bool],
 ):
     return traverse(
@@ -363,8 +370,8 @@ def traverse_leaves(
 
 
 def traverse_leaves_iter(
-    main_tree: T,
-    *other_trees: T,
+    main_tree: TreeLike,
+    *other_trees: TreeLike,
     is_leaf: Callable[..., bool],
 ):
     # The function outputs a tuple if there are other_trees as well
@@ -393,7 +400,7 @@ class _TreeDef:
         self.data = data
         self.recreate = recreate
 
-    def unflatten(self, flattened_obj: list):
+    def unflatten(self, flattened_obj: list) -> TreeLike:
         if self.recreate is None:
             if isinstance(self.data, _IndexInFlattened):
                 return flattened_obj[self.data.i]
@@ -432,9 +439,10 @@ def is_not_array_like(x):
 
 
 def flatten(
-    obj: Union[Tree, Any],
+    obj: TreeLike,
     is_static: Callable[[Any], bool] = is_not_array_like,
-):
+    is_tree_like: Callable[[Any], bool] = Tree.is_tree_like,
+) -> FlattenedResult:
     dynamic = []
     paths = []
     static = []
@@ -446,7 +454,7 @@ def flatten(
             obj = Tree(obj)
             dummy = {}
             for key, node in zip(obj.keys(), obj.children()):
-                if Tree.is_tree_like(node):
+                if is_tree_like(node):
                     dummy[key] = _flatten(node, path + [key])
                 elif obj.is_marked_as_static(key) or is_static(node):
                     static.append(node)

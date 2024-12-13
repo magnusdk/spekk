@@ -10,6 +10,8 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import dataclass_transform
 
+from spekk.module.slicing_mixin import SlicingMixin
+
 _has_dataclass_init = weakref.WeakKeyDictionary()
 
 
@@ -176,7 +178,7 @@ def module_leaves(module: "Module") -> list:
     return [_field for _field in dataclasses.fields(module)]
 
 
-class Module(metaclass=_ModuleMeta):
+class Module(SlicingMixin, metaclass=_ModuleMeta):
     # TODO: Re-add docstring from equinox
     def __hash__(self):
         return hash(tuple(module_leaves(self)))
