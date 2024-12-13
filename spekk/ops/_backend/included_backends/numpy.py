@@ -29,3 +29,12 @@ def _python_vmap(f, in_axes=None):
 
 vmap = common.get_vmap_fn(_python_vmap)
 jit = lambda f: f  # There is no Numpy jit; just return function as-is.
+
+
+def scan(fn, init, xs):
+    carry = init
+    result = []
+    for x in xs:
+        carry, y = fn(carry, x)
+        result.append(y)
+    return carry, np.stack(result)

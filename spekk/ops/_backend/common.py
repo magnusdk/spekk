@@ -105,6 +105,24 @@ def get_vmap_fn(vmap_impl):
     return vmap
 
 
+def get_scan_fn(scan_impl):
+    def scan(f, init, xs):
+        flattened_carry = trees.flatten(init)
+
+        def wrapped_f(carry, x):
+            nonlocal flattened_carry
+            carry = flattened_carry.treedef.unflatten(carry)
+
+            new_carry, y = f(carry, x)
+            flattened_carry = trees.flatten(new_carry)
+            return flattened_carry.dynamic, y
+
+        carry, ys = scan_impl(wrapped_f, flattened_carry.dynamic, xs)
+        return flattened_carry.treedef.unflatten(carry), ys
+
+    return scan
+
+
 def get_jit_fn(jit_impl):
     @functools.wraps(jit_impl)
     def jit(f):
