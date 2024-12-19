@@ -1395,25 +1395,37 @@ class array:
         return self.__add__(other)
 
     def __rsub__(self, other):
-        return -self.__sub__(other)  # Reverse subtraction
+        from spekk.ops import subtract
+
+        return subtract(other, self)
 
     def __rmul__(self, other):
         return self.__mul__(other)
 
     def __rtruediv__(self, other):
-        return 1 / self.__truediv__(other)  # Reverse division
+        from spekk.ops import divide
+
+        return divide(other, self)
 
     def __rfloordiv__(self, other):
-        return other // self.__floordiv__(other)
+        from spekk.ops import floor_divide
+
+        return floor_divide(other, self)
 
     def __rmod__(self, other):
-        return other % self.__mod__(other)
+        from spekk.ops import remainder
+
+        return remainder(other, self)
 
     def __rpow__(self, other):
-        return other ** self.__pow__(other)
+        from spekk.ops import pow
+
+        return pow(other, self)
 
     def __rmatmul__(self, other):
-        return self.__matmul__(other)
+        from spekk.ops import matmul
+
+        return matmul(other, self)
 
     def __rand__(self, other):
         return self.__and__(other)
@@ -1425,10 +1437,14 @@ class array:
         return self.__xor__(other)
 
     def __rlshift__(self, other):
-        return self.__lshift__(other)
+        from spekk.ops import bitwise_left_shift
+
+        return bitwise_left_shift(other, self)
 
     def __rrshift__(self, other):
-        return self.__rshift__(other)
+        from spekk.ops import bitwise_right_shift
+
+        return bitwise_right_shift(other, self)
 
     def to_device(
         self: array, device: Device, /, *, stream: Optional[Union[int, Any]] = None
