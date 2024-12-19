@@ -1481,6 +1481,12 @@ class array:
     def __array__(self, dtype=None, copy=None) -> np.ndarray:
         return self._data.__array__(dtype=dtype, copy=copy)
 
+    def __iter__(self):
+        return iter(array(x, self.dims[1:]) for x in iter(self.data))
+
+    def __len__(self):
+        return self.shape[0]
+
     @property
     def data(self):
         return self._data
