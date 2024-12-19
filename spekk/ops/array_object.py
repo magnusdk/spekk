@@ -1494,4 +1494,7 @@ class array:
         return {d: s for d, s in zip(self.dims, self.shape)}
 
     def __repr__(self):
-        return f"array(shape={self.shape}, dims={self.dims}, dtype={self.dtype})"
+        return (
+            f"array(shape={self.shape}, dims={self.dims}, "
+            f"dtype={self.dtype}, data={self.data})"
+        )
