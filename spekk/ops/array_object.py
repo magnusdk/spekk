@@ -8,12 +8,12 @@ from typing import Any, Dict, Optional, Tuple, Union
 from spekk.ops._backend import backend
 from spekk.ops._types import (
     ArrayLike,
+    Dim,
     Dims,
     Enum,
     PyCapsule,
     UndefinedDim,
     ellipsis,
-    Dim,
 )
 from spekk.ops._types import (
     device as Device,
@@ -716,6 +716,8 @@ class array:
         out: array
             an array containing the accessed value(s). The returned array must have the same data type as ``self``.
         """
+        from spekk import ops
+
         # Handle changes to dimensions
         if isinstance(key, int):
             # Remove first dimension
@@ -762,22 +764,31 @@ class array:
                         dim_i = len(self._dims) - n_remaining_single_axes
                 elif k is None:
                     dims.append(UndefinedDim())
-                elif isinstance(key, array):
-                    raise NotImplementedError(
-                        "Indexing by boolean array is not implemented."
-                    )
-                elif hasattr(k, "ndim"):
-                    if k.ndim != 0:
-                        raise NotImplementedError()
-                    # Don't include the dimension
-                    dim_i += 1
+                elif hasattr(k, "ndim") and hasattr(k, "dtype"):
+                    if ops.isdtype(k.dtype, "integral"):
+                        if k.ndim == 1:
+                            dims.append(self._dims[dim_i])
+                        elif k.ndim > 1:
+                            raise ValueError(
+                                "May not index by an array with ndim greater than one. "
+                                "Perhaps you could use ops.take_along_dim instead."
+                            )
+                        dim_i += 1
+                    else:
+                        raise NotImplementedError(
+                            f"Indexing by array with dtype={k.dtype} is not implemented."
+                        )
                 else:
                     raise ValueError(f"Unknown indexing key type: '{k.__class__}'.")
 
         elif isinstance(key, array):
             raise NotImplementedError("Indexing by boolean array is not implemented.")
 
-        data = self._data.__getitem__(key._data if isinstance(key, array) else key)
+        if isinstance(key, array):
+            key = key._data
+        elif isinstance(key, Tuple):
+            key = tuple(k._data if isinstance(k, array) else k for k in key)
+        data = self._data.__getitem__(key)
         return array(data, dims)
 
     def __gt__(self: array, other: Union[int, float, array], /) -> array:
