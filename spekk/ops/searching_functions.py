@@ -1,9 +1,11 @@
 __all__ = ["argmax", "argmin", "nonzero", "searchsorted", "where"]
 
 from typing import Literal
-from spekk.ops._types import Dim, Optional, Tuple, UndefinedDim
-from spekk.ops.array_object import array
+
 from spekk.ops._backend import backend
+from spekk.ops._types import Dim, Optional, Tuple, UndefinedDim
+from spekk.ops._util import ensure_array
+from spekk.ops.array_object import array
 from spekk.ops.exceptions import MismatchedDimensionsError
 from spekk.ops.manipulation_functions import broadcast_arrays
 
@@ -31,10 +33,15 @@ def argmax(x: array, /, *, axis: Optional[Dim] = None, keepdims: bool = False) -
     out: array
         if ``axis`` is ``None``, a zero-dimensional array containing the index of the first occurrence of the maximum value; otherwise, a non-zero-dimensional array containing the indices of the maximum values. The returned array must have be the default array index data type.
     """
+    x = ensure_array(x)
+    if isinstance(axis, Dim):
+        axis = x._dims.index(axis)
     dims = list(x._dims)
     if not keepdims:
-        dims.remove(axis)
-    axis = x._dims.index(axis)
+        if axis is None:
+            dims = []
+        else:    
+            del dims[axis]
     return array(backend.argmax(x._data, axis=axis, keepdims=keepdims), dims)
 
 
@@ -61,10 +68,15 @@ def argmin(x: array, /, *, axis: Optional[int] = None, keepdims: bool = False) -
     out: array
         if ``axis`` is ``None``, a zero-dimensional array containing the index of the first occurrence of the minimum value; otherwise, a non-zero-dimensional array containing the indices of the minimum values. The returned array must have the default array index data type.
     """
+    x = ensure_array(x)
+    if isinstance(axis, Dim):
+        axis = x._dims.index(axis)
     dims = list(x._dims)
     if not keepdims:
-        dims.remove(axis)
-    axis = x._dims.index(axis)
+        if axis is None:
+            dims = []
+        else:    
+            del dims[axis]
     return array(backend.argmin(x._data, axis=axis, keepdims=keepdims), dims)
 
 

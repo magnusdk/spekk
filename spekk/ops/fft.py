@@ -204,8 +204,8 @@ def fftn(
     .. versionchanged:: 2023.12
        Required the input array have a complex floating-point data type and required that the output array have the same data type as the input array.
     """
-    if isinstance(axes, Sequence[Dim]):
-        axes = [x._dims.index(dim) for dim in axes]
+    if isinstance(axes, Sequence):
+        axes = [x._dims.index(dim) if isinstance(dim, Dim) else dim for dim in axes]
     dims = list(x._dims)
     if rename_dims is not None:
         for axis, rename_dim in zip(axes, rename_dims):
@@ -270,8 +270,8 @@ def ifftn(
     .. versionchanged:: 2023.12
        Required the input array have a complex floating-point data type and required that the output array have the same data type as the input array.
     """
-    if isinstance(axes, Sequence[Dim]):
-        axes = [x._dims.index(dim) for dim in axes]
+    if isinstance(axes, Sequence):
+        axes = [x._dims.index(dim) if isinstance(dim, Dim) else dim for dim in axes]
     dims = list(x._dims)
     if rename_dims is not None:
         for axis, rename_dim in zip(axes, rename_dims):
@@ -332,7 +332,7 @@ def rfft(
     dims = list(x._dims)
     if rename_dim is not None:
         dims[axis] = rename_dim
-    return array(backend.fft.rfft(x, n=n, axes=axis, norm=norm), dims)
+    return array(backend.fft.rfft(x, n=n, axis=axis, norm=norm), dims)
 
 
 def irfft(
@@ -393,7 +393,7 @@ def irfft(
     dims = list(x._dims)
     if rename_dim is not None:
         dims[axis] = rename_dim
-    return array(backend.fft.irfft(x, n=n, axes=axis, norm=norm), dims)
+    return array(backend.fft.irfft(x, n=n, axis=axis, norm=norm), dims)
 
 
 def rfftn(
@@ -450,8 +450,8 @@ def rfftn(
 
     .. versionadded:: 2022.12
     """
-    if isinstance(axes, Sequence[Dim]):
-        axes = [x._dims.index(dim) for dim in axes]
+    if isinstance(axes, Sequence):
+        axes = [x._dims.index(dim) if isinstance(dim, Dim) else dim for dim in axes]
     dims = list(x._dims)
     if rename_dims is not None:
         for axis, rename_dim in zip(axes, rename_dims):
@@ -518,8 +518,8 @@ def irfftn(
     .. versionchanged:: 2023.12
        Required the output array have a real-valued floating-point data type having the same precision as the input array.
     """
-    if isinstance(axes, Sequence[Dim]):
-        axes = [x._dims.index(dim) for dim in axes]
+    if isinstance(axes, Sequence):
+        axes = [x._dims.index(dim) if isinstance(dim, Dim) else dim for dim in axes]
     dims = list(x._dims)
     if rename_dims is not None:
         for axis, rename_dim in zip(axes, rename_dims):
@@ -580,7 +580,7 @@ def hfft(
     dims = list(x._dims)
     if rename_dim is not None:
         dims[axis] = rename_dim
-    return array(backend.fft.hfft(x, n=n, axes=axis, norm=norm), dims)
+    return array(backend.fft.hfft(x, n=n, axis=axis, norm=norm), dims)
 
 
 def ihfft(
@@ -633,7 +633,7 @@ def ihfft(
     dims = list(x._dims)
     if rename_dim is not None:
         dims[axis] = rename_dim
-    return array(backend.fft.ihfft(x, n=n, axes=axis, norm=norm), dims)
+    return array(backend.fft.ihfft(x, n=n, axis=axis, norm=norm), dims)
 
 
 def fftfreq(
@@ -678,7 +678,7 @@ def fftfreq(
     """
     if dim is None:
         dim = UndefinedDim()
-    return array(backend.fftfreq(n, d=d, device=device), [dim])
+    return array(backend.fft.fftfreq(n, d=d, device=device), [dim])
 
 
 def rfftfreq(
@@ -725,7 +725,7 @@ def rfftfreq(
     """
     if dim is None:
         dim = UndefinedDim()
-    return array(backend.rfftfreq(n, d=d, device=device), [dim])
+    return array(backend.fft.rfftfreq(n, d=d, device=device), [dim])
 
 
 def fftshift(
@@ -764,8 +764,8 @@ def fftshift(
     """
     if isinstance(axes, Dim):
         axes = x._dims.index(axes)
-    elif isinstance(axes, Sequence[Dim]):
-        axes = [x._dims.index(dim) for dim in axes]
+    elif isinstance(axes, Sequence):
+        axes = [x._dims.index(dim) if isinstance(dim, Dim) else dim for dim in axes]
     dims = list(x._dims)
     if rename_dims is not None:
         for axis, rename_dim in zip(axes, rename_dims):
@@ -807,8 +807,8 @@ def ifftshift(
     """
     if isinstance(axes, Dim):
         axes = x._dims.index(axes)
-    elif isinstance(axes, Sequence[Dim]):
-        axes = [x._dims.index(dim) for dim in axes]
+    elif isinstance(axes, Sequence):
+        axes = [x._dims.index(dim) if isinstance(dim, Dim) else dim for dim in axes]
     dims = list(x._dims)
     if rename_dims is not None:
         for axis, rename_dim in zip(axes, rename_dims):

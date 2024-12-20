@@ -18,6 +18,8 @@ __all__ = [
 ]
 from typing import List, Optional, Tuple, Union
 
+import spekk.ops.data_types as data_types
+from spekk.ops._backend import backend
 from spekk.ops._types import (
     Dim,
     Dims,
@@ -28,7 +30,7 @@ from spekk.ops._types import (
     dtype,
 )
 from spekk.ops.array_object import array
-from spekk.ops._backend import backend
+from spekk.ops.data_types import _DType
 
 
 def arange(
@@ -68,6 +70,8 @@ def arange(
     """
     if dim is None:
         dim = UndefinedDim()
+    if dtype is not None:
+        dtype = _DType._to_backend_dtype(dtype)
     return array(
         backend.arange(start, stop, step, dtype=dtype, device=device),
         [dim],
@@ -132,17 +136,18 @@ def asarray(
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    if dtype is not None:
+        dtype = _DType._to_backend_dtype(dtype)
     if isinstance(obj, array):
         if dims is None:
-            dims = obj._dims
-        return array(
-            backend.asarray(obj._data, dtype=dtype, device=device, copy=copy),
-            dims,
-        )
+            dims = obj.dims
+        #if dtype is None and obj.dtype == data_types.bool:
+        #    dtype = _DType._to_backend_dtype(obj.dtype)
+        data = backend.asarray(obj.data, dtype=dtype, device=device, copy=copy)
+        return array(data, dims)
 
     data = backend.asarray(obj, dtype=dtype, device=device, copy=copy)
-    if dims is None:
-        dims = [UndefinedDim()] * data.ndim
+    dims = [UndefinedDim()] * data.ndim
     return array(data, dims)
 
 
@@ -172,6 +177,8 @@ def empty(
     """
     if dims is None:
         dims = [UndefinedDim()] * (1 if isinstance(shape, int) else len(shape))
+    if dtype is not None:
+        dtype = _DType._to_backend_dtype(dtype)
     return array(backend.empty(shape, dtype=dtype, device=device), dims)
 
 
@@ -199,6 +206,8 @@ def empty_like(
     out: array
         an array having the same shape as ``x`` and containing uninitialized data.
     """
+    if dtype is not None:
+        dtype = _DType._to_backend_dtype(dtype)
     return array(backend.empty_like(x._data, dtype=dtype, device=device), x._dims)
 
 
@@ -244,8 +253,10 @@ def eye(
     """
     if dims is None:
         dims = [UndefinedDim(), UndefinedDim()]
+    if dtype is not None:
+        dtype = _DType._to_backend_dtype(dtype)
     return array(
-        backend.eye(n_rows=n_rows, n_cols=n_cols, k=k, dtype=dtype, device=device),
+        backend.eye(n_rows, n_cols, k=k, dtype=dtype, device=device),
         dims,
     )
 
@@ -382,7 +393,9 @@ def full(
     """
     if dims is None:
         dims = [UndefinedDim()] * (1 if isinstance(shape, int) else len(shape))
-    return array(backend.empty(shape, fill_value, dtype=dtype, device=device), dims)
+    if dtype is not None:
+        dtype = _DType._to_backend_dtype(dtype)
+    return array(backend.full(shape, fill_value, dtype=dtype, device=device), dims)
 
 
 def full_like(
@@ -425,8 +438,10 @@ def full_like(
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    if dtype is not None:
+        dtype = _DType._to_backend_dtype(dtype)
     return array(
-        backend.empty_like(x._data, fill_value, dtype=dtype, device=device),
+        backend.full_like(x._data, fill_value, dtype=dtype, device=device),
         x._dims,
     )
 
@@ -504,6 +519,8 @@ def linspace(
     """
     if dim is None:
         dim = UndefinedDim()
+    if dtype is not None:
+        dtype = _DType._to_backend_dtype(dtype)
     return array(
         backend.linspace(
             start, stop, num, dtype=dtype, device=device, endpoint=endpoint
@@ -589,6 +606,8 @@ def ones(
     """
     if dims is None:
         dims = [UndefinedDim()] * (1 if isinstance(shape, int) else len(shape))
+    if dtype is not None:
+        dtype = _DType._to_backend_dtype(dtype)
     return array(backend.ones(shape, dtype=dtype, device=device), dims)
 
 
@@ -621,6 +640,8 @@ def ones_like(
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    if dtype is not None:
+        dtype = _DType._to_backend_dtype(dtype)
     return array(backend.ones_like(x._data, dtype=dtype, device=device), x._dims)
 
 
@@ -700,6 +721,8 @@ def zeros(
     """
     if dims is None:
         dims = [UndefinedDim()] * (1 if isinstance(shape, int) else len(shape))
+    if dtype is not None:
+        dtype = _DType._to_backend_dtype(dtype)
     return array(backend.zeros(shape, dtype=dtype, device=device), dims)
 
 
@@ -723,4 +746,6 @@ def zeros_like(
     out: array
         an array having the same shape as ``x`` and filled with zeros.
     """
+    if dtype is not None:
+        dtype = _DType._to_backend_dtype(dtype)
     return array(backend.zeros_like(x._data, dtype=dtype, device=device), x._dims)

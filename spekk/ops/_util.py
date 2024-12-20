@@ -3,6 +3,7 @@ from typing import Optional, Sequence, Tuple, Union
 from spekk.ops._backend import backend
 from spekk.ops._types import ArrayLike, Dim, Dims, UndefinedDim
 from spekk.ops.array_object import array
+from spekk.ops.data_types import _DType
 
 
 def get_reduction_axes_and_resulting_dims(
@@ -30,11 +31,12 @@ def get_reduction_axes_and_resulting_dims(
     """
     # Allow sending explicit axis
     if isinstance(dim, int):
-        # Ensure that dim is a dimension (str), not an axis (int) going forward
-        dim = all_dims[dim]
+        axis = dim
+        dims = list(all_dims)
+        del dims[axis]
 
     # Reducing over all axes (when dim is None)
-    if dim is None:
+    elif dim is None:
         # Return all axes, and empty dimension list
         axis = tuple(range(len(all_dims)))
         dims = []
@@ -50,19 +52,13 @@ def get_reduction_axes_and_resulting_dims(
     # Reducing over multiple axes
     elif isinstance(dim, Sequence):
         axes = []
-        new_dims = list(all_dims)
         for dim1 in dim:
             # Allow sending explicit axis
-            if isinstance(dim1, Dim):
-                axis = all_dims.index(dim1)
-            else:
-                axis = dim1
-
+            axis = all_dims.index(dim1) if isinstance(dim1, Dim) else dim1
             axes.append(axis)
-            new_dims.remove(dim1)
         # Return the reduced-over axes and all dimensions minus the ones reduced over
-        axis = tuple(axes)
-        dims = new_dims
+        axis = tuple(canonicalize_axis(len(all_dims), axis) for axis in axes)
+        dims = [dim1 for i, dim1 in enumerate(all_dims) if i not in axis]
 
     else:
         raise ValueError(
@@ -76,11 +72,18 @@ def get_reduction_axes_and_resulting_dims(
     return axis, dims
 
 
-def ensure_array(x: ArrayLike) -> array:
+def ensure_array(x: ArrayLike, dtype: _DType = None) -> array:
     if not isinstance(x, array):
-        x = backend.asarray(x)
+        dtype = dtype._to_backend_dtype() if dtype is not None else None
+        x = backend.asarray(x, dtype=dtype)
         x = array(x, [UndefinedDim()] * x.ndim)
     return x
+
+
+def canonicalize_axis(n: int, i: int) -> int:
+    if i < 0:
+        i += n
+    return i
 
 
 if __name__ == "__main__":

@@ -36,9 +36,10 @@ from spekk.ops._types import (
     Union,
     dtype,
 )
+from spekk.ops._util import ensure_array
 from spekk.ops.array_object import array
 from spekk.ops.constants import inf
-from spekk.ops.manipulation_functions import broadcast_arrays
+from spekk.ops.manipulation_functions import broadcast_arrays, permute_dims
 
 
 def cholesky(x: array, /, *, upper: bool = False) -> array:
@@ -134,7 +135,7 @@ def cross(x1: array, x2: array, /, *, axis: int = -1) -> array:
     return array(backend.linalg.cross(x1._data, x2._data, axis=axis), x1._dims)
 
 
-def det(x: array, /) -> array:
+def det(x: array, /, *, axes: Tuple[int, int]) -> array:
     """
     Returns the determinant of a square matrix (or a stack of square matrices) ``x``.
 
@@ -154,8 +155,10 @@ def det(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
+    # Place the axes last
+    x = permute_dims(x, [d for d in x._dims if d not in axes] + list(axes))
     data = backend.linalg.det(x._data)
-    # linalg.det doesn't take in 'axes' argument, and requires the square matrix as the last two axes.
     dims = x._dims[:-2]
     return array(data, dims)
 
@@ -249,6 +252,7 @@ def eigh(x: array, /) -> Tuple[array]:
        Added complex data type support.
     """
     raise NotImplementedError("Please help me implement this!")
+
 
 def eigvalsh(x: array, /) -> array:
     r"""

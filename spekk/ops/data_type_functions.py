@@ -1,5 +1,7 @@
 __all__ = ["astype", "can_cast", "finfo", "iinfo", "isdtype", "result_type"]
 
+from dataclasses import dataclass
+
 from spekk.ops._backend import backend
 from spekk.ops._types import (
     Optional,
@@ -11,6 +13,7 @@ from spekk.ops._types import (
     iinfo_object,
 )
 from spekk.ops.array_object import array
+from spekk.ops.data_types import _DType
 
 
 def astype(
@@ -62,11 +65,12 @@ def astype(
     .. versionchanged:: 2023.12
        Added device keyword argument support.
     """
-    # NOTE: Hack to make it work with Numpy. Remove this (and just pass copy and device 
+    # NOTE: Hack to make it work with Numpy. Remove this (and just pass copy and device
     # directly to backend.astype) when it has been fixed.
     kwargs = dict(copy=copy)
     if device is not None:
         kwargs["device"] = device
+    dtype = _DType._to_backend_dtype(dtype)
     data = backend.astype(x._data, dtype, **kwargs)
     return array(data, x._dims)
 
@@ -88,7 +92,29 @@ def can_cast(from_: Union[dtype, array], to: dtype, /) -> bool:
         ``True`` if the cast can occur according to :ref:`type-promotion` rules; otherwise, ``False``.
     """
     from_ = from_._data if isinstance(from_, array) else from_
+    from_ = _DType._to_backend_dtype(from_)
+    to = _DType._to_backend_dtype(to)
     return backend.can_cast(from_, to)
+
+
+@dataclass
+class finfo_object:
+    bits: int
+    # Note: The types of the float data here are float, whereas in NumPy they
+    # are scalars of the corresponding float dtype.
+    eps: float
+    max: float
+    min: float
+    smallest_normal: float
+    dtype: _DType
+
+
+@dataclass
+class iinfo_object:
+    bits: int
+    max: int
+    min: int
+    dtype: _DType
 
 
 def finfo(type: Union[dtype, array], /) -> finfo_object:
@@ -140,8 +166,19 @@ def finfo(type: Union[dtype, array], /) -> finfo_object:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
-    type = type._data if isinstance(type, array) else type
-    return backend.finfo(type)
+    if isinstance(type, array):
+        type = type._data
+    if not backend._is_backend_array(type):
+        type = _DType._to_backend_dtype(type)
+    backend_finfo = backend.finfo(type)
+    return finfo_object(
+        int(backend_finfo.bits),
+        float(backend_finfo.eps),
+        float(backend_finfo.max),
+        float(backend_finfo.min),
+        float(backend_finfo.smallest_normal),
+        _DType._from_backend_dtype(backend_finfo.dtype),
+    )
 
 
 def iinfo(type: Union[dtype, array], /) -> iinfo_object:
@@ -176,7 +213,10 @@ def iinfo(type: Union[dtype, array], /) -> iinfo_object:
 
           .. versionadded:: 2022.12
     """
-    type = type._data if isinstance(type, array) else type
+    if isinstance(type, array):
+        type = type._data
+    elif not backend._is_backend_array(type):
+        type = _DType._to_backend_dtype(type)
     return backend.iinfo(type)
 
 
@@ -221,6 +261,11 @@ def isdtype(
 
     .. versionadded:: 2022.12
     """
+    dtype = _DType._to_backend_dtype(dtype)
+    if isinstance(kind, tuple):
+        return any(isdtype(dtype, k) for k in kind)
+    elif not isinstance(kind, str):
+        kind = _DType._to_backend_dtype(kind)
     return backend.isdtype(dtype, kind)
 
 
@@ -242,6 +287,11 @@ def result_type(*arrays_and_dtypes: Union[array, dtype]) -> dtype:
         the dtype resulting from an operation involving the input arrays and dtypes.
     """
     arrays_and_dtypes = [
-        x._data if isinstance(x, array) else x for x in arrays_and_dtypes
+        (
+            x._data
+            if isinstance(x, array)
+            else _DType._to_backend_dtype(x) if isinstance(x, _DType) else x
+        )
+        for x in arrays_and_dtypes
     ]
-    return backend.result_type(*arrays_and_dtypes)
+    return _DType._from_backend_dtype(backend.result_type(*arrays_and_dtypes))

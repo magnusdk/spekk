@@ -851,8 +851,20 @@ def clip(
 
     .. versionadded:: 2023.12
     """
-    x = ensure_array(x)
-    return array(backend.clip(x._data, min=min, max=max), x._dims)
+    if isinstance(min, array) and isinstance(max, array):
+        x, min, max = broadcast_arrays(x, min, max)
+    elif isinstance(min, array):
+        x, min = broadcast_arrays(x, min)
+    elif isinstance(max, array):
+        x, max = broadcast_arrays(x, max)
+    return array(
+        backend.clip(
+            x.data if isinstance(x, array) else x,
+            min=min.data if isinstance(min, array) else min,
+            max=max.data if isinstance(max, array) else max,
+        ),
+        x.dims,
+    )
 
 
 def conj(x: array, /) -> array:
@@ -1979,7 +1991,7 @@ def logical_or(x1: array, x2: array, /) -> array:
         an array containing the element-wise results. The returned array must have a data type of ``bool``.
     """
     x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.logical_not(x1._data, x2._data), x1._dims)
+    return array(backend.logical_or(x1._data, x2._data), x1._dims)
 
 
 def logical_xor(x1: array, x2: array, /) -> array:

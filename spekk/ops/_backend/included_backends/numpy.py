@@ -2,8 +2,11 @@ import functools
 
 import numpy as np
 from array_api_compat.numpy import *
+from array_api_compat.numpy import _info
 
 import spekk.ops._backend.common as common
+
+__array_namespace_info__ = _info.__array_namespace_info__
 
 
 def _python_vmap(f, in_axes=None):

@@ -2,9 +2,10 @@ __all__ = ["cumulative_sum", "max", "mean", "min", "prod", "std", "sum", "var"]
 
 
 from spekk.ops._backend import backend
-from spekk.ops._types import Dim, Optional, Tuple, Union, dtype
+from spekk.ops._types import Dim, Optional, Tuple, UndefinedDim, Union, dtype
 from spekk.ops._util import ensure_array, get_reduction_axes_and_resulting_dims
 from spekk.ops.array_object import array
+from spekk.ops.data_types import _DType
 
 
 def cumulative_sum(
@@ -58,15 +59,21 @@ def cumulative_sum(
     .. versionadded:: 2023.12
     """
     x = ensure_array(x)
-    if axis is None and x.ndim != 1:
-        raise ValueError("dim must be provided when x has more than one dimension.")
+    if dtype is not None:
+        dtype = _DType._to_backend_dtype(dtype)
+    if axis is None:
+        if x.ndim != 1:
+            raise ValueError("dim must be provided when x has more than one dimension.")
+        axis = 0
 
-    axis = x._dims.index(axis)
+    axis = x._dims.index(axis) if isinstance(axis, Dim) else axis
     data = backend.cumulative_sum(
         x._data, axis=axis, dtype=dtype, include_initial=include_initial
     )
     dims = list(x._dims)
-    dims.remove(axis)
+    del dims[axis]
+    # Add the new dimension for the cumulatively summed elements
+    dims = [UndefinedDim()] + dims
     return array(data, dims)
 
 
@@ -261,6 +268,8 @@ def prod(
        Required the function to return a floating-point array having the same data type as the input array when provided a floating-point array.
     """
     x = ensure_array(x)
+    if dtype is not None:
+        dtype = _DType._to_backend_dtype(dtype)
     axis, dims = get_reduction_axes_and_resulting_dims(axis, x._dims, keepdims)
     data = backend.prod(x._data, axis=axis, dtype=dtype, keepdims=keepdims)
     return array(data, dims)
@@ -364,6 +373,8 @@ def sum(
        Required the function to return a floating-point array having the same data type as the input array when provided a floating-point array.
     """
     x = ensure_array(x)
+    if dtype is not None:
+        dtype = _DType._to_backend_dtype(dtype)
     axis, dims = get_reduction_axes_and_resulting_dims(axis, x._dims, keepdims)
     data = backend.sum(x._data, axis=axis, dtype=dtype, keepdims=keepdims)
     return array(data, dims)

@@ -33,7 +33,7 @@ def argsort(
     """
     axis = x._dims.index(axis) if isinstance(axis, Dim) else axis
     return array(
-        backend.argsort(x._data, axis=axis, descending=descending, sgtable=stable),
+        backend.argsort(x._data, axis=axis, descending=descending, stable=stable),
         x._dims,
     )
 
@@ -65,6 +65,6 @@ def sort(
     """
     axis = x._dims.index(axis) if isinstance(axis, Dim) else axis
     return array(
-        backend.sort(x._data, axis=axis, descending=descending, sgtable=stable),
+        backend.sort(x._data, axis=axis, descending=descending, stable=stable),
         x._dims,
     )

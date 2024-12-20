@@ -21,6 +21,7 @@ from spekk.ops._types import (
 from spekk.ops._types import (
     dtype as Dtype,
 )
+from spekk.ops.data_types import _DType
 
 
 class array:
@@ -37,7 +38,7 @@ class array:
             if dims is None:
                 dims = data._dims
             data = data._data
-        elif not backend._is_backend_array(data):
+        if not backend._is_backend_array(data):
             data = backend.asarray(data)
 
         if dims is None:
@@ -70,7 +71,7 @@ class array:
         out: dtype
             array data type.
         """
-        return self._data.dtype
+        return _DType._from_backend_dtype(self._data.dtype)
 
     @property
     def device(self: array) -> Device:
@@ -1311,7 +1312,15 @@ class array:
 
            When ``value`` is an ``array`` of a different data type than ``self``, how values are cast to the data type of ``self`` is implementation defined.
         """
-        self._data = backend._setitem_impl(self._data, key, value)
+        from spekk import ops
+
+        if isinstance(key, array):
+            key = key.data
+        elif isinstance(key, tuple):
+            key = tuple(k.data if isinstance(k, array) else k for k in key)
+        broadcasted_self, value = ops.broadcast_arrays(self, value)
+        self._data = backend._setitem_impl(broadcasted_self.data, key, value.data)
+        self._dims = broadcasted_self.dims
 
     def __sub__(self: array, other: Union[int, float, array], /) -> array:
         """
