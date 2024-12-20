@@ -5,6 +5,7 @@ import numpy as np
 __all__ = ["array"]
 from typing import Any, Dict, Optional, Tuple, Union
 
+import spekk.ops.data_types as data_types
 from spekk.ops._backend import backend
 from spekk.ops._types import (
     ArrayLike,
@@ -1518,6 +1519,46 @@ class array:
     @property
     def dim_sizes(self) -> Dict[Dim, int]:
         return {d: s for d, s in zip(self.dims, self.shape)}
+
+    # Methods for casting dtype
+    def int8(self):
+        return data_types.int8(self)
+
+    def int16(self):
+        return data_types.int16(self)
+
+    def int32(self):
+        return data_types.int32(self)
+
+    def int64(self):
+        return data_types.int64(self)
+
+    def uint8(self):
+        return data_types.uint8(self)
+
+    def uint16(self):
+        return data_types.uint16(self)
+
+    def uint32(self):
+        return data_types.uint32(self)
+
+    def uint64(self):
+        return data_types.uint64(self)
+
+    def float32(self):
+        return data_types.float32(self)
+
+    def float64(self):
+        return data_types.float64(self)
+
+    def complex64(self):
+        return data_types.complex64(self)
+
+    def complex128(self):
+        return data_types.complex128(self)
+
+    def bool(self):
+        return data_types.bool(self)
 
     def __repr__(self):
         return (
