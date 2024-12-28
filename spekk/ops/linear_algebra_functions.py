@@ -236,5 +236,10 @@ def vecdot(x1: array, x2: array, /, *, axis: int = -1) -> array:
     """
     x1, x2 = broadcast_arrays(x1, x2)
     if isinstance(axis, Dim):
-        axis = x1._dims.index(axis)
-    return array(backend.vecdot(x1, x2, axis=axis))
+        dim = axis
+        axis = x1.dims.index(axis)
+    else:
+        dim = x1.dims[axis]
+    dims = list(x1.dims)
+    dims.remove(dim)
+    return array(backend.vecdot(x1, x2, axis=axis), dims)
