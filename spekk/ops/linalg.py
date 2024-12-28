@@ -905,4 +905,16 @@ def vector_norm(
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
-    raise NotImplementedError("Please help me implement this!")
+    if isinstance(axis, Dim):
+        dim = axis
+        axis = x.dims.index(axis)
+    else:
+        dim = x.dims[axis]
+
+    dims = list(x.dims)
+    if not keepdims:
+        dims.remove(dim)
+    return array(
+        backend.linalg.vector_norm(x.data, axis=axis, keepdims=keepdims, ord=ord),
+        dims,
+    )
