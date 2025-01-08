@@ -4,14 +4,18 @@ from typing import Any, Sequence, Union
 import numpy as np
 
 from spekk.module import trees
+from spekk.ops import backend
 
 
 def _get_key(static_xs: Sequence[Any]):
-    from fastmath import ops
+    from spekk import ops
 
     key = []
     for x in static_xs:
-        if ops.is_array(x):
+        if isinstance(x, ops.array):
+            # Use the memory address (id for CPython) as key for static arrays
+            key.append(hash((id(x), id(x.data))))
+        elif backend._is_backend_array(x):
             # Use the memory address (id for CPython) as key for static arrays
             key.append(id(x))
         else:
@@ -24,7 +28,6 @@ def _get_key(static_xs: Sequence[Any]):
 
 
 def get_vmap_fn(vmap_impl):
-
     @functools.wraps(vmap_impl)
     def vmap(f, in_axes):
         cache = {}
