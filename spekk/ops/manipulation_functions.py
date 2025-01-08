@@ -29,7 +29,6 @@ from spekk.ops._types import (
     Union,
 )
 from spekk.ops._util import canonicalize_axis, ensure_array
-from spekk.ops.data_type_functions import result_type
 from spekk.ops.array_object import array
 
 
@@ -47,9 +46,8 @@ def broadcast_arrays(*arrays: array) -> List[array]:
     out: List[array]
         a list of broadcasted arrays. Each array must have the same shape. Each array must have the same dtype as its corresponding input array.
     """
-    output_dtype = result_type(*arrays)
     # Esnure that they are all arrays
-    arrays = [ensure_array(x, output_dtype) for x in arrays]
+    arrays = [ensure_array(x) for x in arrays]
 
     # TODO: How to handle UndefinedDim?
     if any(isinstance(dim, UndefinedDim) for x in arrays for dim in x._dims):
