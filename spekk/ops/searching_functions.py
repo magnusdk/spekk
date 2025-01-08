@@ -1,6 +1,6 @@
 __all__ = ["argmax", "argmin", "nonzero", "searchsorted", "where"]
 
-from typing import Literal
+from typing import TYPE_CHECKING, Literal, TypeVar
 
 from spekk.ops._backend import backend
 from spekk.ops._types import Dim, Optional, Tuple, UndefinedDim
@@ -40,7 +40,7 @@ def argmax(x: array, /, *, axis: Optional[Dim] = None, keepdims: bool = False) -
     if not keepdims:
         if axis is None:
             dims = []
-        else:    
+        else:
             del dims[axis]
     return array(backend.argmax(x._data, axis=axis, keepdims=keepdims), dims)
 
@@ -75,7 +75,7 @@ def argmin(x: array, /, *, axis: Optional[int] = None, keepdims: bool = False) -
     if not keepdims:
         if axis is None:
             dims = []
-        else:    
+        else:
             del dims[axis]
     return array(backend.argmin(x._data, axis=axis, keepdims=keepdims), dims)
 
@@ -176,6 +176,52 @@ def searchsorted(
     )
 
 
+if TYPE_CHECKING:
+    from spekk.module import Module
+
+    TModule = TypeVar("TModule", bound=Module)
+
+
+def _where_with_modules(condition: array, x1: "TModule", x2: "TModule", /) -> "TModule":
+    """Flatten the `x1` and `x2` such that we can work on the underlying arrays. This
+    enables calling :func:`where` on objects.
+
+    `x1` and `x2` must have the same type. Otherwise, how would we know what type to
+    return if there are multiple conditions?"""
+    if type(x1) is not type(x2):
+        raise ValueError(
+            f"x1 and x2 must have the same type. Got {type(x1)} and {type(x2)}."
+        )
+
+    from spekk.module import flatten
+
+    def get_dims_at_path(path: list, x: "TModule"):
+        """`flatten` also flatten spekk arrays down to the backend array. This function
+        gets the dimension names of the array so that we can re-wrap it."""
+        # Skip the last step because that's "data" (as in array.data)
+        path = path[:-1]
+        for step in path:
+            x = getattr(x, step)
+        return x.dims
+
+    flattened_x1 = flatten(x1)
+    flattened_x2 = flatten(x2)
+    result_parts = [
+        where(
+            condition,
+            array(_x1, get_dims_at_path(_x1_paths, x1)),
+            array(_x2, get_dims_at_path(_x2_paths, x2)),
+        )
+        for _x1, _x1_paths, _x2, _x2_paths in zip(
+            flattened_x1.dynamic,
+            flattened_x1.paths,
+            flattened_x2.dynamic,
+            flattened_x2.paths,
+        )
+    ]
+    return flattened_x1.treedef.unflatten(result_parts)
+
+
 def where(condition: array, x1: array, x2: array, /) -> array:
     """
     Returns elements chosen from ``x1`` or ``x2`` depending on ``condition``.
@@ -194,5 +240,11 @@ def where(condition: array, x1: array, x2: array, /) -> array:
     out: array
         an array with elements from ``x1`` where ``condition`` is ``True``, and elements from ``x2`` elsewhere. The returned array must have a data type determined by :ref:`type-promotion` rules with the arrays ``x1`` and ``x2``.
     """
+
+    from spekk.module import Module
+
+    if isinstance(x1, Module) or isinstance(x2, Module):
+        return _where_with_modules(condition, x1, x2)
+
     condition, x1, x2 = broadcast_arrays(condition, x1, x2)
     return array(backend.where(condition._data, x1._data, x2._data), condition._dims)
