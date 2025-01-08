@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 from typing_extensions import dataclass_transform
 
+from spekk.module.abstract_classes import ABCMeta, dataclass
 from spekk.module.slicing_mixin import SlicingMixin
 
 _has_dataclass_init = weakref.WeakKeyDictionary()
@@ -33,7 +34,7 @@ def _is_abstract(cls):
     return len(cls.__abstractmethods__) > 0
 
 
-class _ModuleMeta(abc.ABCMeta):
+class _ModuleMeta(ABCMeta):
     # This method is called whenever you define a module: `class Foo(Module): ...`
     def __new__(mcs, name, bases, dict_, **kwargs):
         # Create class as normal (Equinox step 1).
@@ -99,7 +100,7 @@ class _ModuleMeta(abc.ABCMeta):
         # Unlike Equinox, we don't use frozen dataclasses. This is a matter of
         # preference, and it is often easier to just mutate the object, especially when
         # experimenting interactively (like in a notebook setting).
-        cls = dataclasses.dataclass(init=has_dataclass_init)(cls)
+        cls = dataclass(init=has_dataclass_init)(cls)
 
         # Registering here records that the `dataclass(...)` call has happened.
         _has_dataclass_init[cls] = has_dataclass_init
