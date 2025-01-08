@@ -177,7 +177,7 @@ def finfo(type: Union[dtype, array], /) -> finfo_object:
         float(backend_finfo.max),
         float(backend_finfo.min),
         float(backend_finfo.smallest_normal),
-        _DType._from_backend_dtype(backend_finfo.dtype),
+        _DType(backend_finfo.dtype),
     )
 
 
@@ -294,4 +294,4 @@ def result_type(*arrays_and_dtypes: Union[array, dtype]) -> dtype:
         )
         for x in arrays_and_dtypes
     ]
-    return _DType._from_backend_dtype(backend.result_type(*arrays_and_dtypes))
+    return _DType(backend.result_type(*arrays_and_dtypes))

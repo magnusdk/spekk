@@ -72,7 +72,7 @@ class array:
         out: dtype
             array data type.
         """
-        return _DType._from_backend_dtype(self._data.dtype)
+        return _DType(self._data.dtype)
 
     @property
     def device(self: array) -> Device:

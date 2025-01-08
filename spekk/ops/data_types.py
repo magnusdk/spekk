@@ -1,27 +1,26 @@
+from typing import Any, Union
+
 from spekk.ops._backend import backend
 
 
 class _DType:
-    def __init__(self, name: str):
-        self.name = name
+    def __init__(self, dtype: Union[Any, str]):
+        if isinstance(dtype, str):
+           dtype = getattr(backend, dtype)
+        self._dtype = dtype
 
     def __eq__(self, other):
         if isinstance(other, _DType):
-            return self.name == other.name
+            return self._dtype == other._dtype
         elif isinstance(other, str):
-            return self.name == other
-        try:
-            other = _DType._from_backend_dtype(other)
-            return self.name == other.name
-        except Exception:
-            pass
-        return False
-    
+            return self._dtype == getattr(backend, other)
+        return self._dtype == other
+
     def __repr__(self):
-        return f"_DType('{self.name}')"
-    
+        return f"_DType('{self._dtype}')"
+
     def __hash__(self):
-        return hash(self.name)
+        return hash(self._dtype)
 
     def __call__(self, x):
         from spekk import ops
@@ -30,15 +29,11 @@ class _DType:
 
     def _to_backend_dtype(dtype):
         if isinstance(dtype, _DType):
-            return getattr(backend, dtype.name)
+            return dtype._dtype
         elif isinstance(dtype, str):
             return getattr(backend, dtype)
         else:
             return dtype
-
-    @staticmethod
-    def _from_backend_dtype(dtype) -> "_DType":
-        return _DType(backend.dtype(dtype).name)
 
 
 int8 = _DType("int8")
