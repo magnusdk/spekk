@@ -92,13 +92,41 @@ def scan_over_dim(
     dim: Dim,
     *,
     init: TCarry,
+    include_index: bool = False,
 ) -> Tuple[TCarry, TOutputData]:
+    from spekk import ops
 
     def scan_fn(carry, i):
-        return f(carry, data.slice_dim(dim)[i])
+        args = [carry, data.slice_dim(dim)[i]]
+        if include_index:
+            args.append(i)
+        return f(*args)
 
+    init, y0 = scan_fn(init, 0)
     n = data.dim_size(dim)
-    return backend.scan(scan_fn, init, arange(n))
+    result, ys = backend.scan(scan_fn, init, backend.arange(1, n))
+    ys = ops.concat([ops.array([y0]), ys])
+    return result, ys
+
+
+def reduce_over_dim(
+    f: Callable[[TCarry, TInputData], Tuple[TCarry, TOutputData]],
+    data: TInputData,
+    dim: Dim,
+    *,
+    init: TCarry,
+    include_index: bool = False,
+):
+    def scan_fn(carry, i):
+        args = [carry, data.slice_dim(dim)[i]]
+        if include_index:
+            args.append(i)
+        return f(*args), i
+
+    init, _ = scan_fn(init, 0)
+    n = data.dim_size(dim)
+    result, _ = backend.scan(scan_fn, init, backend.arange(1, n))
+    return result
 
 
 def map_reduce_over_dim(
@@ -107,20 +135,19 @@ def map_reduce_over_dim(
     data: TInputData,
     dim: Dim,
     *,
-    init: Optional[TCarry] = None,
+    init: TCarry,
+    include_index: bool = False,
 ) -> TReducedOutputData:
     def scan_fn(carry, i):
         x = map_f(data.slice_dim(dim)[i])
-        return reduce_f(carry, x), i
+        args = [carry, x]
+        if include_index:
+            args.append(i)
+        return reduce_f(*args), i
 
+    init, _ = scan_fn(init, 0)
     n = data.dim_size(dim)
-    if init is None:
-        init = map_f(data.slice_dim(dim)[0])
-        xs = backend.arange(1, n)
-    else:
-        xs = backend.arange(n)
-
-    carry, _ = backend.scan(scan_fn, init, xs)
+    carry, _ = backend.scan(scan_fn, init, backend.arange(1, n))
     return carry
 
 
