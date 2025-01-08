@@ -18,7 +18,6 @@ __all__ = [
 ]
 from typing import List, Optional, Tuple, Union
 
-import spekk.ops.data_types as data_types
 from spekk.ops._backend import backend
 from spekk.ops._types import (
     Dim,
@@ -32,6 +31,7 @@ from spekk.ops._types import (
 from spekk.ops._util import ensure_array
 from spekk.ops.array_object import array
 from spekk.ops.data_types import _DType
+from spekk.ops.manipulation_functions import broadcast_arrays
 
 
 def arange(
@@ -73,9 +73,11 @@ def arange(
         dim = UndefinedDim()
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
+    start, stop = broadcast_arrays(start, stop)
+    dims = [dim, *start.dims]
     return array(
-        backend.arange(start, stop, step, dtype=dtype, device=device),
-        [dim],
+        backend.arange(start.data, stop.data, step, dtype=dtype, device=device),
+        dims,
     )
 
 
@@ -522,11 +524,13 @@ def linspace(
         dim = UndefinedDim()
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
+    start, stop = broadcast_arrays(start, stop)
+    dims = [dim, *start.dims]
     return array(
         backend.linspace(
-            start, stop, num, dtype=dtype, device=device, endpoint=endpoint
+            start.data, stop.data, num, dtype=dtype, device=device, endpoint=endpoint
         ),
-        [dim],
+        dims,
     )
 
 
