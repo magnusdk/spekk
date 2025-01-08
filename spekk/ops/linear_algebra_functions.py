@@ -242,4 +242,4 @@ def vecdot(x1: array, x2: array, /, *, axis: int = -1) -> array:
         dim = x1.dims[axis]
     dims = list(x1.dims)
     dims.remove(dim)
-    return array(backend.vecdot(x1, x2, axis=axis), dims)
+    return array(backend.vecdot(x1.data, x2.data, axis=axis), dims)
