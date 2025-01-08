@@ -159,18 +159,11 @@ def concat(
         .. note::
            This specification leaves type promotion between data type families (i.e., ``intxx`` and ``floatxx``) unspecified.
     """
+    arrays = broadcast_arrays(*arrays)
     if isinstance(axis, Dim):
-        raise NotImplementedError(
-            "Concatenating along a named dimension not yet implemented."
-        )
+        axis = arrays[0].dims.index(axis)
     data = backend.concat([arr._data for arr in arrays], axis=axis)
-    if axis is None:
-        dims = [UndefinedDim()]
-    elif arrays[0].ndim >= 1:
-        dims = arrays[0].dims
-    else:
-        dims = [UndefinedDim()]
-    return array(data, dims)
+    return array(data, arrays[0].dims)
 
 
 def expand_dims(x: array, /, *, axis: Union[Dim, int] = 0) -> array:
