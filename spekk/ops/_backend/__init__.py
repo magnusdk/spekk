@@ -1,3 +1,4 @@
+import contextlib
 import os
 from typing import Literal, Optional
 
@@ -52,13 +53,15 @@ def _is_writeable_array(x) -> bool:
 
 
 class Backend:
-    def __init__(self, backend_name: Optional[Literal["numpy", "jax", "torch"]] = None):
+    def __init__(
+        self, backend_name: Optional[Literal["numpy", "mlx", "jax", "torch"]] = None
+    ):
         self.backend_name = backend_name
         if self.backend_name is None:
             _set_initial_backend(self)
 
-    def set_backend(self, backend_name: Literal["numpy", "jax", "torch"]):
-        if backend_name not in ["numpy", "jax", "torch"]:
+    def set_backend(self, backend_name: Literal["numpy", "mlx", "jax", "torch"]):
+        if backend_name not in ["numpy", "mlx", "jax", "torch"]:
             raise ValueError(f"Unknown backend '{backend_name}'")
         old_backend_name = self.backend_name
         self.backend_name = backend_name
@@ -70,6 +73,15 @@ class Backend:
         except ImportError:
             self.backend_name = old_backend_name
             raise
+
+    @contextlib.contextmanager
+    def temporary_backend(self, backend_name: Literal["numpy", "mlx", "jax", "torch"]):
+        original_backend = self.backend_name
+        self.set_backend(backend_name)
+        try:
+            yield
+        finally:
+            self.set_backend(original_backend)
 
     def _is_backend_array(self, x):
         return isinstance(x, type(self.empty(())))
@@ -87,6 +99,8 @@ class Backend:
             import spekk.ops._backend.included_backends.numpy as ops
         elif self.backend_name == "jax":
             import spekk.ops._backend.included_backends.jax as ops
+        elif self.backend_name == "mlx":
+            import spekk.ops._backend.included_backends.mlx as ops
         elif self.backend_name == "torch":
             import spekk.ops._backend.included_backends.torch as ops
         return getattr(ops, name)
