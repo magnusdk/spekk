@@ -905,6 +905,7 @@ def vector_norm(
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
+    x = ensure_array(x)
     if isinstance(axis, Dim):
         dim = axis
         axis = x.dims.index(axis)
