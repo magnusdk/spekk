@@ -557,7 +557,7 @@ def tile(x: array, repetitions: Tuple[int, ...], /) -> array:
     .. versionadded:: 2023.12
     """
     x = ensure_array(x)
-    data = backend.tile(x, repetitions)
+    data = backend.tile(x.data, repetitions)
     dims = [UndefinedDim()] * (len(repetitions) - x.ndim) + x.dims
     return array(data, dims)
 
