@@ -1,26 +1,22 @@
-from typing import Any, Union
-
 from spekk.ops._backend import backend
 
 
 class _DType:
-    def __init__(self, dtype: Union[Any, str]):
-        if isinstance(dtype, str):
-           dtype = getattr(backend, dtype)
-        self._dtype = dtype
+    def __init__(self, dtype: str):
+        self.name = dtype
 
     def __eq__(self, other):
         if isinstance(other, _DType):
-            return self._dtype == other._dtype
+            return self.name == other.name
         elif isinstance(other, str):
-            return self._dtype == getattr(backend, other)
-        return self._dtype == other
+            return self.name == other
+        return getattr(backend, self.name) == other
 
     def __repr__(self):
-        return f"_DType('{self._dtype}')"
+        return f"_DType('{self.name}')"
 
     def __hash__(self):
-        return hash(self._dtype)
+        return hash(self.name)
 
     def __call__(self, x):
         from spekk import ops
@@ -29,7 +25,7 @@ class _DType:
 
     def _to_backend_dtype(dtype):
         if isinstance(dtype, _DType):
-            return dtype._dtype
+            return getattr(backend, dtype.name)
         elif isinstance(dtype, str):
             return getattr(backend, dtype)
         else:
