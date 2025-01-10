@@ -31,6 +31,7 @@ __all__ = [
     "Info",
 ]
 
+import uuid
 from dataclasses import dataclass
 from enum import Enum
 from typing import (
@@ -50,10 +51,17 @@ from typing import (
 
 
 class UndefinedDim:
+    def __init__(self):
+        # Used to calculate the hash
+        self._id = uuid.uuid4()
+
     def __eq__(self, other):
         # Like NaN, an undefined dim can't be said to equal anything else, since we
         # can't know what it represents.
         return False
+
+    def __hash__(self):
+        return hash(self._id)
 
     def __repr__(self):
         return "?"
