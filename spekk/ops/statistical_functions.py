@@ -66,15 +66,11 @@ def cumulative_sum(
             raise ValueError("dim must be provided when x has more than one dimension.")
         axis = 0
 
-    axis = x._dims.index(axis) if isinstance(axis, Dim) else axis
+    axis = x.dims.index(axis) if isinstance(axis, Dim) else axis
     data = backend.cumulative_sum(
-        x._data, axis=axis, dtype=dtype, include_initial=include_initial
+        x.data, axis=axis, dtype=dtype, include_initial=include_initial
     )
-    dims = list(x._dims)
-    del dims[axis]
-    # Add the new dimension for the cumulatively summed elements
-    dims = [UndefinedDim()] + dims
-    return array(data, dims)
+    return array(data, list(x.dims))
 
 
 def max(
