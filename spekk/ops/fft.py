@@ -85,7 +85,7 @@ def fft(
     dims = list(x._dims)
     if rename_dim is not None:
         dims[axis] = rename_dim
-    return array(backend.fft.fft(x, n=n, axis=axis, norm=norm), dims)
+    return array(backend.fft.fft(x.data, n=n, axis=axis, norm=norm), dims)
 
 
 def ifft(
@@ -144,7 +144,7 @@ def ifft(
     dims = list(x._dims)
     if rename_dim is not None:
         dims[axis] = rename_dim
-    return array(backend.fft.ifft(x, n=n, axis=axis, norm=norm), dims)
+    return array(backend.fft.ifft(x.data, n=n, axis=axis, norm=norm), dims)
 
 
 def fftn(
@@ -210,7 +210,7 @@ def fftn(
     if rename_dims is not None:
         for axis, rename_dim in zip(axes, rename_dims):
             dims[axis] = rename_dim
-    return array(backend.fft.fftn(x, s=s, axes=axes, norm=norm), dims)
+    return array(backend.fft.fftn(x.data, s=s, axes=axes, norm=norm), dims)
 
 
 def ifftn(
@@ -276,7 +276,7 @@ def ifftn(
     if rename_dims is not None:
         for axis, rename_dim in zip(axes, rename_dims):
             dims[axis] = rename_dim
-    return array(backend.fft.ifftn(x, s=s, axes=axes, norm=norm), dims)
+    return array(backend.fft.ifftn(x.data, s=s, axes=axes, norm=norm), dims)
 
 
 def rfft(
@@ -332,7 +332,7 @@ def rfft(
     dims = list(x._dims)
     if rename_dim is not None:
         dims[axis] = rename_dim
-    return array(backend.fft.rfft(x, n=n, axis=axis, norm=norm), dims)
+    return array(backend.fft.rfft(x.data, n=n, axis=axis, norm=norm), dims)
 
 
 def irfft(
@@ -393,7 +393,7 @@ def irfft(
     dims = list(x._dims)
     if rename_dim is not None:
         dims[axis] = rename_dim
-    return array(backend.fft.irfft(x, n=n, axis=axis, norm=norm), dims)
+    return array(backend.fft.irfft(x.data, n=n, axis=axis, norm=norm), dims)
 
 
 def rfftn(
@@ -456,7 +456,7 @@ def rfftn(
     if rename_dims is not None:
         for axis, rename_dim in zip(axes, rename_dims):
             dims[axis] = rename_dim
-    return array(backend.fft.rfftn(x, s=s, axes=axes, norm=norm), dims)
+    return array(backend.fft.rfftn(x.data, s=s, axes=axes, norm=norm), dims)
 
 
 def irfftn(
@@ -524,7 +524,7 @@ def irfftn(
     if rename_dims is not None:
         for axis, rename_dim in zip(axes, rename_dims):
             dims[axis] = rename_dim
-    return array(backend.fft.irfftn(x, s=s, axes=axes, norm=norm), dims)
+    return array(backend.fft.irfftn(x.data, s=s, axes=axes, norm=norm), dims)
 
 
 def hfft(
@@ -580,7 +580,7 @@ def hfft(
     dims = list(x._dims)
     if rename_dim is not None:
         dims[axis] = rename_dim
-    return array(backend.fft.hfft(x, n=n, axis=axis, norm=norm), dims)
+    return array(backend.fft.hfft(x.data, n=n, axis=axis, norm=norm), dims)
 
 
 def ihfft(
@@ -633,7 +633,7 @@ def ihfft(
     dims = list(x._dims)
     if rename_dim is not None:
         dims[axis] = rename_dim
-    return array(backend.fft.ihfft(x, n=n, axis=axis, norm=norm), dims)
+    return array(backend.fft.ihfft(x.data, n=n, axis=axis, norm=norm), dims)
 
 
 def fftfreq(
@@ -770,7 +770,7 @@ def fftshift(
     if rename_dims is not None:
         for axis, rename_dim in zip(axes, rename_dims):
             dims[axis] = rename_dim
-    return array(backend.fft.fftshift(x, axes=axes), dims)
+    return array(backend.fft.fftshift(x.data, axes=axes), dims)
 
 
 def ifftshift(
@@ -813,4 +813,4 @@ def ifftshift(
     if rename_dims is not None:
         for axis, rename_dim in zip(axes, rename_dims):
             dims[axis] = rename_dim
-    return array(backend.fft.ifftshift(x, axes=axes), dims)
+    return array(backend.fft.ifftshift(x.data, axes=axes), dims)
