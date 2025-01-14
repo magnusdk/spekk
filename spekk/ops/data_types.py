@@ -1,9 +1,19 @@
+from typing import Any, Union
+
 from spekk.ops._backend import backend
 
 
 class _DType:
-    def __init__(self, dtype: str):
-        self.name = dtype
+    def __init__(self, dtype: Union[str, "_DType", Any]):
+        if isinstance(dtype, str):
+            self.name = dtype
+        elif isinstance(dtype, _DType):
+            self.name = dtype.name
+        else:
+            try:
+                self.name = backend.get_dtype_name(dtype)
+            except Exception:
+                raise ValueError(f"Unrecognized {dtype=}.")
 
     def __eq__(self, other):
         if isinstance(other, _DType):

@@ -41,3 +41,7 @@ def scan(fn, init, xs):
         carry, y = fn(carry, x)
         result.append(y)
     return carry, np.stack(result)
+
+
+def get_dtype_name(dtype):
+    return dtype.name
