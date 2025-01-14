@@ -2,11 +2,9 @@ from typing import Callable, Optional, Tuple, TypeVar, Union
 
 from spekk.module.base import Module
 from spekk.ops._backend import backend
-from spekk.ops._types import Dim, Dims
+from spekk.ops._types import Dim
+from spekk.ops._util import prepare_slicing_along_dim
 from spekk.ops.array_object import array
-from spekk.ops.creation_functions import arange
-from spekk.ops.data_type_functions import astype
-from spekk.ops.manipulation_functions import moveaxis
 
 TFunc = TypeVar("TFunc", bound=Callable)
 TCarry = TypeVar("TCarry")
@@ -41,23 +39,22 @@ def nan_to_num(
 
 
 def take_along_dim(x: array, i: array, dim: Dim) -> array:
-    # Ensure dim is the first axis. This makes it easier to keep track of dimensions.
-    if x._dims.index(dim) != 0:
-        x = moveaxis(x, dim, 0)
-
-    common_dims = set(x._dims) & set(i._dims) - {dim}
-    slices = [slice(None)] * x.ndim
-    slices[x._dims.index(dim)] = i._data
-    for d in common_dims:
-        dim_idx = x._dims.index(d)
-        dim_size = x.shape[dim_idx]
-        broadcastable_shape = [1] * i.ndim
-        broadcastable_shape[i._dims.index(d)] = dim_size
-        slices[dim_idx] = backend.reshape(backend.arange(dim_size), broadcastable_shape)
-
-    data = x._data[tuple(slices)]
-    dims = i._dims + [d for d in x._dims if d not in i._dims and d != dim]
+    x, slices, dims = prepare_slicing_along_dim(x, i, dim)
+    data = x.data[slices]
     return array(data, dims)
+
+
+def update_indices_along_dim(
+    f: Callable[[array], array], x: array, i: array, x_dim: Dim, i_dim: Dim
+) -> array:
+    from spekk import ops
+
+    x, slices, dims = prepare_slicing_along_dim(x, i, x_dim)
+    updated_x_slices = f(array(x.data[slices], dims))
+    updated_x_slices._dims = [x_dim if d == i_dim else d for d in updated_x_slices.dims]
+    x, updated_x_slices = ops.broadcast_arrays(x, updated_x_slices)
+    updated_data = backend._setitem_impl(x.data, slices, updated_x_slices.data)
+    return array(updated_data, x.dims)
 
 
 def expand_slice_to_axis(s: Union[slice, int, array], axis: int):

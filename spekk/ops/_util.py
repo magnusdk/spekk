@@ -72,6 +72,31 @@ def get_reduction_axes_and_resulting_dims(
     return axis, dims
 
 
+def prepare_slicing_along_dim(
+    x: array, i: array, dim: Dim
+) -> Tuple[array, Tuple[slice, array], Dims]:
+    from spekk import ops
+
+    x, i = ensure_array(x), ensure_array(i)
+
+    # Ensure dim is the first axis. This makes it easier to keep track of dimensions.
+    if x.dims.index(dim) != 0:
+        x = ops.moveaxis(x, dim, 0)
+
+    common_dims = set(x.dims) & set(i.dims) - {dim}
+    slices = [slice(None)] * x.ndim
+    slices[x.dims.index(dim)] = i.data
+    for d in common_dims:
+        dim_idx = x.dims.index(d)
+        dim_size = x.shape[dim_idx]
+        broadcastable_shape = [1] * i.ndim
+        broadcastable_shape[i.dims.index(d)] = dim_size
+        slices[dim_idx] = backend.reshape(backend.arange(dim_size), broadcastable_shape)
+
+    resulting_dims = i.dims + [d for d in x.dims if d not in i.dims and d != dim]
+    return x, tuple(slices), resulting_dims
+
+
 def ensure_array(x: ArrayLike, dtype: _DType = None) -> array:
     if not isinstance(x, array):
         dtype = dtype._to_backend_dtype() if dtype is not None else None
