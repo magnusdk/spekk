@@ -76,7 +76,7 @@ def ensure_array(x: ArrayLike, dtype: _DType = None) -> array:
     if not isinstance(x, array):
         dtype = dtype._to_backend_dtype() if dtype is not None else None
         x = backend.asarray(x, dtype=dtype)
-        x = array(x, [UndefinedDim()] * x.ndim)
+        x = array(x, [UndefinedDim() for _ in range(x.ndim)])
     return x
 
 
