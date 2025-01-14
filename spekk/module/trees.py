@@ -420,6 +420,20 @@ class _TreeDef:
         return repr(self.data)
 
 
+class _IdentityTreeDef(_TreeDef):
+    """A _TreeDef of something that should not and has not been flattened. unflatten
+    simply returns the input object."""
+
+    def __init__(self):
+        pass
+
+    def unflatten(self, flattened_obj: Any) -> Any:
+        return flattened_obj
+
+    def __repr__(self):
+        return "_LeafTreeDef()"
+
+
 @dataclasses.dataclass
 class FlattenedResult:
     dynamic: tuple
@@ -478,7 +492,16 @@ def flatten(
                 dynamic.append(obj)
                 return _TreeDef(_IndexInFlattened(0), None)
 
-    treedef = _flatten(obj)
+    if is_tree_like(obj):
+        treedef = _flatten(obj)
+    else:
+        treedef = _IdentityTreeDef()
+        if is_static(obj):
+            static.append(obj)
+        else:
+            dynamic.append(obj)
+            paths.append([])
+
     dynamic = tuple(dynamic)
     return FlattenedResult(dynamic, paths, treedef, static)
 
