@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import numpy as np
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
-__all__ = ["array"]
-from typing import Any, Dict, Optional, Tuple, Union
+import numpy as np
 
 import spekk.ops.data_types as data_types
 from spekk.ops._backend import backend
@@ -24,6 +23,8 @@ from spekk.ops._types import (
 )
 from spekk.ops.data_types import _DType
 
+__all__ = ["array"]
+
 
 class array:
     def __init__(
@@ -43,12 +44,14 @@ class array:
             data = backend.asarray(data)
 
         if dims is None:
-            dims = [UndefinedDim()] * data.ndim
+            dims = [UndefinedDim() for _ in range(data.ndim)]
         elif data.ndim != len(dims):
             raise ValueError(
                 "The number of dimensions must equal the number of axes in the data "
                 f"(got ndim={data.ndim} and {len(dims)=})."
             )
+        if len(set(dims)) < len(dims):
+            raise ValueError(f"The dimensions must be unique, but got {dims=}")
 
         # Set the dtype and device (if given)
         args, kwargs = [], {}
@@ -1516,9 +1519,18 @@ class array:
     def dims(self):
         return self._dims
 
-    @property
-    def dim_sizes(self) -> Dict[Dim, int]:
-        return {d: s for d, s in zip(self.dims, self.shape)}
+    def dim_size(self, dim: Optional[Dim] = None) -> Union[Dict[Dim, int], int]:
+        dim_sizes = {d: s for d, s in zip(self.dims, self.shape)}
+        if dim is not None:
+            return dim_sizes[dim]
+        return dim_sizes
+
+    def slice_dim(self, dim: Dim) -> "_DimSlicer":
+        return _DimSlicer(self, dim)
+
+    def rename_dim(self, dim: Dim, new_dim: Dim) -> "array":
+        dims = [new_dim if d == dim else d for d in self.dims]
+        return array(self.data, dims)
 
     # Methods for casting dtype
     def int8(self):
@@ -1565,3 +1577,15 @@ class array:
             f"array(shape={self.shape}, dims={self.dims}, "
             f"dtype={self.dtype}, data={self.data})"
         )
+
+
+class _DimSlicer:
+    def __init__(self, data: array, dim: Dim):
+        self.data = data
+        self.dim = dim
+
+    def __getitem__(self, key):
+        axis = self.data.dims.index(self.dim)
+        slices = (slice(None),) * axis + (key, ...)
+        return self.data.__getitem__(slices)
+
