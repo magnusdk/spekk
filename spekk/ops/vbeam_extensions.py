@@ -1,4 +1,4 @@
-from typing import Callable, Optional, Tuple, TypeVar, Union
+from typing import Callable, Literal, Optional, Tuple, TypeVar, Union
 
 from spekk.module.base import Module
 from spekk.ops._backend import backend
@@ -36,6 +36,59 @@ def nan_to_num(
     if neginf is not None:
         x = ops.where(x == -ops.inf, neginf, x)
     return x
+
+
+def _get_conv_mode_slice(
+    x_size: Tuple[int],
+    filter_size: Tuple[int],
+    mode: Literal["full", "same", "valid"],
+) -> slice:
+    full_size = x_size + filter_size - 1
+
+    # Calculate what samples to include in the convolved result based on the mode.
+    if mode == "full":
+        start = 0
+        stop = full_size
+    elif mode == "same":
+        if filter_size > x_size:
+            raise NotImplementedError(
+                "mode='same' is not implemented when the a is larger than v"
+            )
+        start = (filter_size - 1) // 2
+        stop = start + x_size
+    elif mode == "valid":
+        raise NotImplementedError("mode='valid' is not implemented.")
+    else:
+        raise ValueError(f"Invalid mode: '{mode}'")
+    return slice(start, stop)
+
+
+def fftconvolve(
+    x: array,
+    filter: array,
+    *,
+    mode: Literal["full", "same", "valid"],
+    axis: Dim,
+    filter_axis: Dim,
+):
+    from spekk import ops
+
+    # Get data sizes along axis
+    x_size = x.dim_size(axis)
+    filter_size = filter.dim_size(filter_axis)
+    full_size = x_size + filter_size - 1
+
+    # Perform convolution
+    x = ops.fft.fft(x, n=full_size, axis=axis)
+    filter = ops.fft.fft(filter, n=full_size, axis=filter_axis, rename_dim=axis)
+    convolved = x * filter
+    convolved = ops.fft.ifft(convolved, axis=axis)
+
+    # "Trim" the result according to mode.
+    mode_slice = _get_conv_mode_slice(x_size, filter_size, mode)
+    convolved = convolved.slice_dim(axis)[mode_slice]
+
+    return convolved
 
 
 def take_along_dim(x: array, i: array, dim: Dim) -> array:
@@ -146,6 +199,10 @@ def map_reduce_over_dim(
     n = data.dim_size(dim)
     carry, _ = backend.scan(scan_fn, init, backend.arange(1, n))
     return carry
+
+
+def vmap(f, in_axes):
+    return backend.vmap(f, in_axes=in_axes)
 
 
 if __name__ == "__main__":
