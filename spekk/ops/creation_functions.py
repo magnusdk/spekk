@@ -69,15 +69,16 @@ def arange(
     out: array
         a one-dimensional array containing evenly spaced values. The length of the output array must be ``ceil((stop-start)/step)`` if ``stop - start`` and ``step`` have the same sign, and length ``0`` otherwise.
     """
+    if isinstance(start, array) or isinstance(stop, array) or isinstance(step, array):
+        raise ValueError("arange doesn't support array arguments.")
+
     if dim is None:
         dim = UndefinedDim()
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
-    start, stop = broadcast_arrays(start, stop)
-    dims = [dim, *start.dims]
     return array(
-        backend.arange(start.data, stop.data, step, dtype=dtype, device=device),
-        dims,
+        backend.arange(start, stop, step, dtype=dtype, device=device),
+        [dim],
     )
 
 
