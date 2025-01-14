@@ -2,7 +2,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Optional
 
 import spekk.ops as ops
-from spekk.ops._types import Dim
+from spekk.ops._types import Dim, Dims
 
 if TYPE_CHECKING:
     from spekk.module.trees import TreeLike
@@ -69,3 +69,17 @@ class SlicingMixin:
                 )
             output[d] = size
         return output
+
+    @property
+    def dims(self) -> Dims:
+        from spekk.module.trees import flatten
+
+        flattened = flatten(
+            self,
+            is_static=lambda x: not isinstance(x, ops.array),
+            is_tree_like=lambda x: not isinstance(x, ops.array),
+        )
+        dims = set()
+        for x in flattened.dynamic:
+            dims.update(x.dims)
+        return list(dims)
