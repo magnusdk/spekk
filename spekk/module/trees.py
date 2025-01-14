@@ -431,7 +431,9 @@ class FlattenedResult:
 def is_array_like(x):
     from spekk import ops
 
-    return isinstance(x, (float, int, complex)) or ops.backend._is_backend_array(x)
+    return isinstance(
+        x, (ops.array, float, int, complex)
+    ) or ops.backend._is_backend_array(x)
 
 
 def is_not_array_like(x):
