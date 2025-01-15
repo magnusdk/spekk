@@ -16,6 +16,7 @@ __all__ = [
 ]
 
 from collections import defaultdict
+from typing import Sequence
 
 from spekk.ops._backend import backend
 from spekk.ops._types import (
@@ -443,7 +444,7 @@ def roll(
 def squeeze(
     x: ArrayLike,
     /,
-    axis: Union[Dim, Tuple[Dim, ...], int, Tuple[int, ...]],
+    axis: Union[Dim, Sequence[Dim], int, Sequence[int]],
 ) -> array:
     """
     Removes singleton dimensions (axes) from ``x``.
@@ -475,7 +476,7 @@ def squeeze(
         del dims[axis]
     elif isinstance(axis, int):
         del dims[axis]
-    elif isinstance(axis, tuple):
+    elif isinstance(axis, Sequence):
         axis = tuple(
             x._dims.index(i) if isinstance(i, Dim) else canonicalize_axis(x.ndim, i)
             for i in axis
