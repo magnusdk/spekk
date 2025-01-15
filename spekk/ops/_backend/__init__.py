@@ -83,9 +83,6 @@ class Backend:
         finally:
             self.set_backend(original_backend)
 
-    def _is_backend_array(self, x):
-        return isinstance(x, type(self.empty(())))
-
     def _setitem_impl(self, x, key, value):
         if self.backend_name == "jax":
             return x.at.__getitem__(key).set(value)

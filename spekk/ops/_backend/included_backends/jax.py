@@ -12,3 +12,7 @@ def get_dtype_name(dtype):
     if not hasattr(dtype, "name"):
         dtype = dtype.dtype
     return dtype.name
+
+
+def _is_backend_array(x):
+    return isinstance(x, jax.Array)

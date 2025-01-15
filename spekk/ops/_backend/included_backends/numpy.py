@@ -45,3 +45,7 @@ def scan(fn, init, xs):
 
 def get_dtype_name(dtype):
     return dtype.name
+
+
+def _is_backend_array(x):
+    return isinstance(x, np.ndarray)

@@ -21,3 +21,7 @@ def scan(fn, init, xs):
 
 def get_dtype_name(dtype):
     return str(dtype).removeprefix("torch.")
+
+
+def _is_backend_array(x):
+    return isinstance(x, torch.Tensor)

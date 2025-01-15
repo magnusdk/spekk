@@ -28,3 +28,7 @@ class dtype:
 
     @property
     def name(self): ...
+
+
+def _is_backend_array(x):
+    return isinstance(x, mx.array)
