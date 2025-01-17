@@ -94,7 +94,7 @@ def fftconvolve(
 def reshape_at_dim(
     x: array,
     dim: Dim,
-    new_dim_shape: tuple,
+    new_dim_shape: Sequence[int],
     new_dim_names: Sequence[Dim],
 ):
     """
@@ -105,6 +105,8 @@ def reshape_at_dim(
     >>> y.shape
     (3, 2, 2, 5)
     """
+    from spekk import ops
+
     axis = x.dims.index(dim)
     new_shape = (*x.shape[:axis], *new_dim_shape, *x.shape[axis + 1 :])
     new_dims = [*x.dims[:axis], *new_dim_names, *x.dims[axis + 1 :]]
