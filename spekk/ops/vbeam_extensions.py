@@ -1,4 +1,4 @@
-from typing import Callable, Literal, Optional, Tuple, TypeVar, Union
+from typing import Callable, Literal, Optional, Sequence, Tuple, TypeVar, Union
 
 from spekk.module.base import Module
 from spekk.ops._backend import backend
@@ -89,6 +89,26 @@ def fftconvolve(
     convolved = convolved.slice_dim(axis)[mode_slice]
 
     return convolved
+
+
+def reshape_at_dim(
+    x: array,
+    dim: Dim,
+    new_dim_shape: tuple,
+    new_dim_names: Sequence[Dim],
+):
+    """
+    >>> x = ops.ones((3,4,5), dims=["a", "b", "c"])
+    >>> y = reshape_at_dim(x, "b", (2, 2), ("b1", "b2"))
+    >>> y.dims
+    ['a', 'b1', 'b2', 'c']
+    >>> y.shape
+    (3, 2, 2, 5)
+    """
+    axis = x.dims.index(dim)
+    new_shape = (*x.shape[:axis], *new_dim_shape, *x.shape[axis + 1 :])
+    new_dims = [*x.dims[:axis], *new_dim_names, *x.dims[axis + 1 :]]
+    return ops.reshape(x, new_shape, new_dims)
 
 
 def take_along_dim(x: array, i: array, dim: Dim) -> array:
