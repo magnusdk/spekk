@@ -113,6 +113,26 @@ def reshape_at_dim(
     return ops.reshape(x, new_shape, new_dims)
 
 
+def merge_dims(
+    x: array,
+    merged_dims: Sequence[Dim],
+    new_dim_name: Dim,
+) -> array:
+    from spekk import ops
+
+    # Get the dim names and sizes of the dimensions that are not being merged.
+    other_dim_names = [d for d in x.dims if d not in merged_dims]
+    other_dim_sizes = [x.dim_size(d) for d in x.dims if d not in merged_dims]
+
+    # Move the dimensions to the start and in the right order.
+    x = ops.permute_dims(x, [*merged_dims, *other_dim_names])
+
+    # Perform the actual reshape operation and return.
+    new_dims = [new_dim_name, *other_dim_names]
+    new_shape = [-1, *other_dim_sizes]
+    return ops.reshape(x, new_shape, new_dims)
+
+
 def take_along_dim(x: array, i: array, dim: Dim) -> array:
     x, slices, dims = prepare_slicing_along_dim(x, i, dim)
     data = x.data[slices]
