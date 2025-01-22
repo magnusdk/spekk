@@ -125,7 +125,7 @@ def broadcast_to(
     """
     x = ensure_array(x)
     if dims is None:
-        dims = [UndefinedDim()] * len(shape)
+        dims = [UndefinedDim() for _ in range(len(shape))]
     elif len(dims) != len(shape):
         raise ValueError(
             "The number of dimensions must equal the number of axes when broadcasting."
@@ -403,7 +403,7 @@ def reshape(
             "The number of dimensions must equal the number of axes when reshaping."
         )
     if dims is None:
-        dims = [UndefinedDim()] * len(shape)
+        dims = [UndefinedDim() for _ in range(len(shape))]
     return array(backend.reshape(x._data, shape, copy=copy), dims)
 
 
@@ -559,7 +559,7 @@ def tile(x: array, repetitions: Tuple[int, ...], /) -> array:
     """
     x = ensure_array(x)
     data = backend.tile(x.data, repetitions)
-    dims = [UndefinedDim()] * (len(repetitions) - x.ndim) + x.dims
+    dims = [UndefinedDim() for _ in range(len(repetitions) - x.ndim)] + x.dims
     return array(data, dims)
 
 

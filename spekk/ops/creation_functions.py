@@ -149,7 +149,7 @@ def asarray(
         return array(data, dims)
 
     data = backend.asarray(obj, dtype=dtype, device=device, copy=copy)
-    dims = [UndefinedDim()] * data.ndim
+    dims = [UndefinedDim() for _ in range(data.ndim)]
     return array(data, dims)
 
 
@@ -178,7 +178,9 @@ def empty(
         an array containing uninitialized data.
     """
     if dims is None:
-        dims = [UndefinedDim()] * (1 if isinstance(shape, int) else len(shape))
+        if isinstance(shape, int):
+            shape = (shape,)
+        dims = [UndefinedDim() for _ in range(len(shape))]
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
     return array(backend.empty(shape, dtype=dtype, device=device), dims)
@@ -348,7 +350,7 @@ def from_dlpack(
     """
     data = backend.from_dlpack(x, device=device, copy=copy)
     if dims is None:
-        dims = [UndefinedDim()] * data.ndim
+        dims = [UndefinedDim() for _ in range(data.ndim)]
     return array(data, dims)
 
 
@@ -395,7 +397,9 @@ def full(
        Added complex data type support.
     """
     if dims is None:
-        dims = [UndefinedDim()] * (1 if isinstance(shape, int) else len(shape))
+        if isinstance(shape, int):
+            shape = (shape,)
+        dims = [UndefinedDim() for _ in range(len(shape))]
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
     return array(backend.full(shape, fill_value, dtype=dtype, device=device), dims)
@@ -611,7 +615,9 @@ def ones(
        Added complex data type support.
     """
     if dims is None:
-        dims = [UndefinedDim()] * (1 if isinstance(shape, int) else len(shape))
+        if isinstance(shape, int):
+            shape = (shape,)
+        dims = [UndefinedDim() for _ in range(len(shape))]
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
     return array(backend.ones(shape, dtype=dtype, device=device), dims)
@@ -727,7 +733,9 @@ def zeros(
         an array containing zeros.
     """
     if dims is None:
-        dims = [UndefinedDim()] * (1 if isinstance(shape, int) else len(shape))
+        if isinstance(shape, int):
+            shape = (shape,)
+        dims = [UndefinedDim() for _ in range(len(shape))]
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
     return array(backend.zeros(shape, dtype=dtype, device=device), dims)
