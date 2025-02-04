@@ -1524,6 +1524,9 @@ class array:
         if dim is not None:
             return dim_sizes[dim]
         return dim_sizes
+    
+    def dim_index(self, dim: Dim) -> int:
+        return self.dims.index(dim)
 
     def slice_dim(self, dim: Dim) -> "_DimSlicer":
         return _DimSlicer(self, dim)
