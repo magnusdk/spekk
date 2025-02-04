@@ -1457,6 +1457,9 @@ class array:
     @property
     def dim_sizes(self) -> Dict[Dim, int]:
         return {d: s for d, s in zip(self.dims, self.shape)}
+    
+    def dim_index(self, dim: Dim) -> int:
+        return self.dims.index(dim)
 
     def slice_dim(self, dim: Dim) -> "_DimSlicer":
         warnings.warn(
