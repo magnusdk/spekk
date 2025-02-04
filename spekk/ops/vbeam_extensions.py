@@ -63,6 +63,21 @@ def _get_conv_mode_slice(
     return slice(start, stop)
 
 
+def convolve1d(
+    x: array,
+    filter: array, #1D array
+    *,
+    mode: Literal["full", "same", "valid"],
+    axis: Dim,
+):
+
+    dims = x.dims
+    filter = filter.rename_dim(filter.dims[0], axis)
+    axis_idx = x.dims.index(axis)
+
+    data_filtered = backend.convolve1d(x.data, filter.data, mode=mode, axis=axis_idx)
+
+    return array(data_filtered, dims=dims)
 def fftconvolve(
     x: array,
     filter: array,
