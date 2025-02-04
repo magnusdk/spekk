@@ -1,5 +1,6 @@
 from typing import Callable, Literal, Optional, Sequence, Tuple, TypeVar, Union
 
+from spekk import ops
 from spekk.module.base import Module
 from spekk.ops._backend import backend
 from spekk.ops._types import Dim
@@ -78,6 +79,34 @@ def convolve1d(
     data_filtered = backend.convolve1d(x.data, filter.data, mode=mode, axis=axis_idx)
 
     return array(data_filtered, dims=dims)
+
+def dilation1d(
+        x: array,
+        dilation_factor: int,
+        value: float,
+        *,
+        axis: Dim,        
+    ):
+
+    # Number of zeros to interleave
+    axis_idx = x.dim_index(axis)
+
+    # Calculate the new shape after interleaving zeros
+    new_shape = list(x.shape)
+    new_shape[axis_idx] = x.shape[axis_idx] + (x.shape[axis_idx] - 1) * dilation_factor
+    
+    # Create an array of zeros with the new shape
+    result = ops.ones(new_shape, dtype=x.dtype, dims=x.dims)*value
+    
+    # Create an index array to place the original values
+    indices = [slice(None)] * x.ndim
+    indices[axis_idx] = slice(0, new_shape[axis_idx], dilation_factor + 1)
+    
+    # Place the original values into the zeros array
+    result[tuple(indices)] = x
+
+    return result
+
 def fftconvolve(
     x: array,
     filter: array,
