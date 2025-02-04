@@ -29,6 +29,7 @@ from spekk.ops import linear_algebra_functions
 from spekk.ops._backend import backend
 from spekk.ops._types import (
     Dim,
+    Dims,
     Optional,
     Sequence,
     Tuple,
@@ -530,7 +531,11 @@ def pinv(x: array, /, *, rtol: Optional[Union[float, array]] = None) -> array:
 
 
 def qr(
-    x: array, /, *, mode: Literal["reduced", "complete"] = "reduced"
+    x: array, 
+    /, 
+    *, 
+    mode: Literal["reduced", "complete"] = "reduced",
+    rename_dims: Optional[Dims] = None,
 ) -> Tuple[array, array]:
     r"""
     Returns the QR decomposition of a full column rank matrix (or a stack of matrices).
@@ -592,7 +597,21 @@ def qr(
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
-    raise NotImplementedError("Please help me implement this!")
+    q, r = backend.linalg.qr(x._data, mode=mode)  
+
+    dims_q = list(x._dims)
+    dims_r = list(x._dims)
+    dims_q[-2], dims_q[-1] = UndefinedDim, UndefinedDim
+    dims_r[-2], dims_r[-1] = UndefinedDim, UndefinedDim
+    if rename_dims is not None:
+        if len(rename_dims)!=3:
+            raise ValueError(f"Argument 'rename_dims' must be of length three. 'rename_dims' is {rename_dims}")        
+        dims_q[-2], dims_q[-1] = rename_dims[0], rename_dims[1]
+        dims_r[-2], dims_r[-1] = rename_dims[1], rename_dims[2]  
+    
+    from array_api_compat.common._linalg import QRResult
+
+    return QRResult(array(q, dims_q), array(r, dims_r))
 
 
 def slogdet(x: array, /) -> Tuple[array, array]:
