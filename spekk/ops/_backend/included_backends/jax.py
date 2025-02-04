@@ -1,3 +1,5 @@
+from typing import Literal
+
 import jax
 from jax.numpy import *
 
@@ -16,3 +18,16 @@ def get_dtype_name(dtype):
 
 def _is_backend_array(x):
     return isinstance(x, jax.Array)
+
+
+def convolve1d(
+    x: jax.Array,
+    filter: jax.Array,
+    *,
+    mode: Literal["full", "same", "valid"],
+    axis: int,
+):
+    from jax.scipy.signal import convolve
+   
+    return apply_along_axis(lambda m: convolve(m, filter, mode=mode), axis, x)
+
