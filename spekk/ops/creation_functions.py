@@ -28,10 +28,9 @@ from spekk.ops._types import (
     dtype,
     undefined_dim,
 )
-from spekk.ops._util import ensure_array
+from spekk.ops._util import ensure_array, ensure_broadcastable
 from spekk.ops.array_object import array
 from spekk.ops.data_types import _DType
-from spekk.ops.manipulation_functions import broadcast_arrays
 
 
 def arange(
@@ -529,8 +528,8 @@ def linspace(
         dim = undefined_dim
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
-    start, stop = broadcast_arrays(start, stop)
-    dims = [dim, *start.dims]
+    broadcasted_dims, (start, stop) = ensure_broadcastable(start, stop)
+    dims = [dim, *broadcasted_dims]
     return array(
         backend.linspace(
             start.data, stop.data, num, dtype=dtype, device=device, endpoint=endpoint

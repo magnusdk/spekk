@@ -1,11 +1,11 @@
 __all__ = ["matmul", "matrix_transpose", "tensordot", "vecdot"]
 
 
-from spekk.ops._types import Dim, Sequence, Tuple, Union
-from spekk.ops.array_object import array
 from spekk.ops._backend import backend
+from spekk.ops._types import Dim, Sequence, Tuple, Union
+from spekk.ops._util import ensure_broadcastable
+from spekk.ops.array_object import array
 from spekk.ops.exceptions import MismatchedDimensionsError
-from spekk.ops.manipulation_functions import broadcast_arrays
 
 
 def matmul(x1: array, x2: array, /) -> array:
@@ -234,12 +234,11 @@ def vecdot(x1: array, x2: array, /, *, axis: int = -1) -> array:
     .. versionchanged:: 2023.12
        Restricted ``axis`` to only negative integers.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
     if isinstance(axis, Dim):
         dim = axis
-        axis = x1.dims.index(axis)
+        axis = broadcasted_dims.index(axis)
     else:
-        dim = x1.dims[axis]
-    dims = list(x1.dims)
-    dims.remove(dim)
-    return array(backend.vecdot(x1.data, x2.data, axis=axis), dims)
+        dim = broadcasted_dims[axis]
+    broadcasted_dims.remove(dim)
+    return array(backend.vecdot(x1.data, x2.data, axis=axis), broadcasted_dims)

@@ -1,5 +1,4 @@
-from collections import defaultdict
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import spekk.ops as ops
 from spekk.ops._types import Dim, Dims
@@ -40,7 +39,8 @@ class SlicingMixin:
     def slice_dim(self, dim: Dim):
         return DimSlicer(self, dim)
 
-    def dim_size(self, dim: Optional[Dim] = None):
+    @property
+    def dim_size(self):
         from spekk.module.trees import flatten
 
         flattened = flatten(
@@ -48,27 +48,11 @@ class SlicingMixin:
             is_static=lambda x: not isinstance(x, ops.array),
             is_tree_like=lambda x: not isinstance(x, ops.array),
         )
-        dim_sizes = defaultdict(set)
+        dim_sizes = {}
         for arr in flattened.dynamic:
             for d, s in zip(arr.dims, arr.shape):
-                dim_sizes[d].add(s)
-
-        if dim is not None:
-            size, *other_sizes = dim_sizes[dim]
-            if other_sizes:
-                raise ValueError(
-                    f"Got multiple sizes for dimension {dim}: {dim_sizes[dim]}"
-                )
-            return size
-
-        output = {}
-        for d, (size, *other_sizes) in dim_sizes.items():
-            if other_sizes:
-                raise ValueError(
-                    f"Got multiple sizes for dimension {dim}: {dim_sizes[dim]}"
-                )
-            output[d] = size
-        return output
+                dim_sizes[d] = s
+        return dim_sizes
 
     @property
     def dims(self) -> Dims:

@@ -28,7 +28,12 @@ from spekk.ops._types import (
     Union,
     undefined_dim,
 )
-from spekk.ops._util import canonicalize_axis, ensure_array, get_broadcast_array_fn
+from spekk.ops._util import (
+    canonicalize_axis,
+    ensure_array,
+    ensure_broadcastable,
+    get_broadcast_array_fn,
+)
 from spekk.ops.array_object import array
 
 
@@ -113,10 +118,11 @@ def concat(
     """
     # TODO: What to do with 'UndefinedDims's arrays? Then we shouldn't broadcast here.
     arrays = broadcast_arrays(*arrays)
+    broadcasted_dims = list(arrays[0].dims)
     if isinstance(axis, Dim):
-        axis = arrays[0].dims.index(axis)
+        axis = broadcasted_dims.index(axis)
     data = backend.concat([arr._data for arr in arrays], axis=axis)
-    return array(data, arrays[0].dims)
+    return array(data, broadcasted_dims)
 
 
 def expand_dims(x: array, /, *, axis: Union[Dim, int] = 0) -> array:
@@ -474,14 +480,14 @@ def stack(
     else:
         dim = undefined_dim
     data = backend.stack([arr._data for arr in arrays], axis=axis)
-    dims = list(arrays[0]._dims)
+    broadcasted_dims = list(arrays[0].dims)
     if axis < 0:
         # Handle negative index for list.insert. We have to add an additional 1 to the
         # axis, otherwise -1 refers to the second-to-last position when it should be
         # the last position.
-        axis += len(dims) + 1
-    dims.insert(axis, dim)
-    return array(data, dims)
+        axis += len(broadcasted_dims) + 1
+    broadcasted_dims.insert(axis, dim)
+    return array(data, broadcasted_dims)
 
 
 def tile(x: array, repetitions: Tuple[int, ...], /) -> array:
