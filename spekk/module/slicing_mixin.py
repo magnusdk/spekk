@@ -40,7 +40,7 @@ class SlicingMixin:
         return DimSlicer(self, dim)
 
     @property
-    def dim_size(self):
+    def dim_sizes(self):
         from spekk.module.trees import flatten
 
         flattened = flatten(
