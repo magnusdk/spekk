@@ -5,6 +5,13 @@ if TYPE_CHECKING:
     from spekk import Dim, Dims, ops
 
 
+def _index_of_first_ellipsis(objs) -> int:
+    for i, obj in enumerate(objs):
+        if obj is Ellipsis:
+            return i
+    raise IndexError()
+
+
 def _expand_indexing_objects(n_axes: int, indexing_objects: Sequence) -> tuple:
     """Ensure that the number of indexing objects equal the number of axes in the
     indexed array by expanding the indexing_objects.
@@ -30,7 +37,7 @@ def _expand_indexing_objects(n_axes: int, indexing_objects: Sequence) -> tuple:
         raise IndexError("An index can only have a single ellipsis (...).")
     elif n_ellipsis == 1:
         # Replace ... by slices, i.e.: x[0, ..., 1] becomes x[0, :, :, 1] if x.ndim==4.
-        ellipsis_index = indexing_objects.index(Ellipsis)
+        ellipsis_index = _index_of_first_ellipsis(indexing_objects)
         num_explicit = len(indexing_objects) - 1
         n_missing = n_axes - num_explicit
         indexing_objects = (
