@@ -162,11 +162,27 @@ def get_broadcast_array_fn(*arrays: array) -> Callable[[array], array]:
     return broadcast_array
 
 
-def ensure_broadcastable(
-    *arrays: array,
-    additional_dims: Sequence[Dim] = (),
-) -> Tuple[List[Dim], List[array]]:
+def ensure_broadcastable(*arrays: array) -> Tuple[List[Dim], List[array]]:
     from spekk import ops
+
+    # Check if the arrays have any undefined dimensions. If all the dimensions are
+    # undefined, then we just return the arrays as-is (and pray that they are actually
+    # broadcastable) and give the broadcasting responsibility to the underlying
+    # backend. If some, but not all dimensions are undefined, raise a ValueError.
+    all_dims_are_undefined_dims = True
+    any_dims_are_undefined_dims = False
+    for arr in arrays:
+        if isinstance(arr, array):
+            for dim in arr.dims:
+                if isinstance(dim, _UndefinedDim):
+                    any_dims_are_undefined_dims = True
+                else:
+                    all_dims_are_undefined_dims = False
+    if any_dims_are_undefined_dims:
+        if not all_dims_are_undefined_dims:
+            raise ValueError()
+        n_dim = max(arr.ndim for arr in arrays if isinstance(arr, ops.array))
+        return [undefined_dim] * n_dim, arrays
 
     # Get the output dimension list of each array after broadcasting. Ordering of
     # output dimensions are determined by the ordering of input arrays and their
@@ -177,9 +193,6 @@ def ensure_broadcastable(
             for dim in arr.dims:
                 if dim not in output_dims:
                     output_dims.append(dim)
-    for dim in additional_dims:
-        if dim not in output_dims:
-            output_dims.append(dim)
 
     # Expand dimensions if needed (using reshape) in the correct order.
     resulting_arrays = []
