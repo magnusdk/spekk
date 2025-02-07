@@ -151,7 +151,7 @@ def _parse_indexing_objects(data_dims: "Dims", indexing_objects: tuple) -> tuple
     indexing_objects_dict = dict(zip(data_dims, indexing_objects))
     for dim_outer, i in zip(data_dims, indexing_objects):
         if isinstance(i, ops.array):
-            for dim_inner in i.dim_sizes:
+            for dim_inner in i.dim_sizes.keys():
                 if (
                     dim_inner in indexing_objects_dict
                     and dim_inner != dim_outer
@@ -398,7 +398,7 @@ def _finalize_indices(
         # broadcastable arange of values for the advanced indexing to be correct.
         if dim in x.dims and dim not in slices:
             indices[dim] = ensure_broadcastable_with(
-                ops.arange(x.dim_sizes(dim), dim=dim), output_dims
+                ops.arange(x.dim_sizes[dim], dim=dim), output_dims
             )
     indices = {dim: (slice(None) if i is _none else i) for dim, i in indices.items()}
     output_dims = _ensure_correct_mixed_indexing_output_dims(indices, output_dims)

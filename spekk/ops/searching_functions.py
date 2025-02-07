@@ -4,10 +4,9 @@ from typing import TYPE_CHECKING, Literal, TypeVar
 
 from spekk.ops._backend import backend
 from spekk.ops._types import Dim, Optional, Tuple, undefined_dim
-from spekk.ops._util import ensure_array
+from spekk.ops._util import ensure_array, ensure_broadcastable
 from spekk.ops.array_object import array
 from spekk.ops.exceptions import MismatchedDimensionsError
-from spekk.ops.manipulation_functions import broadcast_arrays
 
 
 def argmax(x: array, /, *, axis: Optional[Dim] = None, keepdims: bool = False) -> array:
@@ -246,5 +245,5 @@ def where(condition: array, x1: array, x2: array, /) -> array:
     if isinstance(x1, Module) or isinstance(x2, Module):
         return _where_with_modules(condition, x1, x2)
 
-    condition, x1, x2 = broadcast_arrays(condition, x1, x2)
-    return array(backend.where(condition._data, x1._data, x2._data), condition._dims)
+    broadcasted_dims, (condition, x1, x2) = ensure_broadcastable(condition, x1, x2)
+    return array(backend.where(condition._data, x1._data, x2._data), broadcasted_dims)

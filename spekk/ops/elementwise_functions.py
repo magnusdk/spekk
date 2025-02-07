@@ -69,9 +69,8 @@ __all__ = [
 
 from spekk.ops._backend import backend
 from spekk.ops._types import Optional, Union
-from spekk.ops._util import ensure_array
+from spekk.ops._util import ensure_array, ensure_broadcastable
 from spekk.ops.array_object import array
-from spekk.ops.manipulation_functions import broadcast_arrays
 
 
 def abs(x: array, /) -> array:
@@ -346,8 +345,8 @@ def add(x1: array, x2: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.add(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.add(x1._data, x2._data), broadcasted_dims)
 
 
 def asin(x: array, /) -> array:
@@ -584,8 +583,8 @@ def atan2(x1: array, x2: array, /) -> array:
     - If ``x1_i`` is ``-infinity`` and ``x2_i`` is ``+infinity``, the result is an implementation-dependent approximation to ``-π/4``.
     - If ``x1_i`` is ``-infinity`` and ``x2_i`` is ``-infinity``, the result is an implementation-dependent approximation to ``-3π/4``.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.atan2(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.atan2(x1._data, x2._data), broadcasted_dims)
 
 
 def atanh(x: array, /) -> array:
@@ -675,8 +674,8 @@ def bitwise_and(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type determined by :ref:`type-promotion`.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.bitwise_and(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.bitwise_and(x1._data, x2._data), broadcasted_dims)
 
 
 def bitwise_left_shift(x1: array, x2: array, /) -> array:
@@ -695,8 +694,8 @@ def bitwise_left_shift(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type determined by :ref:`type-promotion`.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.bitwise_left_shift(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.bitwise_left_shift(x1._data, x2._data), broadcasted_dims)
 
 
 def bitwise_invert(x: array, /) -> array:
@@ -733,8 +732,8 @@ def bitwise_or(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type determined by :ref:`type-promotion`.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.bitwise_or(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.bitwise_or(x1._data, x2._data), broadcasted_dims)
 
 
 def bitwise_right_shift(x1: array, x2: array, /) -> array:
@@ -756,8 +755,8 @@ def bitwise_right_shift(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type determined by :ref:`type-promotion`.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.bitwise_right_shift(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.bitwise_right_shift(x1._data, x2._data), broadcasted_dims)
 
 
 def bitwise_xor(x1: array, x2: array, /) -> array:
@@ -776,8 +775,8 @@ def bitwise_xor(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type determined by :ref:`type-promotion`.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.bitwise_xor(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.bitwise_xor(x1._data, x2._data), broadcasted_dims)
 
 
 def ceil(x: array, /) -> array:
@@ -852,11 +851,11 @@ def clip(
     .. versionadded:: 2023.12
     """
     if isinstance(min, array) and isinstance(max, array):
-        x, min, max = broadcast_arrays(x, min, max)
+        _, (x, min, max) = ensure_broadcastable(x, min, max)
     elif isinstance(min, array):
-        x, min = broadcast_arrays(x, min)
+        _, (x, min) = ensure_broadcastable(x, min)
     elif isinstance(max, array):
-        x, max = broadcast_arrays(x, max)
+        _, (x, max) = ensure_broadcastable(x, max)
     return array(
         backend.clip(
             x.data if isinstance(x, array) else x,
@@ -941,8 +940,8 @@ def copysign(x1: array, x2: array, /) -> array:
 
     .. versionadded:: 2023.12
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.copysign(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.copysign(x1._data, x2._data), broadcasted_dims)
 
 
 def cos(x: array, /) -> array:
@@ -1140,8 +1139,8 @@ def divide(x1: array, x2: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.divide(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.divide(x1._data, x2._data), broadcasted_dims)
 
 
 def equal(x1: array, x2: array, /) -> array:
@@ -1186,8 +1185,8 @@ def equal(x1: array, x2: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.equal(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.equal(x1._data, x2._data), broadcasted_dims)
 
 
 def exp(x: array, /) -> array:
@@ -1400,8 +1399,8 @@ def floor_divide(x1: array, x2: array, /) -> array:
     - If ``x1_i`` and ``x2_i`` have different mathematical signs and are both nonzero finite numbers, the result has a negative mathematical sign.
     - In the remaining cases, where neither ``-infinity``, ``+0``, ``-0``, nor ``NaN`` is involved, the quotient must be computed and rounded to the greatest (i.e., closest to `+infinity`) representable integer-value number that is not greater than the division result. If the magnitude is too large to represent, the operation overflows and the result is an ``infinity`` of appropriate mathematical sign. If the magnitude is too small to represent, the operation underflows and the result is a zero of appropriate mathematical sign.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.floor_divide(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.floor_divide(x1._data, x2._data), broadcasted_dims)
 
 
 def greater(x1: array, x2: array, /) -> array:
@@ -1423,8 +1422,8 @@ def greater(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type of ``bool``.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.greater(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.greater(x1._data, x2._data), broadcasted_dims)
 
 
 def greater_equal(x1: array, x2: array, /) -> array:
@@ -1446,8 +1445,8 @@ def greater_equal(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type of ``bool``.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.greater_equal(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.greater_equal(x1._data, x2._data), broadcasted_dims)
 
 
 def hypot(x1: array, x2: array, /) -> array:
@@ -1495,8 +1494,8 @@ def hypot(x1: array, x2: array, /) -> array:
 
     .. versionadded:: 2023.12
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.hypot(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.hypot(x1._data, x2._data), broadcasted_dims)
 
 
 def imag(x: array, /) -> array:
@@ -1653,8 +1652,8 @@ def less(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type of ``bool``.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.less(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.less(x1._data, x2._data), broadcasted_dims)
 
 
 def less_equal(x1: array, x2: array, /) -> array:
@@ -1676,8 +1675,8 @@ def less_equal(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type of ``bool``.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.less_equal(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.less_equal(x1._data, x2._data), broadcasted_dims)
 
 
 def log(x: array, /) -> array:
@@ -1923,8 +1922,8 @@ def logaddexp(x1: array, x2: array, /) -> array:
     - If ``x1_i`` is ``+infinity`` and ``x2_i`` is not ``NaN``, the result is ``+infinity``.
     - If ``x1_i`` is not ``NaN`` and ``x2_i`` is ``+infinity``, the result is ``+infinity``.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.logaddexp(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.logaddexp(x1._data, x2._data), broadcasted_dims)
 
 
 def logical_and(x1: array, x2: array, /) -> array:
@@ -1946,8 +1945,8 @@ def logical_and(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type of `bool`.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.logical_and(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.logical_and(x1._data, x2._data), broadcasted_dims)
 
 
 def logical_not(x: array, /) -> array:
@@ -1990,8 +1989,8 @@ def logical_or(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type of ``bool``.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.logical_or(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.logical_or(x1._data, x2._data), broadcasted_dims)
 
 
 def logical_xor(x1: array, x2: array, /) -> array:
@@ -2013,8 +2012,8 @@ def logical_xor(x1: array, x2: array, /) -> array:
     out: array
         an array containing the element-wise results. The returned array must have a data type of ``bool``.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.logical_xor(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.logical_xor(x1._data, x2._data), broadcasted_dims)
 
 
 def maximum(x1: array, x2: array, /) -> array:
@@ -2048,8 +2047,8 @@ def maximum(x1: array, x2: array, /) -> array:
 
     .. versionadded:: 2023.12
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.maximum(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.maximum(x1._data, x2._data), broadcasted_dims)
 
 
 def minimum(x1: array, x2: array, /) -> array:
@@ -2083,8 +2082,8 @@ def minimum(x1: array, x2: array, /) -> array:
 
     .. versionadded:: 2023.12
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.minimum(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.minimum(x1._data, x2._data), broadcasted_dims)
 
 
 def multiply(x1: array, x2: array, /) -> array:
@@ -2153,8 +2152,8 @@ def multiply(x1: array, x2: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.multiply(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.multiply(x1._data, x2._data), broadcasted_dims)
 
 
 def negative(x: array, /) -> array:
@@ -2227,8 +2226,8 @@ def not_equal(x1: array, x2: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.not_equal(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.not_equal(x1._data, x2._data), broadcasted_dims)
 
 
 def positive(x: array, /) -> array:
@@ -2323,8 +2322,8 @@ def pow(x1: array, x2: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.pow(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.pow(x1._data, x2._data), broadcasted_dims)
 
 
 def real(x: array, /) -> array:
@@ -2403,8 +2402,8 @@ def remainder(x1: array, x2: array, /) -> array:
     - If ``x1_i`` is a negative (i.e., less than ``0``) finite number and ``x2_i`` is ``-infinity``, the result is ``x1_i``. (**note**: this result matches Python behavior.)
     - In the remaining cases, the result must match that of the Python ``%`` operator.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.remainder(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.remainder(x1._data, x2._data), broadcasted_dims)
 
 
 def round(x: array, /) -> array:
@@ -2770,8 +2769,8 @@ def subtract(x1: array, x2: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
-    return array(backend.subtract(x1._data, x2._data), x1._dims)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    return array(backend.subtract(x1._data, x2._data), broadcasted_dims)
 
 
 def tan(x: array, /) -> array:
