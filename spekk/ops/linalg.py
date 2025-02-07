@@ -33,9 +33,9 @@ from spekk.ops._types import (
     Optional,
     Sequence,
     Tuple,
-    UndefinedDim,
     Union,
     dtype,
+    undefined_dim,
 )
 from spekk.ops._util import ensure_array
 from spekk.ops.array_object import array
@@ -193,7 +193,7 @@ def diagonal(
         an array containing the diagonals and whose shape is determined by removing the last two dimensions and appending a dimension equal to the size of the resulting diagonals. The returned array must have the same data type as ``x``.
     """
     if new_dim is None:
-        new_dim = UndefinedDim()
+        new_dim = undefined_dim
     data = backend.linalg.det(x._data, offset=offset)
     dims = x._dims[:-2] + [new_dim]
     return array(data, dims)

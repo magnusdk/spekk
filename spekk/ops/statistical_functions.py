@@ -2,7 +2,7 @@ __all__ = ["cumulative_sum", "max", "mean", "min", "prod", "std", "sum", "var"]
 
 
 from spekk.ops._backend import backend
-from spekk.ops._types import Dim, Optional, Tuple, UndefinedDim, Union, dtype
+from spekk.ops._types import Dim, Optional, Tuple, Union, dtype
 from spekk.ops._util import ensure_array, get_reduction_axes_and_resulting_dims
 from spekk.ops.array_object import array
 from spekk.ops.data_types import _DType
