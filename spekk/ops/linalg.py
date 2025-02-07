@@ -37,7 +37,11 @@ from spekk.ops._types import (
     dtype,
     undefined_dim,
 )
-from spekk.ops._util import ensure_array, ensure_broadcastable
+from spekk.ops._util import (
+    ensure_array,
+    ensure_backend_compatible_data,
+    ensure_broadcastable,
+)
 from spekk.ops.array_object import array
 from spekk.ops.constants import inf
 from spekk.ops.manipulation_functions import permute_dims
@@ -132,8 +136,9 @@ def cross(x1: array, x2: array, /, *, axis: int = -1) -> array:
     """
     broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
     if isinstance(axis, Dim):
-        axis = x1._dims.index(axis)
-    return array(backend.linalg.cross(x1._data, x2._data, axis=axis), broadcasted_dims)
+        axis = broadcasted_dims.index(axis)
+    x1, x2 = ensure_backend_compatible_data(x1, x2)
+    return array(backend.linalg.cross(x1, x2, axis=axis), broadcasted_dims)
 
 
 def det(x: array, /, *, axes: Tuple[int, int]) -> array:

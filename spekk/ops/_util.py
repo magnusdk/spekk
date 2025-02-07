@@ -213,6 +213,25 @@ def ensure_broadcastable_with(x: array, dims: Dims) -> array:
     return x
 
 
+def ensure_backend_compatible_data(*data) -> list:
+    new_data = []
+    for item in data:
+        if isinstance(item, array):
+            item = item.data
+        new_data.append(item)
+    return new_data
+
+
+def get_dims(obj) -> Dims:
+    if isinstance(obj, array):
+        return obj.dims
+    elif hasattr(obj, "ndim"):
+        return [undefined_dim] * obj.ndim
+    elif isinstance(obj, (list, tuple)):
+        raise NotImplementedError()
+    return []
+
+
 if __name__ == "__main__":
     import doctest
 

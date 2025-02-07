@@ -4,7 +4,11 @@ from typing import TYPE_CHECKING, Literal, TypeVar
 
 from spekk.ops._backend import backend
 from spekk.ops._types import Dim, Optional, Tuple, undefined_dim
-from spekk.ops._util import ensure_array, ensure_broadcastable
+from spekk.ops._util import (
+    ensure_array,
+    ensure_backend_compatible_data,
+    ensure_broadcastable,
+)
 from spekk.ops.array_object import array
 from spekk.ops.exceptions import MismatchedDimensionsError
 
@@ -246,4 +250,5 @@ def where(condition: array, x1: array, x2: array, /) -> array:
         return _where_with_modules(condition, x1, x2)
 
     broadcasted_dims, (condition, x1, x2) = ensure_broadcastable(condition, x1, x2)
-    return array(backend.where(condition._data, x1._data, x2._data), broadcasted_dims)
+    condition, x1, x2 = ensure_backend_compatible_data(condition, x1, x2)
+    return array(backend.where(condition, x1, x2), broadcasted_dims)

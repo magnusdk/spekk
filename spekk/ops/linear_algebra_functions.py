@@ -3,7 +3,7 @@ __all__ = ["matmul", "matrix_transpose", "tensordot", "vecdot"]
 
 from spekk.ops._backend import backend
 from spekk.ops._types import Dim, Sequence, Tuple, Union
-from spekk.ops._util import ensure_broadcastable
+from spekk.ops._util import ensure_backend_compatible_data, ensure_broadcastable
 from spekk.ops.array_object import array
 from spekk.ops.exceptions import MismatchedDimensionsError
 
@@ -241,4 +241,5 @@ def vecdot(x1: array, x2: array, /, *, axis: int = -1) -> array:
     else:
         dim = broadcasted_dims[axis]
     broadcasted_dims.remove(dim)
-    return array(backend.vecdot(x1.data, x2.data, axis=axis), broadcasted_dims)
+    x1, x2 = ensure_backend_compatible_data(x1, x2)
+    return array(backend.vecdot(x1, x2, axis=axis), broadcasted_dims)
