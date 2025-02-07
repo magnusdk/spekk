@@ -37,10 +37,10 @@ from spekk.ops._types import (
     dtype,
     undefined_dim,
 )
-from spekk.ops._util import ensure_array
+from spekk.ops._util import ensure_array, ensure_broadcastable
 from spekk.ops.array_object import array
 from spekk.ops.constants import inf
-from spekk.ops.manipulation_functions import broadcast_arrays, permute_dims
+from spekk.ops.manipulation_functions import permute_dims
 
 
 def cholesky(x: array, /, *, upper: bool = False) -> array:
@@ -130,10 +130,10 @@ def cross(x1: array, x2: array, /, *, axis: int = -1) -> array:
     .. versionchanged:: 2023.12
        Restricted broadcasting to only non-compute axes and required that ``axis`` be a negative integer.
     """
-    x1, x2 = broadcast_arrays(x1, x2)
+    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
     if isinstance(axis, Dim):
         axis = x1._dims.index(axis)
-    return array(backend.linalg.cross(x1._data, x2._data, axis=axis), x1._dims)
+    return array(backend.linalg.cross(x1._data, x2._data, axis=axis), broadcasted_dims)
 
 
 def det(x: array, /, *, axes: Tuple[int, int]) -> array:

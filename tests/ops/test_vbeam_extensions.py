@@ -48,14 +48,14 @@ def foo():
                 )
 
                 # Construct a dictionary of the expected dimension sizes.
-                expected_output_dim_sizes = x.dim_size() | i.dim_size()
+                expected_output_dim_sizes = x.dim_sizes | i.dim_sizes
                 # The resulting array will have the indexing dimension of the indices in place
                 # of the indexing dimension of the data.
                 del expected_output_dim_sizes[x_indexing_dim]
 
                 try:
                     result = ops.take_along_dim(x, i, x_indexing_dim)
-                    assert expected_output_dim_sizes == result.dim_size()
+                    assert expected_output_dim_sizes == result.dim_sizes
                 except Exception:
                     print(f"{x.dims=}")
                     print(f"{i.dims=}")
@@ -63,7 +63,7 @@ def foo():
                     print(f"{i_indexing_dim=}")
                     print(f"{expected_output_dim_sizes=}")
                     try:
-                        print(f"{result.dim_size()=}")
+                        print(f"{result.dim_sizes=}")
                     except Exception:
                         pass
                     raise
