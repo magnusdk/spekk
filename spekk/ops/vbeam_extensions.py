@@ -239,7 +239,7 @@ def scan_over_dim(
         return f(*args)
 
     init, y0 = scan_fn(init, 0)
-    n = data.dim_size(dim)
+    n = data.dim_sizes[dim]
     result, ys = backend.scan(scan_fn, init, backend.arange(1, n))
     ys = ops.concat([ops.array([y0]), ys])
     return result, ys
@@ -260,7 +260,7 @@ def reduce_over_dim(
         return f(*args), i
 
     init, _ = scan_fn(init, 0)
-    n = data.dim_size(dim)
+    n = data.dim_sizes[dim]
     result, _ = backend.scan(scan_fn, init, backend.arange(1, n))
     return result
 
@@ -275,14 +275,14 @@ def map_reduce_over_dim(
     include_index: bool = False,
 ) -> TReducedOutputData:
     def scan_fn(carry, i):
-        x = map_f(data.slice_dim(dim)[i])
+        x = map_f(data.slice_dim(dim)[array(i)])
         args = [carry, x]
         if include_index:
             args.append(i)
         return reduce_f(*args), i
 
     init, _ = scan_fn(init, 0)
-    n = data.dim_size(dim)
+    n = data.dim_sizes[dim]
     carry, _ = backend.scan(scan_fn, init, backend.arange(1, n))
     return carry
 
