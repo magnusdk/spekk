@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from typing import Any, Dict, Optional, Tuple, Union
 
 import numpy as np
@@ -15,7 +16,6 @@ from spekk.ops._types import (
     PyCapsule,
     _UndefinedDim,
     ellipsis,
-    undefined_dim,
 )
 from spekk.ops._types import (
     device as Device,
@@ -46,7 +46,7 @@ class array:
             data = backend.asarray(data)
 
         if dims is None:
-            dims = [undefined_dim()] * data.ndim
+            dims = [_UndefinedDim() for _ in range(data.ndim)]
         elif data.ndim != len(dims):
             raise ValueError(
                 "The number of dimensions must equal the number of axes in the data "
@@ -1462,9 +1462,11 @@ class array:
         return self.dims.index(dim)
     
     def slice_dim(self, dim: Dim) -> "_DimSlicer":
-        print(
+        warnings.warn(
             "arr.slice_dim(dim)[a:b] is deprecated. "
-            "Use arr[dim, a:b] or arr.at[dim, a:b].get() instead."
+            "Use arr[dim, a:b] or arr.at[dim, a:b].get() instead.",
+            category=DeprecationWarning,
+            stacklevel=2,
         )
         return _DimSlicer(self, dim)
 
