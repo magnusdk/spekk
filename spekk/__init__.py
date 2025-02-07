@@ -1,6 +1,6 @@
 import spekk.ops as ops
 import spekk.util as util
-from spekk.module import AbstractClassVar, AbstractVar, Module, field
+from spekk.module import AbstractClassVar, AbstractVar, Module, field, trees
 from spekk.ops._types import Dim, Dims
 
 __all__ = [
@@ -10,6 +10,7 @@ __all__ = [
     "AbstractVar",
     "Module",
     "field",
+    "trees",
     "Dim",
     "Dims",
 ]
