@@ -24,9 +24,9 @@ from spekk.ops._types import (
     Dims,
     NestedSequence,
     SupportsBufferProtocol,
-    UndefinedDim,
     device,
     dtype,
+    undefined_dim,
 )
 from spekk.ops._util import ensure_array
 from spekk.ops.array_object import array
@@ -73,7 +73,7 @@ def arange(
         raise ValueError("arange doesn't support array arguments.")
 
     if dim is None:
-        dim = UndefinedDim()
+        dim = undefined_dim
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
     return array(
@@ -149,7 +149,7 @@ def asarray(
         return array(data, dims)
 
     data = backend.asarray(obj, dtype=dtype, device=device, copy=copy)
-    dims = [UndefinedDim() for _ in range(data.ndim)]
+    dims = [undefined_dim] * data.ndim
     return array(data, dims)
 
 
@@ -180,7 +180,7 @@ def empty(
     if dims is None:
         if isinstance(shape, int):
             shape = (shape,)
-        dims = [UndefinedDim() for _ in range(len(shape))]
+        dims = [undefined_dim] * len(shape)
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
     return array(backend.empty(shape, dtype=dtype, device=device), dims)
@@ -257,7 +257,7 @@ def eye(
        Added complex data type support.
     """
     if dims is None:
-        dims = [UndefinedDim(), UndefinedDim()]
+        dims = [undefined_dim, undefined_dim]
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
     return array(
@@ -350,7 +350,7 @@ def from_dlpack(
     """
     data = backend.from_dlpack(x, device=device, copy=copy)
     if dims is None:
-        dims = [UndefinedDim() for _ in range(data.ndim)]
+        dims = [undefined_dim] * data.ndim
     return array(data, dims)
 
 
@@ -399,7 +399,7 @@ def full(
     if dims is None:
         if isinstance(shape, int):
             shape = (shape,)
-        dims = [UndefinedDim() for _ in range(len(shape))]
+        dims = [undefined_dim] * len(shape)
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
     return array(backend.full(shape, fill_value, dtype=dtype, device=device), dims)
@@ -526,7 +526,7 @@ def linspace(
        Added complex data type support.
     """
     if dim is None:
-        dim = UndefinedDim()
+        dim = undefined_dim
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
     start, stop = broadcast_arrays(start, stop)
@@ -617,7 +617,7 @@ def ones(
     if dims is None:
         if isinstance(shape, int):
             shape = (shape,)
-        dims = [UndefinedDim() for _ in range(len(shape))]
+        dims = [undefined_dim] * len(shape)
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
     return array(backend.ones(shape, dtype=dtype, device=device), dims)
@@ -735,7 +735,7 @@ def zeros(
     if dims is None:
         if isinstance(shape, int):
             shape = (shape,)
-        dims = [UndefinedDim() for _ in range(len(shape))]
+        dims = [undefined_dim] * len(shape)
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
     return array(backend.zeros(shape, dtype=dtype, device=device), dims)

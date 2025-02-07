@@ -22,9 +22,9 @@ from spekk.ops._types import (
     Dims,
     Optional,
     Sequence,
-    UndefinedDim,
     Union,
     device,
+    undefined_dim,
 )
 from spekk.ops.array_object import array
 
@@ -677,7 +677,7 @@ def fftfreq(
        Required the output array have the default real-valued floating-point data type.
     """
     if dim is None:
-        dim = UndefinedDim()
+        dim = undefined_dim
     return array(backend.fft.fftfreq(n, d=d, device=device), [dim])
 
 
@@ -724,7 +724,7 @@ def rfftfreq(
        Required the output array have the default real-valued floating-point data type.
     """
     if dim is None:
-        dim = UndefinedDim()
+        dim = undefined_dim
     return array(backend.fft.rfftfreq(n, d=d, device=device), [dim])
 
 

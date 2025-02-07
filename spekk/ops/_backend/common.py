@@ -4,7 +4,7 @@ from typing import Any, List, Sequence, Union
 import numpy as np
 
 from spekk.module import trees
-from spekk.ops._types import UndefinedDim
+from spekk.ops._types import undefined_dim
 
 
 def _get_key(static_xs: Sequence[Any]):
@@ -18,7 +18,7 @@ def _get_key(static_xs: Sequence[Any]):
         elif ops.backend._is_backend_array(x):
             # Use the memory address (id for CPython) as key for static arrays
             key.append(id(x))
-        elif isinstance(x, UndefinedDim):
+        elif x is undefined_dim:
             key.append(hash(x))
         else:
             try:
@@ -38,7 +38,7 @@ def get_vmap_fn(vmap_impl):
         def wrapped_outer(*original_positional_args, **original_kwargs):
             from spekk import Dim, ops
 
-            if isinstance(in_axes, UndefinedDim):
+            if in_axes is undefined_dim:
                 raise ValueError(f"Can not vmap over an UndefinedDim: {in_axes=}")
             if original_positional_args and original_kwargs:
                 raise ValueError(
@@ -149,9 +149,7 @@ def get_vmap_fn(vmap_impl):
                         flattened_dynamic_data.append(x)
                         flattened_dynamic_dims_vmap_context.append(None)
 
-                known_vmapped_dims = [
-                    d for d in vmapped_dims if not isinstance(d, UndefinedDim)
-                ]
+                known_vmapped_dims = [d for d in vmapped_dims if d is not undefined_dim]
                 if len(known_vmapped_dims) > 1:
                     raise ValueError(
                         "Vmapping over axes with differing dimensions is not allowed."
@@ -159,7 +157,7 @@ def get_vmap_fn(vmap_impl):
                 # Iterate again because the number of known vmapped dimensions may be
                 # zero, aka they may all be UndefinedDim.
                 for vmapped_dim in vmapped_dims:
-                    if not isinstance(vmapped_dim, UndefinedDim):
+                    if vmapped_dim is not undefined_dim:
                         break
 
                 # Declare a variable named flatten_result_inner that will be set within
