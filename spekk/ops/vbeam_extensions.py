@@ -118,8 +118,8 @@ def fftconvolve(
     from spekk import ops
 
     # Get data sizes along axis
-    x_size = x.dim_size(axis)
-    filter_size = filter.dim_size(filter_axis)
+    x_size = x.dim_sizes[axis]
+    filter_size = filter.dim_sizes[filter_axis]
     full_size = x_size + filter_size - 1
 
     # Perform convolution
@@ -166,7 +166,7 @@ def merge_dims(
 
     # Get the dim names and sizes of the dimensions that are not being merged.
     other_dim_names = [d for d in x.dims if d not in merged_dims]
-    other_dim_sizes = [x.dim_size(d) for d in x.dims if d not in merged_dims]
+    other_dim_sizes = [x.dim_sizes[d] for d in x.dims if d not in merged_dims]
 
     # Move the dimensions to the start and in the right order.
     x = ops.permute_dims(x, [*merged_dims, *other_dim_names])

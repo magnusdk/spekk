@@ -15,7 +15,6 @@ __all__ = [
     "unstack",
 ]
 
-from collections import defaultdict
 from typing import Sequence
 
 from spekk.ops._backend import backend
@@ -26,10 +25,10 @@ from spekk.ops._types import (
     List,
     Optional,
     Tuple,
-    UndefinedDim,
     Union,
+    undefined_dim,
 )
-from spekk.ops._util import canonicalize_axis, ensure_array
+from spekk.ops._util import canonicalize_axis, ensure_array, get_broadcast_array_fn
 from spekk.ops.array_object import array
 
 
@@ -47,55 +46,9 @@ def broadcast_arrays(*arrays: array) -> List[array]:
     out: List[array]
         a list of broadcasted arrays. Each array must have the same shape. Each array must have the same dtype as its corresponding input array.
     """
-    # Esnure that they are all arrays
     arrays = [ensure_array(x) for x in arrays]
-
-    # TODO: How to handle UndefinedDim?
-    if any(isinstance(dim, UndefinedDim) for x in arrays for dim in x._dims):
-        # If all dimensions are undefined, fall back to regular broadcasting.
-        if all(
-            (isinstance(dim, UndefinedDim) or (len(x._dims) == 0))
-            for x in arrays
-            for dim in x._dims
-        ):
-            return [
-                array(x) for x in backend.broadcast_arrays(*[x.data for x in arrays])
-            ]
-
-        raise NotImplementedError()
-
-    # Get the output dimension list of each array after broadcasting. Ordering of output dimensions are determined by the ordering of input arrays and their dimensions.
-    output_dims = defaultdict(set)
-    for arr in arrays:
-        for size, dim in zip(arr.shape, arr._dims):
-            if dim not in output_dims:
-                output_dims[dim].add(size)
-
-    output_dims = {dim: sizes.pop() for dim, sizes in output_dims.items()}
-
-    # Expand dimensions if needed (using reshape) and place dimensions in the correct order using permute_dims.
-    resulting_arrays = []
-    for arr in arrays:
-        # Find the dimensions that need to be added to the array in order to be broadcastable with all other arrays. missing_dims is a dictionary from the name of the dimension to the size of that dimension.
-        missing_dims = {
-            dim: size for dim, size in output_dims.items() if dim not in arr._dims
-        }
-
-        # Add the new dimensions to the array's data, making it broadcastable.
-        new_shape_broadcastable = arr._data.shape + (1,) * len(missing_dims)
-        new_data = backend.reshape(arr._data, new_shape_broadcastable)
-
-        # Add the correct sizes to the corresponding dimensions
-        new_shape = (*arr._data.shape, *missing_dims.values())
-        new_data = backend.broadcast_to(new_data, new_shape)
-        # Also add them to the dimensions list
-        new_dims = [*arr._dims, *missing_dims.keys()]
-
-        # Put the dimensions in the correct order (same as all other arrays)
-        arr = permute_dims(array(new_data, new_dims), list(output_dims.keys()))
-        resulting_arrays.append(arr)
-
-    return resulting_arrays
+    broadcast_array = get_broadcast_array_fn(*arrays)
+    return [broadcast_array(arr) for arr in arrays]
 
 
 def broadcast_to(
@@ -125,7 +78,7 @@ def broadcast_to(
     """
     x = ensure_array(x)
     if dims is None:
-        dims = [UndefinedDim() for _ in range(len(shape))]
+        dims = [undefined_dim] * len(shape)
     elif len(dims) != len(shape):
         raise ValueError(
             "The number of dimensions must equal the number of axes when broadcasting."
@@ -158,6 +111,7 @@ def concat(
         .. note::
            This specification leaves type promotion between data type families (i.e., ``intxx`` and ``floatxx``) unspecified.
     """
+    # TODO: What to do with 'UndefinedDims's arrays? Then we shouldn't broadcast here.
     arrays = broadcast_arrays(*arrays)
     if isinstance(axis, Dim):
         axis = arrays[0].dims.index(axis)
@@ -196,7 +150,7 @@ def expand_dims(x: array, /, *, axis: Union[Dim, int] = 0) -> array:
         dim = axis
         axis = 0
     else:
-        dim = UndefinedDim()
+        dim = undefined_dim
     data = backend.expand_dims(x._data, axis)
     dims = list(x._dims)
     dims.insert(axis, dim)
@@ -356,7 +310,7 @@ def repeat(
     .. versionadded:: 2023.12
     """
     x = ensure_array(x)
-    dims = [UndefinedDim()] if axis is None else x.dims
+    dims = [undefined_dim] if axis is None else x.dims
     if isinstance(axis, Dim):
         axis = x._dims.index(axis)
     data = backend.repeat(x._data, repeats=repeats, axis=axis)
@@ -403,7 +357,7 @@ def reshape(
             "The number of dimensions must equal the number of axes when reshaping."
         )
     if dims is None:
-        dims = [UndefinedDim() for _ in range(len(shape))]
+        dims = [undefined_dim] * len(shape)
     return array(backend.reshape(x._data, shape, copy=copy), dims)
 
 
@@ -518,7 +472,7 @@ def stack(
         dim = axis
         axis = 0
     else:
-        dim = UndefinedDim()
+        dim = undefined_dim
     data = backend.stack([arr._data for arr in arrays], axis=axis)
     dims = list(arrays[0]._dims)
     if axis < 0:
@@ -559,7 +513,7 @@ def tile(x: array, repetitions: Tuple[int, ...], /) -> array:
     """
     x = ensure_array(x)
     data = backend.tile(x.data, repetitions)
-    dims = [UndefinedDim() for _ in range(len(repetitions) - x.ndim)] + x.dims
+    dims = [undefined_dim] * (len(repetitions) - x.ndim) + x.dims
     return array(data, dims)
 
 

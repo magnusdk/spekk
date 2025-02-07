@@ -1,19 +1,21 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union
 
 import numpy as np
 
 import spekk.ops.data_types as data_types
 from spekk.ops._backend import backend
+from spekk.ops._slicing import ArrayIndexUpdateHelper
 from spekk.ops._types import (
     ArrayLike,
     Dim,
     Dims,
     Enum,
     PyCapsule,
-    UndefinedDim,
+    _UndefinedDim,
     ellipsis,
+    undefined_dim,
 )
 from spekk.ops._types import (
     device as Device,
@@ -44,13 +46,19 @@ class array:
             data = backend.asarray(data)
 
         if dims is None:
-            dims = [UndefinedDim() for _ in range(data.ndim)]
+            dims = [undefined_dim()] * data.ndim
         elif data.ndim != len(dims):
             raise ValueError(
                 "The number of dimensions must equal the number of axes in the data "
                 f"(got ndim={data.ndim} and {len(dims)=})."
             )
-        if len(set(dims)) < len(dims):
+        else:
+            # Ensure that undefined dimensions are unique objects.
+            dims = [
+                _UndefinedDim() if isinstance(dim, _UndefinedDim) else dim
+                for dim in dims
+            ]
+        if len(set(dims)) != len(dims):
             raise ValueError(f"The dimensions must be unique, but got {dims=}")
 
         # Set the dtype and device (if given)
@@ -721,80 +729,7 @@ class array:
         out: array
             an array containing the accessed value(s). The returned array must have the same data type as ``self``.
         """
-        from spekk import ops
-
-        # Handle changes to dimensions
-        if isinstance(key, int):
-            # Remove first dimension
-            dims = self._dims[1:]
-        elif isinstance(key, slice):
-            # slice can't remove any dimensions; do nothing
-            dims = self._dims
-        elif key is Ellipsis:  # Ellipsis is these three dots: '...'
-            # Ellipsis means 'keep everything'; do nothing
-            dims = self._dims
-        elif key is None:
-            # None means prepend a new dimension. We don't know what that dimension is, however
-            dims = [UndefinedDim(), *self._dims]
-        elif isinstance(key, tuple):
-            n_ellipses = sum(1 for k in key if k is Ellipsis)
-            n_single_axes = sum(1 for k in key if k is not None)
-            if n_ellipses == 0 and n_single_axes != len(self._dims):
-                # Modified error message from https://github.com/data-apis/array-api-strict/blob/main/array_api_strict/_array_object.py#L419
-                raise ValueError(
-                    f"{self.ndim=}, but the multi-axes index only specifies "
-                    f"{n_single_axes} dimensions. If this was intentional, add a "
-                    "trailing ellipsis (...) which expands into as many slices (:) as "
-                    "necessary."
-                )
-
-            dims = []
-            dim_i = 0
-            for key_i, k in enumerate(key):
-                if isinstance(k, int):
-                    # Don't include the dimension
-                    dim_i += 1
-                elif isinstance(k, slice):
-                    dims.append(self._dims[dim_i])
-                    dim_i += 1
-                elif k is Ellipsis:
-                    n_remaining_single_axes = sum(
-                        1 for k in key[key_i + 1 :] if k is not None
-                    )
-                    if n_remaining_single_axes == 0:
-                        dims.extend(self._dims[dim_i:])
-                    else:
-                        for dim in self._dims[dim_i:-n_remaining_single_axes]:
-                            dims.append(dim)
-                        dim_i = len(self._dims) - n_remaining_single_axes
-                elif k is None:
-                    dims.append(UndefinedDim())
-                elif hasattr(k, "ndim") and hasattr(k, "dtype"):
-                    if ops.isdtype(k.dtype, "integral"):
-                        if k.ndim == 1:
-                            dims.append(self._dims[dim_i])
-                        elif k.ndim > 1:
-                            raise ValueError(
-                                "May not index by an array with ndim greater than one. "
-                                "Perhaps you could use ops.take_along_dim instead."
-                            )
-                        dim_i += 1
-                    else:
-                        raise NotImplementedError(
-                            f"Indexing by array with dtype={k.dtype} is not implemented."
-                        )
-                else:
-                    raise ValueError(f"Unknown indexing key type: '{k.__class__}'.")
-
-        elif isinstance(key, array):
-            raise NotImplementedError("Indexing by boolean array is not implemented.")
-
-        if isinstance(key, array):
-            key = key._data
-        elif isinstance(key, Tuple):
-            key = tuple(k._data if isinstance(k, array) else k for k in key)
-        data = self._data.__getitem__(key)
-        return array(data, dims)
+        return self.at.__getitem__(key).get()
 
     def __gt__(self: array, other: Union[int, float, array], /) -> array:
         """
@@ -1519,16 +1454,18 @@ class array:
     def dims(self):
         return self._dims
 
-    def dim_size(self, dim: Optional[Dim] = None) -> Union[Dict[Dim, int], int]:
-        dim_sizes = {d: s for d, s in zip(self.dims, self.shape)}
-        if dim is not None:
-            return dim_sizes[dim]
-        return dim_sizes
+    @property
+    def dim_sizes(self) -> Dict[Dim, int]:
+        return {d: s for d, s in zip(self.dims, self.shape)}
     
     def dim_index(self, dim: Dim) -> int:
         return self.dims.index(dim)
-
+    
     def slice_dim(self, dim: Dim) -> "_DimSlicer":
+        print(
+            "arr.slice_dim(dim)[a:b] is deprecated. "
+            "Use arr[dim, a:b] or arr.at[dim, a:b].get() instead."
+        )
         return _DimSlicer(self, dim)
 
     def rename_dim(self, dim: Dim, new_dim: Dim) -> "array":
@@ -1575,6 +1512,10 @@ class array:
     def bool(self):
         return data_types.bool(self)
 
+    @property
+    def at(self) -> "ArrayIndexUpdateHelper":
+        return ArrayIndexUpdateHelper(self)
+
     def __repr__(self):
         return (
             f"array(shape={self.shape}, dims={self.dims}, "
@@ -1591,4 +1532,3 @@ class _DimSlicer:
         axis = self.data.dims.index(self.dim)
         slices = (slice(None),) * axis + (key, ...)
         return self.data.__getitem__(slices)
-

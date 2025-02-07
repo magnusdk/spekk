@@ -3,7 +3,7 @@ __all__ = ["argmax", "argmin", "nonzero", "searchsorted", "where"]
 from typing import TYPE_CHECKING, Literal, TypeVar
 
 from spekk.ops._backend import backend
-from spekk.ops._types import Dim, Optional, Tuple, UndefinedDim
+from spekk.ops._types import Dim, Optional, Tuple, undefined_dim
 from spekk.ops._util import ensure_array
 from spekk.ops.array_object import array
 from spekk.ops.exceptions import MismatchedDimensionsError
@@ -111,7 +111,7 @@ def nonzero(x: array, /) -> Tuple[array, ...]:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
-    return tuple(array(result, [UndefinedDim()]) for result in backend.nonzero(x._data))
+    return tuple(array(result, [undefined_dim]) for result in backend.nonzero(x._data))
 
 
 def searchsorted(

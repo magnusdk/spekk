@@ -50,24 +50,21 @@ from typing import (
 )
 
 
-class UndefinedDim:
-    def __init__(self):
-        # Used to calculate the hash
-        self._id = uuid.uuid4()
-
+class _UndefinedDim:
     def __eq__(self, other):
         # Like NaN, an undefined dim can't be said to equal anything else, since we
         # can't know what it represents.
         return False
 
-    def __hash__(self):
-        return hash(self._id)
-
     def __repr__(self):
         return "?"
 
+    __hash__ = object.__hash__
 
-Dim: TypeAlias = Union[str, UndefinedDim]
+
+undefined_dim = _UndefinedDim()
+
+Dim: TypeAlias = Union[str, _UndefinedDim]
 Dims: TypeAlias = Sequence[Dim]
 
 
