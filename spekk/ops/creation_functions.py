@@ -28,7 +28,11 @@ from spekk.ops._types import (
     dtype,
     undefined_dim,
 )
-from spekk.ops._util import ensure_array, ensure_broadcastable
+from spekk.ops._util import (
+    ensure_array,
+    ensure_backend_compatible_data,
+    ensure_broadcastable,
+)
 from spekk.ops.array_object import array
 from spekk.ops.data_types import _DType
 
@@ -530,9 +534,10 @@ def linspace(
         dtype = _DType._to_backend_dtype(dtype)
     broadcasted_dims, (start, stop) = ensure_broadcastable(start, stop)
     dims = [dim, *broadcasted_dims]
+    start, stop = ensure_backend_compatible_data(start, stop)
     return array(
         backend.linspace(
-            start.data, stop.data, num, dtype=dtype, device=device, endpoint=endpoint
+            start, stop, num, dtype=dtype, device=device, endpoint=endpoint
         ),
         dims,
     )
