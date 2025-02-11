@@ -266,14 +266,21 @@ def getitem(x: "ops.array", indexing_objects: tuple) -> "ops.array":
 
     indexing_objects = _parse_indexing_objects(x.dims, indexing_objects)
 
-    # Short-circuit to NumPy broadcasting if any dimensions are undefined
     # TODO: Clean up this hack
+    # Short-circuit to NumPy broadcasting if:
+    # - Any dimensions are undefined
+    # - Only one indexing object is given and it has dtype=bool
     all_dims = set(x.dims)
+    n_arrays = 0
+    n_arrays_with_dtype_bool = 0
     for indexing_object in indexing_objects:
         if isinstance(indexing_object, ops.array):
             all_dims.update(indexing_object.dims)
-    if any(ops.is_undefined_dim(dim) for dim in all_dims):
-        return x.data.__getitem__(
+            n_arrays += 1
+            if indexing_object.dtype == "bool":
+                n_arrays_with_dtype_bool += 1
+    if n_arrays == n_arrays_with_dtype_bool == 1:
+        data = x.data.__getitem__(
             tuple(
                 indexing_object.data
                 if isinstance(indexing_object, ops.array)
@@ -281,6 +288,17 @@ def getitem(x: "ops.array", indexing_objects: tuple) -> "ops.array":
                 for indexing_object in indexing_objects
             )
         )
+        return ops.array(data, x.dims)
+    elif any(ops.is_undefined_dim(dim) for dim in all_dims):
+        data = x.data.__getitem__(
+            tuple(
+                indexing_object.data
+                if isinstance(indexing_object, ops.array)
+                else indexing_object
+                for indexing_object in indexing_objects
+            )
+        )
+        return ops.array(data)
 
     is_basic_slicing = all(
         isinstance(i, (int, slice)) or i is None or i is Ellipsis
@@ -322,15 +340,21 @@ def setitem(x: "ops.array", indexing_objects: tuple, value: "ops.array") -> "ops
         ensure_broadcastable_with,
     )
 
-    # Short-circuit to NumPy broadcasting if any dimensions are undefined
     # TODO: Clean up this hack
+    # Short-circuit to NumPy broadcasting if:
+    # - Any dimensions are undefined
+    # - Only one indexing object is given and it has dtype=bool
     all_dims = set(x.dims)
+    n_arrays = 0
+    n_arrays_with_dtype_bool = 0
     for indexing_object in indexing_objects:
         if isinstance(indexing_object, ops.array):
             all_dims.update(indexing_object.dims)
-    if any(ops.is_undefined_dim(dim) for dim in all_dims):
-        indexing_objects = _parse_indexing_objects(x.dims, indexing_objects)
-        return x.data.__getitem__(
+            n_arrays += 1
+            if indexing_object.dtype == "bool":
+                n_arrays_with_dtype_bool += 1
+    if n_arrays == n_arrays_with_dtype_bool == 1:
+        data = x.data.__getitem__(
             tuple(
                 indexing_object.data
                 if isinstance(indexing_object, ops.array)
@@ -338,6 +362,18 @@ def setitem(x: "ops.array", indexing_objects: tuple, value: "ops.array") -> "ops
                 for indexing_object in indexing_objects
             )
         )
+        return ops.array(data, x.dims)
+    elif any(ops.is_undefined_dim(dim) for dim in all_dims):
+        indexing_objects = _parse_indexing_objects(x.dims, indexing_objects)
+        data = x.data.__getitem__(
+            tuple(
+                indexing_object.data
+                if isinstance(indexing_object, ops.array)
+                else indexing_object
+                for indexing_object in indexing_objects
+            )
+        )
+        return ops.array(data)
 
     # Calculate the union of dimensions and sizes of x, the indexing objects, and the
     # value. We order dimensions such that x's dimensions come first.
