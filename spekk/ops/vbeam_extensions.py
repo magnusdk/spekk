@@ -130,7 +130,7 @@ def fftconvolve(
 
     # "Trim" the result according to mode.
     mode_slice = _get_conv_mode_slice(x_size, filter_size, mode)
-    convolved = convolved.slice_dim(axis)[mode_slice]
+    convolved = convolved[axis, mode_slice]
 
     return convolved
 
