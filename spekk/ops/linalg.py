@@ -536,9 +536,9 @@ def pinv(x: array, /, *, rtol: Optional[Union[float, array]] = None) -> array:
 
 
 def qr(
-    x: array, 
-    /, 
-    *, 
+    x: array,
+    /,
+    *,
     mode: Literal["reduced", "complete"] = "reduced",
     rename_dims: Optional[Dims] = None,
 ) -> Tuple[array, array]:
@@ -602,17 +602,25 @@ def qr(
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
-    q, r = backend.linalg.qr(x._data, mode=mode)  
+    q, r = backend.linalg.qr(x.data, mode=mode)
 
-    dims_q = list(x._dims)
-    dims_r = list(x._dims)
-    dims_q[-2], dims_q[-1] = UndefinedDim, UndefinedDim
-    dims_r[-2], dims_r[-1] = UndefinedDim, UndefinedDim
-    if rename_dims is not None:
-        if len(rename_dims)!=3:
-            raise ValueError(f"Argument 'rename_dims' must be of length three. 'rename_dims' is {rename_dims}")        
-        dims_q[-2], dims_q[-1] = rename_dims[0], rename_dims[1]
-        dims_r[-2], dims_r[-1] = rename_dims[1], rename_dims[2]  
+    dims_q = list(x.dims)
+    dims_r = list(x.dims)
+
+    if rename_dims is None:
+        dims_q[-1] = UndefinedDim()
+        dims_r[-2] = UndefinedDim()
+    else:
+        if len(rename_dims) == 1:
+            dims_q[-1] = rename_dims[0]
+            dims_r[-2] = rename_dims[0]
+        elif len(rename_dims) == 3:
+            dims_q[-2], dims_q[-1] = rename_dims[0], rename_dims[1]
+            dims_r[-2], dims_r[-1] = rename_dims[1], rename_dims[2]
+        else:
+            raise ValueError(
+                f"Argument 'rename_dims' must be of length three. 'rename_dims' is {rename_dims}"
+            )
     
     from array_api_compat.common._linalg import QRResult
 
