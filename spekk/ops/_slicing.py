@@ -265,6 +265,23 @@ def getitem(x: "ops.array", indexing_objects: tuple) -> "ops.array":
     from spekk.ops._util import ensure_broadcastable, ensure_broadcastable_with
 
     indexing_objects = _parse_indexing_objects(x.dims, indexing_objects)
+
+    # Short-circuit to NumPy broadcasting if any dimensions are undefined
+    # TODO: Clean up this hack
+    all_dims = set(x.dims)
+    for indexing_object in indexing_objects:
+        if isinstance(indexing_object, ops.array):
+            all_dims.update(indexing_object.dims)
+    if any(ops.is_undefined_dim(dim) for dim in all_dims):
+        return x.data.__getitem__(
+            tuple(
+                indexing_object.data
+                if isinstance(indexing_object, ops.array)
+                else indexing_object
+                for indexing_object in indexing_objects
+            )
+        )
+
     is_basic_slicing = all(
         isinstance(i, (int, slice)) or i is None or i is Ellipsis
         for i in indexing_objects
@@ -304,6 +321,23 @@ def setitem(x: "ops.array", indexing_objects: tuple, value: "ops.array") -> "ops
         ensure_broadcastable,
         ensure_broadcastable_with,
     )
+
+    # Short-circuit to NumPy broadcasting if any dimensions are undefined
+    # TODO: Clean up this hack
+    all_dims = set(x.dims)
+    for indexing_object in indexing_objects:
+        if isinstance(indexing_object, ops.array):
+            all_dims.update(indexing_object.dims)
+    if any(ops.is_undefined_dim(dim) for dim in all_dims):
+        indexing_objects = _parse_indexing_objects(x.dims, indexing_objects)
+        return x.data.__getitem__(
+            tuple(
+                indexing_object.data
+                if isinstance(indexing_object, ops.array)
+                else indexing_object
+                for indexing_object in indexing_objects
+            )
+        )
 
     # Calculate the union of dimensions and sizes of x, the indexing objects, and the
     # value. We order dimensions such that x's dimensions come first.

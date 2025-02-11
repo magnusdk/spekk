@@ -67,6 +67,10 @@ Dim: TypeAlias = Union[str, _UndefinedDim]
 Dims: TypeAlias = Sequence[Dim]
 
 
+def is_undefined_dim(x) -> bool:
+    return isinstance(x, _UndefinedDim)
+
+
 class BackendArray(Protocol): ...
 
 

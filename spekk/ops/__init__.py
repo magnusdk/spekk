@@ -1,12 +1,13 @@
 """Function stubs and API documentation for the array API standard."""
 
-from spekk.ops.data_types import *
 from spekk.ops import fft, linalg
 from spekk.ops._backend import backend
+from spekk.ops._types import is_undefined_dim, undefined_dim
 from spekk.ops.array_object import *
 from spekk.ops.constants import *
 from spekk.ops.creation_functions import *
 from spekk.ops.data_type_functions import *
+from spekk.ops.data_types import *
 from spekk.ops.elementwise_functions import *
 from spekk.ops.indexing_functions import *
 from spekk.ops.info import __array_namespace_info__
