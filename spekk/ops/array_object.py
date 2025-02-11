@@ -27,6 +27,8 @@ from spekk.ops.data_types import _DType
 
 __all__ = ["array"]
 
+_sentinel = object()
+
 
 class array:
     def __init__(
@@ -1431,8 +1433,13 @@ class array:
         """
         return array(self._data.to_device(device, stream=stream), self._dims)
 
-    def __array__(self, dtype=None, copy=None) -> np.ndarray:
-        return self._data.__array__(dtype=dtype, copy=copy)
+    def __array__(self, dtype=_sentinel, copy=_sentinel) -> np.ndarray:
+        kwargs = {}
+        if dtype is not _sentinel:
+            kwargs["dtype"] = dtype
+        if copy is not _sentinel:
+            kwargs["copy"] = copy
+        return self._data.__array__(**kwargs)
 
     def __iter__(self):
         return iter(array(x, self.dims[1:]) for x in iter(self.data))
@@ -1451,10 +1458,10 @@ class array:
     @property
     def dim_sizes(self) -> Dict[Dim, int]:
         return {d: s for d, s in zip(self.dims, self.shape)}
-    
+
     def dim_index(self, dim: Dim) -> int:
         return self.dims.index(dim)
-    
+
     def slice_dim(self, dim: Dim) -> "_DimSlicer":
         warnings.warn(
             "arr.slice_dim(dim)[a:b] is deprecated. "
