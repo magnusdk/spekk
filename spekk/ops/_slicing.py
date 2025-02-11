@@ -274,13 +274,13 @@ def getitem(x: "ops.array", indexing_objects: tuple) -> "ops.array":
     # Short-circuit to NumPy broadcasting if:
     # - Any dimensions are undefined
     # - Only one indexing object is given and it has dtype=bool
-    all_dims = set(x.dims)
+    tmp_all_indexing_dims = set()
     n_arrays = 0
     n_arrays_with_dtype_bool = 0
     bool_array = None
     for indexing_object in indexing_objects:
         if isinstance(indexing_object, ops.array):
-            all_dims.update(indexing_object.dims)
+            tmp_all_indexing_dims.update(indexing_object.dims)
             n_arrays += 1
             if indexing_object.dtype == "bool":
                 n_arrays_with_dtype_bool += 1
@@ -288,7 +288,7 @@ def getitem(x: "ops.array", indexing_objects: tuple) -> "ops.array":
     if n_arrays == n_arrays_with_dtype_bool == 1:
         data = x.data[bool_array.data]
         return ops.array(data, [ops.undefined_dim])
-    elif any(ops.is_undefined_dim(dim) for dim in all_dims):
+    elif any(ops.is_undefined_dim(dim) for dim in tmp_all_indexing_dims):
         data = x.data.__getitem__(
             tuple(
                 indexing_object.data
@@ -343,13 +343,13 @@ def setitem(x: "ops.array", indexing_objects: tuple, value: "ops.array") -> "ops
     # Short-circuit to NumPy broadcasting if:
     # - Any dimensions are undefined
     # - Only one indexing object is given and it has dtype=bool
-    all_dims = set(x.dims)
+    tmp_all_indexing_dims = set()
     n_arrays = 0
     n_arrays_with_dtype_bool = 0
     bool_array = None
     for indexing_object in indexing_objects:
         if isinstance(indexing_object, ops.array):
-            all_dims.update(indexing_object.dims)
+            tmp_all_indexing_dims.update(indexing_object.dims)
             n_arrays += 1
             if indexing_object.dtype == "bool":
                 n_arrays_with_dtype_bool += 1
@@ -361,7 +361,7 @@ def setitem(x: "ops.array", indexing_objects: tuple, value: "ops.array") -> "ops
             *ensure_backend_compatible_data(value),
         )
         return ops.array(data, x.dims)
-    elif any(ops.is_undefined_dim(dim) for dim in all_dims):
+    elif any(ops.is_undefined_dim(dim) for dim in tmp_all_indexing_dims):
         indexing_objects = _parse_indexing_objects(x.dims, indexing_objects)
         data = ops.backend._setitem_impl(
             x.data,
