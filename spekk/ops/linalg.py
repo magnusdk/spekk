@@ -608,8 +608,8 @@ def qr(
     dims_r = list(x.dims)
 
     if rename_dims is None:
-        dims_q[-1] = UndefinedDim()
-        dims_r[-2] = UndefinedDim()
+        dims_q[-1] = undefined_dim
+        dims_r[-2] = undefined_dim
     else:
         if len(rename_dims) == 1:
             dims_q[-1] = rename_dims[0]

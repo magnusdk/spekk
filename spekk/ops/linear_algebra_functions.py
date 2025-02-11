@@ -2,7 +2,7 @@ __all__ = ["matmul", "matrix_transpose", "tensordot", "vecdot"]
 
 
 from spekk.ops._backend import backend
-from spekk.ops._types import Dim, Sequence, Tuple, Union, UndefinedDim
+from spekk.ops._types import Dim, Sequence, Tuple, Union, _UndefinedDim
 from spekk.ops._util import ensure_backend_compatible_data, ensure_broadcastable
 from spekk.ops.array_object import array
 from spekk.ops.exceptions import MismatchedDimensionsError
@@ -70,7 +70,7 @@ def matmul(x1: array, x2: array, /) -> array:
     # Both are two-dimensional
     if x1.ndim == 2 and x2.ndim == 2:
         if (x1._dims[1] != x2._dims[0]):
-            if not (isinstance(x1._dims[1], UndefinedDim) and isinstance(x2._dims[0], UndefinedDim)):
+            if not (isinstance(x1._dims[1], _UndefinedDim) and isinstance(x2._dims[0], _UndefinedDim)):
                 raise MismatchedDimensionsError(general_error_message)
         return array(
             backend.matmul(x1._data, x2._data),

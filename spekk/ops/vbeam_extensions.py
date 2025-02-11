@@ -3,7 +3,7 @@ from typing import Callable, Literal, Optional, Sequence, Tuple, TypeVar, Union
 from spekk import ops
 from spekk.module.base import Module
 from spekk.ops._backend import backend
-from spekk.ops._types import Dim, UndefinedDim
+from spekk.ops._types import Dim, undefined_dim
 from spekk.ops._util import prepare_slicing_along_dim
 from spekk.ops.array_object import array
 
@@ -29,8 +29,8 @@ def angle(x: array) -> array:
 def flatten(x: array, dim: Optional[Dim] = None) -> array:
     data = backend.flatten(x.data)
     if dim is None:
-        dim =  UndefinedDim()
-    return array(data, dims=[dim])    
+        dim = undefined_dim
+    return array(data, dims=[dim])
 
 
 def nan_to_num(
