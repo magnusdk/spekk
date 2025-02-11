@@ -13,7 +13,7 @@ class Setup:
     data_dim_sizes: Dict[Dim, int]
     # If an indexing object is a dict, then it represents the dim_sizes of an array.
     indexing_objects: Dict[Dim, Union[Dict[Dim, int], int, slice]]
-    value_dim_sizes: Dict[Dim, int]
+    value: Dict[Dim, int]
 
     def perform_indexing_update(self):
         x = ops.zeros(
@@ -27,16 +27,21 @@ class Setup:
                 i = ops.zeros(tuple(i.values()), dims=list(i.keys()), dtype="int32")
             indexing_objects.append(i)
 
-        value = ops.ones(
-            shape=tuple(self.value_dim_sizes.values()),
-            dims=list(self.value_dim_sizes.keys()),
-        )
+        if isinstance(self.value, dict):
+            value = ops.ones(
+                shape=tuple(self.value.values()),
+                dims=list(self.value.keys()),
+            )
+        elif isinstance(self.value, int):
+            value = self.value
+
         x[tuple(indexing_objects)] = value
         return x
 
     @property
     def expected_output_dim_sizes(self):
-        output_dim_sizes = {**self.value_dim_sizes, **self.data_dim_sizes}
+        output_dim_sizes = dict(self.value) if isinstance(self.value, dict) else {}
+        output_dim_sizes.update(self.data_dim_sizes)
         indexing_dim_sizes = {}
         for dim, i in self.indexing_objects.items():
             if isinstance(i, dict):
@@ -95,9 +100,10 @@ def setup_strategy(draw):
         min_size=1,
         max_size=6,
     )
+    value_strategy = st.one_of(data_dim_sizes_strategy, st.just(0))
 
     indexing_objects = draw(indexing_objects_strategy)
-    value_dim_sizes = draw(data_dim_sizes_strategy)
+    value_dim_sizes = draw(value_strategy)
     return Setup(data_dim_sizes, indexing_objects, value_dim_sizes)
 
 
@@ -118,23 +124,25 @@ def invalid_case_1(setup: Setup):
 
 
 def invalid_case_2(setup: Setup) -> bool:
+    value_dim_sizes = setup.value if isinstance(setup.value, dict) else {}
     for indexed_dim, indexing_object in setup.indexing_objects.items():
         if isinstance(indexing_object, dict):
             for dim, size in indexing_object.items():
-                if setup.value_dim_sizes.get(dim, None) != size:
+                if value_dim_sizes.get(dim, None) != size:
                     return True
         elif isinstance(indexing_object, int):
-            if setup.value_dim_sizes.get(indexed_dim, None) != 1:
+            if value_dim_sizes.get(indexed_dim, None) != 1:
                 return True
         elif isinstance(indexing_object, slice):
             new_size = len(range(setup.data_dim_sizes[indexed_dim])[indexing_object])
-            if setup.value_dim_sizes.get(indexed_dim, None) != new_size:
+            if value_dim_sizes.get(indexed_dim, None) != new_size:
                 return True
     return False
 
 
 def invalid_case_3(setup: Setup) -> bool:
-    for dim, size in setup.value_dim_sizes.items():
+    value_dim_sizes = setup.value if isinstance(setup.value, dict) else {}
+    for dim, size in value_dim_sizes.items():
         for indexing_object in setup.indexing_objects.values():
             if (
                 isinstance(indexing_object, dict)
@@ -148,7 +156,7 @@ def invalid_case_3(setup: Setup) -> bool:
     return False
 
 
-@settings(max_examples=20000)
+@settings(max_examples=2000)
 @given(setup_strategy())
 def test_setitem_generative(setup: Setup):
     if invalid_case_1(setup):

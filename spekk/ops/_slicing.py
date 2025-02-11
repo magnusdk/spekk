@@ -299,7 +299,11 @@ def getitem(x: "ops.array", indexing_objects: tuple) -> "ops.array":
 
 def setitem(x: "ops.array", indexing_objects: tuple, value: "ops.array") -> "ops.array":
     from spekk import ops
-    from spekk.ops._util import ensure_broadcastable, ensure_broadcastable_with
+    from spekk.ops._util import (
+        ensure_backend_compatible_data,
+        ensure_broadcastable,
+        ensure_broadcastable_with,
+    )
 
     # Calculate the union of dimensions and sizes of x, the indexing objects, and the
     # value. We order dimensions such that x's dimensions come first.
@@ -355,13 +359,10 @@ def setitem(x: "ops.array", indexing_objects: tuple, value: "ops.array") -> "ops
     )
     value = ensure_broadcastable_with(value, output_dims)
 
-    # TODO: Ensure that indexing objects yield an array that is broadcastable with
-    # value after getitem.
-    data = ops.backend._setitem_impl(
-        x.data,
-        tuple(i.data if isinstance(i, ops.array) else i for i in indexing_objects),
-        value.data,
+    x, value, *indexing_objects = ensure_backend_compatible_data(
+        x, value, *indexing_objects
     )
+    data = ops.backend._setitem_impl(x, tuple(indexing_objects), value)
     return ops.array(data, list(dim_sizes.keys()))
 
 
