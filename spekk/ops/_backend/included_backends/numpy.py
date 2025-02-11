@@ -1,6 +1,7 @@
 import functools
 
 import numpy as np
+from numpy import *
 from array_api_compat.numpy import *
 from array_api_compat.numpy import _info
 
@@ -49,3 +50,6 @@ def get_dtype_name(dtype):
 
 def _is_backend_array(x):
     return isinstance(x, np.ndarray)
+    
+def flatten(x: np.ndarray) -> np.ndarray:
+    return x.flatten()

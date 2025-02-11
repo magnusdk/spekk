@@ -3,7 +3,7 @@ from typing import Callable, Literal, Optional, Sequence, Tuple, TypeVar, Union
 from spekk import ops
 from spekk.module.base import Module
 from spekk.ops._backend import backend
-from spekk.ops._types import Dim
+from spekk.ops._types import Dim, UndefinedDim
 from spekk.ops._util import prepare_slicing_along_dim
 from spekk.ops.array_object import array
 
@@ -20,6 +20,17 @@ def deg2rad(x: array) -> array:
 
 def rad2deg(x: array) -> array:
     return x * 180 / backend.pi
+
+
+def angle(x: array) -> array:
+    data = backend.angle(x.data)
+    return array(data, dims=x.dims)
+
+def flatten(x: array, dim: Optional[Dim] = None) -> array:
+    data = backend.flatten(x.data)
+    if dim is None:
+        dim =  UndefinedDim()
+    return array(data, dims=[dim])    
 
 
 def nan_to_num(

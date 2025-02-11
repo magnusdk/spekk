@@ -1,4 +1,5 @@
 import torch
+from torch import *
 from array_api_compat.torch import *
 from array_api_compat.torch import _info
 
@@ -25,3 +26,6 @@ def get_dtype_name(dtype):
 
 def _is_backend_array(x):
     return isinstance(x, torch.Tensor)
+
+def flatten(x: torch.Tensor) -> torch.Tensor:
+    return x.flatten()    

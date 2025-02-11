@@ -31,3 +31,5 @@ def convolve1d(
    
     return apply_along_axis(lambda m: convolve(m, filter, mode=mode), axis, x)
 
+def flatten(x: jax.Array) -> jax.Array:
+    return x.flatten()

@@ -32,3 +32,9 @@ class dtype:
 
 def _is_backend_array(x):
     return isinstance(x, mx.array)
+
+def angle(x: mx.array) -> mx.array:
+    return mx.angle(x)
+
+def flatten(x: mx.array) -> mx.array:
+    return x.flatten()
