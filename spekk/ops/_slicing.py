@@ -262,7 +262,11 @@ def _get_advanced_indexing_output_dims(
 
 def getitem(x: "ops.array", indexing_objects: tuple) -> "ops.array":
     from spekk import ops
-    from spekk.ops._util import ensure_broadcastable, ensure_broadcastable_with
+    from spekk.ops._util import (
+        ensure_backend_compatible_data,
+        ensure_broadcastable,
+        ensure_broadcastable_with,
+    )
 
     indexing_objects = _parse_indexing_objects(x.dims, indexing_objects)
 
@@ -351,7 +355,11 @@ def setitem(x: "ops.array", indexing_objects: tuple, value: "ops.array") -> "ops
                 n_arrays_with_dtype_bool += 1
                 bool_array = indexing_object
     if n_arrays == n_arrays_with_dtype_bool == 1:
-        data = ops.backend._setitem_impl(x.data, (bool_array.data,), value.data)
+        data = ops.backend._setitem_impl(
+            x.data,
+            (bool_array.data,),
+            *ensure_backend_compatible_data(value),
+        )
         return ops.array(data, x.dims)
     elif any(ops.is_undefined_dim(dim) for dim in all_dims):
         indexing_objects = _parse_indexing_objects(x.dims, indexing_objects)
@@ -363,7 +371,7 @@ def setitem(x: "ops.array", indexing_objects: tuple, value: "ops.array") -> "ops
                 else indexing_object
                 for indexing_object in indexing_objects
             ),
-            value.data,
+            *ensure_backend_compatible_data(value),
         )
         return ops.array(data)
 
