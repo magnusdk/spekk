@@ -1,5 +1,5 @@
 import collections
-from typing import TYPE_CHECKING, Callable, Dict, List, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Callable, List, Sequence
 
 if TYPE_CHECKING:
     from spekk import Dim, Dims, ops
@@ -244,7 +244,7 @@ def _get_advanced_indexing_output_dims(
         output_dims = []
         for i, idx in enumerate(indexing_objects):
             if isinstance(idx, ops.array):
-                output_dims.extend(idx.dims)
+                output_dims += idx.dims
             elif isinstance(idx, int):
                 continue
             else:
@@ -284,12 +284,8 @@ def getitem(x: "ops.array", indexing_objects: tuple) -> "ops.array":
                 _indexing_objects_tmp.append(i)
             else:
                 if isinstance(i, slice) and dim in indexing_objects_dims:
-                    i = ops.arange(
-                        i.start if i.start is not None else 0,
-                        i.stop if i.stop is not None else dim_size,
-                        i.step if i.step is not None else 1,
-                        dim=dim,
-                    )
+                    start, stop, step = i.indices(dim_size)
+                    i = ops.arange(start, stop, step, dim=dim)
                     i = ensure_broadcastable_with(i, indexing_objects_dims)
                 _indexing_objects_tmp.append(i)
         indexing_objects = _indexing_objects_tmp
@@ -301,143 +297,72 @@ def getitem(x: "ops.array", indexing_objects: tuple) -> "ops.array":
         return ops.array(x.data.__getitem__(indexing_objects), output_dims)
 
 
-# TODO: BELOW THIS LINE IS OLD CODE WHICH DOESN'T WORK
-######################################################
-
-
-def _parse_and_validate_slices(
-    slices: tuple, data_dims: "ops.array"
-) -> Tuple[Dict["Dim", Union["ops.array", slice, int]], "Dims"]:
-    from spekk import Dim, ops
-    from spekk.ops._util import ensure_broadcastable
-
-    if not slices:
-        raise ValueError("Must supply at least one (Dim, ops.array) pair.")
-    if len(slices) % 2 != 0:
-        raise ValueError(f"slices must be an even-length tuple, got {slices}.")
-    if not all(isinstance(d, Dim) for d in slices[::2]):
-        raise ValueError(
-            "Every other element of slices, starting from the first, must be a Dim, "
-            f"got {slices}."
-        )
-    if not all(isinstance(d, (ops.array, slice, int)) for d in slices[1::2]):
-        raise ValueError(
-            "Every other element of slices, starting from the second, must be an "
-            f"index-like object, got {slices}."
-        )
-
-    dims = slices[::2]
-    for dim in dims:
-        if dim not in data_dims:
-            raise ValueError(
-                f"Attempting to index at dim {dim} which does not exist in x with dims "
-                f"{data_dims}."
-            )
-    slices_dims, values = ensure_broadcastable(*slices[1::2])
-    slices_dict = dict(zip(dims, values))
-    for dim, i in slices_dict.items():
-        if isinstance(i, slice):
-            slices_dims.append(dim)
-
-    for dim in slices_dims:
-        if (
-            dim in slices_dict
-            and isinstance(slices_dict[dim], ops.array)
-            and dim not in slices_dict[dim].dims
-        ):
-            raise ValueError("TODO: Help me figure out a good error message")
-
-    return slices_dict, slices_dims
-
-
-def _ensure_correct_mixed_indexing_output_dims(
-    indices_per_axis: Dict["Dim", Union["ops.array", slice, int]],
-    broadcasted_dims: "Dims",
-) -> "Dims":
-    """Return the output dimensions after indexing an array when mixing basic and
-    advanced Numpy indexing.
-
-    This is a bit finnicky and we're digging into details of NumPy array indexing. When
-    we perform indexing that is a mix between arrays and "basic" indexing objects,
-    figuring out the output shape is not trivial. If an axis uses slice indexing and
-    there is a previous axis that does not use slice indexing, the slice dimensions are
-    placed at the back of the output shape. Else they are placed in the front of the
-    output shape. 🤷‍♂️
-
-    NumPy docs: https://numpy.org/doc/2.2/user/basics.indexing.html#combining-advanced-and-basic-indexing
-    """
-    extra_dims = []
-    encountered_non_slice = False
-    place_extra_dims_in_back = False
-    for dim, i in indices_per_axis.items():
-        if isinstance(i, slice):
-            if encountered_non_slice:
-                # If we see a slice after we have seen a non-slice indexing object, the
-                # extra dimensions — those with slice(None) indexing objects — should
-                # be placed in the back (according to the Numpy documentaion.)
-                place_extra_dims_in_back = True
-            if i == slice(None) or dim not in broadcasted_dims:
-                extra_dims.append(dim)
-        else:
-            encountered_non_slice = True
-
-    if place_extra_dims_in_back:
-        return broadcasted_dims + extra_dims
-    else:
-        return extra_dims + broadcasted_dims
-
-
-def _finalize_indices(
-    slices: Dict["Dim", Union["ops.array", slice, int]],
-    output_dims: "Dims",
-    x: "ops.array",
-) -> Tuple[Dict["Dim", Union["ops.array", slice, int]], "Dims"]:
+def setitem(x: "ops.array", indexing_objects: tuple, value: "ops.array") -> "ops.array":
     from spekk import ops
-    from spekk.ops._util import ensure_broadcastable_with
+    from spekk.ops._util import ensure_broadcastable, ensure_broadcastable_with
 
-    # Get the index objects (in the correct order according to x.dims).
-    _none = object()
-    indices = {dim: _none for dim in x.dims}
-    for dim, i in slices.items():
-        indices[dim] = i
-    for dim in output_dims:
-        # Dimensions that are part of the indices and part of x needs to have a
-        # broadcastable arange of values for the advanced indexing to be correct.
-        if dim in x.dims and dim not in slices:
-            indices[dim] = ensure_broadcastable_with(
-                ops.arange(x.dim_sizes[dim], dim=dim), output_dims
+    # Calculate the union of dimensions and sizes of x, the indexing objects, and the
+    # value. We order dimensions such that x's dimensions come first.
+    dim_sizes = x.dim_sizes
+    indexing_sizes = {}
+    for indexing_object in [*indexing_objects, value]:
+        if isinstance(indexing_object, ops.array):
+            for dim, size in indexing_object.dim_sizes.items():
+                if dim not in dim_sizes:
+                    dim_sizes[dim] = size
+                if dim not in indexing_sizes:
+                    indexing_sizes[dim] = size
+
+    # Ensure that x has all the dimensions. Note that this means that x may change
+    # shape (become bigger!) after setitem, which differs from NumPy semantics.
+    if x.dim_sizes != dim_sizes:
+        x = ops.broadcast_to(
+            x,
+            shape=tuple(dim_sizes.values()),
+            dims=tuple(dim_sizes.keys()),
+        )
+
+    indexing_objects = _parse_indexing_objects(x.dims, indexing_objects)
+
+    indexing_objects = list(indexing_objects)
+    value_dim_sizes = value.dim_sizes if isinstance(value, ops.array) else {}
+    for dim, size in value_dim_sizes.items():
+        i = x.dims.index(dim)
+        indexing_object = indexing_objects[i]
+        if isinstance(indexing_object, ops.array):
+            if dim not in indexing_object.dims:
+                indexing_objects[i] = ops.broadcast_to(
+                    indexing_object,
+                    shape=indexing_object.shape + (size,),
+                    dims=indexing_object.dims + [dim],
+                )
+        if isinstance(indexing_object, slice):
+            start, stop, step = indexing_object.indices(size)
+            indexing_objects[i] = ops.arange(start, stop, step, dim=dim)
+            indexing_objects[i] = ensure_broadcastable_with(
+                indexing_objects[i], indexing_sizes
             )
-    indices = {dim: (slice(None) if i is _none else i) for dim, i in indices.items()}
-    output_dims = _ensure_correct_mixed_indexing_output_dims(indices, output_dims)
-    return indices, output_dims
+    _, indexing_objects = ensure_broadcastable(*indexing_objects)
 
-
-def setitem(x: "ops.array", slices: tuple, value: "ops.array") -> "ops.array":
-    from spekk import ops
-    from spekk.ops._util import (
-        ensure_broadcastable,
-        ensure_broadcastable_with,
-        get_broadcast_array_fn,
+    is_basic_slicing = all(
+        isinstance(i, (int, slice)) or i is None or i is Ellipsis
+        for i in indexing_objects
     )
-
-    slices, slices_dims = _parse_and_validate_slices(slices, x.dims)
-
-    # Give x any missing dimensions that are present in value and the slices.
-    broadcast_array = get_broadcast_array_fn(
-        x, value, *[i for i in slices.values() if isinstance(i, ops.array)]
+    output_dims = (
+        _get_new_dims_basic_indexing(x.dims, indexing_objects)
+        if is_basic_slicing
+        else _get_advanced_indexing_output_dims(x.dims, indexing_objects)
     )
-    x = broadcast_array(x)
+    value = ensure_broadcastable_with(value, output_dims)
 
-    # Make value and slices broadcastable with each other.
-    value = ensure_broadcastable_with(value, x.dims)
-    output_dims, (value, *slice_values) = ensure_broadcastable(value, *slices.values())
-    slices = {dim: i for dim, i in zip(slices.keys(), slice_values)}
-
-    indices, output_dims = _finalize_indices(slices, output_dims, x)
-
-    indices = tuple(i.data if isinstance(i, ops.array) else i for i in indices.values())
-    data = ops.backend._setitem_impl(x.data, indices, value.data)
-    return ops.array(data, output_dims)
+    # TODO: Ensure that indexing objects yield an array that is broadcastable with
+    # value after getitem.
+    data = ops.backend._setitem_impl(
+        x.data,
+        tuple(i.data if isinstance(i, ops.array) else i for i in indexing_objects),
+        value.data,
+    )
+    return ops.array(data, list(dim_sizes.keys()))
 
 
 class ArrayIndexUpdateHelper:
@@ -459,7 +384,7 @@ class _ArrayIndexUpdateRef:
         return getitem(self.x, self.slices)
 
     def set(self, value: "ops.array") -> "ops.array":
-        raise NotImplementedError()
+        return setitem(self.x, self.slices, value)
 
     def update(
         self, f: Callable[["ops.array"], "ops.array"], *args, **kwargs

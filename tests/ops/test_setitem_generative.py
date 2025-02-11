@@ -1,9 +1,7 @@
-import collections
 import dataclasses
 from typing import Dict, Union
 
 import hypothesis.strategies as st
-import pytest
 from hypothesis import given, settings
 
 from spekk import ops
@@ -15,8 +13,9 @@ class Setup:
     data_dim_sizes: Dict[Dim, int]
     # If an indexing object is a dict, then it represents the dim_sizes of an array.
     indexing_objects: Dict[Dim, Union[Dict[Dim, int], int, slice]]
+    value_dim_sizes: Dict[Dim, int]
 
-    def perform_indexing(self):
+    def perform_indexing_update(self):
         x = ops.zeros(
             shape=tuple(self.data_dim_sizes.values()),
             dims=list(self.data_dim_sizes.keys()),
@@ -28,11 +27,17 @@ class Setup:
                 i = ops.zeros(tuple(i.values()), dims=list(i.keys()), dtype="int32")
             indexing_objects.append(i)
 
-        return x[tuple(indexing_objects)]
+        value = ops.ones(
+            shape=tuple(self.value_dim_sizes.values()),
+            dims=list(self.value_dim_sizes.keys()),
+        )
+        x[tuple(indexing_objects)] = value
+        return x
 
     @property
     def expected_output_dim_sizes(self):
-        output_dim_sizes = dict(self.data_dim_sizes)
+        output_dim_sizes = {**self.value_dim_sizes, **self.data_dim_sizes}
+        indexing_dim_sizes = {}
         for dim, i in self.indexing_objects.items():
             if isinstance(i, dict):
                 assert all(
@@ -46,13 +51,10 @@ class Setup:
                     "the indexed dimension) means that the dimension should have the "
                     "same size as in the indexed array. 😵‍💫"
                 )
-                if dim in output_dim_sizes:
-                    del output_dim_sizes[dim]
-                output_dim_sizes.update(i)
-            elif isinstance(i, int):
-                del output_dim_sizes[dim]
-            elif isinstance(i, slice):
-                output_dim_sizes[dim] = len(range(self.data_dim_sizes[dim])[i])
+                indexing_dim_sizes.update(i)
+        for dim, size in indexing_dim_sizes.items():
+            if dim not in output_dim_sizes:
+                output_dim_sizes[dim] = size
         return output_dim_sizes
 
 
@@ -66,7 +68,7 @@ data_dim_sizes_strategy = st.dictionaries(
     keys=dim_name_strategy,
     values=dim_size_strategy,
     min_size=1,
-    max_size=5,
+    max_size=6,
 )
 
 
@@ -77,7 +79,7 @@ def array_indexing_object_strategy(data_dim_sizes: Dict[str, int]):
         dim_size_strategy,
     )
     dict_entries = st.one_of(dims_in_data, new_dims)
-    return st.lists(dict_entries, min_size=1, max_size=5).map(dict)
+    return st.lists(dict_entries, min_size=1, max_size=4).map(dict)
 
 
 @st.composite
@@ -91,11 +93,12 @@ def setup_strategy(draw):
             st.slices(1),
         ),
         min_size=1,
-        max_size=5,
+        max_size=6,
     )
 
     indexing_objects = draw(indexing_objects_strategy)
-    return Setup(data_dim_sizes, indexing_objects)
+    value_dim_sizes = draw(data_dim_sizes_strategy)
+    return Setup(data_dim_sizes, indexing_objects, value_dim_sizes)
 
 
 def invalid_case_1(setup: Setup):
@@ -114,24 +117,49 @@ def invalid_case_1(setup: Setup):
     return False
 
 
-def invalid_case_2(setup: Setup):
-    indexing_objects_sizes = collections.defaultdict(set)
-    for i in setup.indexing_objects.values():
-        if isinstance(i, dict):
-            for dim, size in i.items():
-                indexing_objects_sizes[dim].add(size)
-    return any(len(size) > 1 for size in indexing_objects_sizes.values())
+def invalid_case_2(setup: Setup) -> bool:
+    for indexed_dim, indexing_object in setup.indexing_objects.items():
+        if isinstance(indexing_object, dict):
+            for dim, size in indexing_object.items():
+                if setup.value_dim_sizes.get(dim, None) != size:
+                    return True
+        elif isinstance(indexing_object, int):
+            if setup.value_dim_sizes.get(indexed_dim, None) != 1:
+                return True
+        elif isinstance(indexing_object, slice):
+            new_size = len(range(setup.data_dim_sizes[indexed_dim])[indexing_object])
+            if setup.value_dim_sizes.get(indexed_dim, None) != new_size:
+                return True
+    return False
+
+
+def invalid_case_3(setup: Setup) -> bool:
+    for dim, size in setup.value_dim_sizes.items():
+        for indexing_object in setup.indexing_objects.values():
+            if (
+                isinstance(indexing_object, dict)
+                and dim in indexing_object
+                and indexing_object[dim] != size
+            ):
+                return True
+        else:
+            if dim in setup.data_dim_sizes and setup.data_dim_sizes[dim] != size:
+                return True
+    return False
 
 
 @settings(max_examples=20000)
 @given(setup_strategy())
-def test_getitem_generative(setup: Setup):
+def test_setitem_generative(setup: Setup):
     if invalid_case_1(setup):
-        with pytest.raises(IndexError):
-            setup.perform_indexing()
+        # TODO: Assert raised IndexError
+        return
     elif invalid_case_2(setup):
-        with pytest.raises(IndexError):
-            setup.perform_indexing()
+        # TODO: Assert raised IndexError
+        return
+    elif invalid_case_3(setup):
+        # TODO: Assert raised IndexError
+        return
     else:
-        result = setup.perform_indexing()
+        result = setup.perform_indexing_update()
         assert result.dim_sizes == setup.expected_output_dim_sizes

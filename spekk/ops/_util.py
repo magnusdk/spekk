@@ -215,13 +215,14 @@ def ensure_broadcastable(*arrays: array) -> Tuple[List[Dim], List[array]]:
 def ensure_broadcastable_with(x: array, dims: Dims) -> array:
     from spekk import ops
 
-    assert all(dim in dims for dim in x.dims)
-    if x.dims != dims:
-        x_dims_in_order = [dim for dim in dims if dim in x.dims]
+    x_dims = get_dims(x)
+    assert all(dim in dims for dim in x_dims)
+    if x_dims != dims:
+        x_dims_in_order = [dim for dim in dims if dim in x_dims]
         x = ops.permute_dims(x, x_dims_in_order)
-    if len(x.dims) != len(dims):
+    if len(x_dims) != len(dims):
         # Add the new dimensions to the array's data, making it broadcastable.
-        broadcastable_shape = [x.dim_sizes[dim] if dim in x.dims else 1 for dim in dims]
+        broadcastable_shape = [x.dim_sizes[dim] if dim in x_dims else 1 for dim in dims]
         x = ops.reshape(x, broadcastable_shape, dims)
     return x
 

@@ -31,7 +31,6 @@ __all__ = [
     "Info",
 ]
 
-import uuid
 from dataclasses import dataclass
 from enum import Enum
 from typing import (

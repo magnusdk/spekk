@@ -31,7 +31,7 @@ from spekk.ops._types import (
 from spekk.ops._util import (
     canonicalize_axis,
     ensure_array,
-    ensure_broadcastable,
+    ensure_broadcastable_with,
     get_broadcast_array_fn,
 )
 from spekk.ops.array_object import array
@@ -88,6 +88,8 @@ def broadcast_to(
         raise ValueError(
             "The number of dimensions must equal the number of axes when broadcasting."
         )
+    else:
+        x = ensure_broadcastable_with(x, dims)
     data = backend.broadcast_to(x.data, shape)
     return array(data, dims)
 

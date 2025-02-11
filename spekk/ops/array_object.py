@@ -1251,15 +1251,9 @@ class array:
 
            When ``value`` is an ``array`` of a different data type than ``self``, how values are cast to the data type of ``self`` is implementation defined.
         """
-        from spekk import ops
-
-        if isinstance(key, array):
-            key = key.data
-        elif isinstance(key, tuple):
-            key = tuple(k.data if isinstance(k, array) else k for k in key)
-        broadcasted_self, value = ops.broadcast_arrays(self, value)
-        self._data = backend._setitem_impl(broadcasted_self.data, key, value.data)
-        self._dims = broadcasted_self.dims
+        result = self.at.__getitem__(key).set(value)
+        self._data = result.data
+        self._dims = result.dims
 
     def __sub__(self: array, other: Union[int, float, array], /) -> array:
         """
