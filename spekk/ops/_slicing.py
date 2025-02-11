@@ -273,22 +273,17 @@ def getitem(x: "ops.array", indexing_objects: tuple) -> "ops.array":
     all_dims = set(x.dims)
     n_arrays = 0
     n_arrays_with_dtype_bool = 0
+    bool_array = None
     for indexing_object in indexing_objects:
         if isinstance(indexing_object, ops.array):
             all_dims.update(indexing_object.dims)
             n_arrays += 1
             if indexing_object.dtype == "bool":
                 n_arrays_with_dtype_bool += 1
+                bool_array = indexing_object
     if n_arrays == n_arrays_with_dtype_bool == 1:
-        data = x.data.__getitem__(
-            tuple(
-                indexing_object.data
-                if isinstance(indexing_object, ops.array)
-                else indexing_object
-                for indexing_object in indexing_objects
-            )
-        )
-        return ops.array(data, x.dims)
+        data = x.data[bool_array.data]
+        return ops.array(data, [ops.undefined_dim])
     elif any(ops.is_undefined_dim(dim) for dim in all_dims):
         data = x.data.__getitem__(
             tuple(
@@ -347,31 +342,28 @@ def setitem(x: "ops.array", indexing_objects: tuple, value: "ops.array") -> "ops
     all_dims = set(x.dims)
     n_arrays = 0
     n_arrays_with_dtype_bool = 0
+    bool_array = None
     for indexing_object in indexing_objects:
         if isinstance(indexing_object, ops.array):
             all_dims.update(indexing_object.dims)
             n_arrays += 1
             if indexing_object.dtype == "bool":
                 n_arrays_with_dtype_bool += 1
+                bool_array = indexing_object
     if n_arrays == n_arrays_with_dtype_bool == 1:
-        data = x.data.__getitem__(
-            tuple(
-                indexing_object.data
-                if isinstance(indexing_object, ops.array)
-                else indexing_object
-                for indexing_object in indexing_objects
-            )
-        )
+        data = ops.backend._setitem_impl(x.data, (bool_array.data,), value.data)
         return ops.array(data, x.dims)
     elif any(ops.is_undefined_dim(dim) for dim in all_dims):
         indexing_objects = _parse_indexing_objects(x.dims, indexing_objects)
-        data = x.data.__getitem__(
+        data = ops.backend._setitem_impl(
+            x.data,
             tuple(
                 indexing_object.data
                 if isinstance(indexing_object, ops.array)
                 else indexing_object
                 for indexing_object in indexing_objects
-            )
+            ),
+            value.data,
         )
         return ops.array(data)
 
