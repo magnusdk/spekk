@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING, Callable, List, Sequence
 if TYPE_CHECKING:
     from spekk import Dim, Dims, ops
 
+import itertools
+
 
 def _index_of_first_ellipsis(objs) -> int:
     for i, obj in enumerate(objs):
@@ -441,7 +443,10 @@ class ArrayIndexUpdateHelper:
         self.x = x
 
     def __getitem__(self, slices):
-        if not isinstance(slices, tuple):
+        if isinstance(slices, dict):
+            # Convert dict to the tuple syntax of interleaved dim and indexing objects.
+            slices = tuple(itertools.chain(*slices.items()))
+        elif not isinstance(slices, tuple):
             slices = (slices,)
         return _ArrayIndexUpdateRef(self.x, slices)
 
