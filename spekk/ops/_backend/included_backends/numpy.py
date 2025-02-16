@@ -1,13 +1,36 @@
 import functools
+from typing import Sequence, Union
 
 import numpy as np
-from numpy import *
 from array_api_compat.numpy import *
 from array_api_compat.numpy import _info
+from numpy import *
 
 import spekk.ops._backend.common as common
 
 __array_namespace_info__ = _info.__array_namespace_info__
+
+
+def getitem_along_axis(x, axis: int, i: int):
+    slice_ = tuple([slice(None)] * axis + [i, ...])
+    try:
+        return x.__getitem__(slice_)
+    except TypeError:
+        try:
+            return np.array(x).__getitem__(slice_)
+        except Exception:
+            raise ValueError(
+                f"Cannot get item at index {i} along axis {axis} for {x!r}"
+            )
+
+
+def get_args_for_index(
+    args: Sequence, in_axes: Sequence[Union[int, None]], i: int
+) -> Sequence:
+    return [
+        getitem_along_axis(arg, a, i) if a is not None else arg
+        for arg, a in zip(args, in_axes)
+    ]
 
 
 def _python_vmap(f, in_axes=None):
@@ -25,7 +48,7 @@ def _python_vmap(f, in_axes=None):
 
         results = []
         for i in range(size):
-            results.append(f(*common.get_args_for_index(args, in_axes, i)))
+            results.append(f(*get_args_for_index(args, in_axes, i)))
         return np.stack(results, 1)
 
     return wrapped
@@ -50,7 +73,8 @@ def get_dtype_name(dtype):
 
 def _is_backend_array(x):
     return isinstance(x, np.ndarray)
-    
+
+
 def flatten(x: np.ndarray) -> np.ndarray:
     return x.flatten()
 

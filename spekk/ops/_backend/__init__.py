@@ -91,7 +91,10 @@ class Backend:
         x.__setitem__(key, value)
         return x
 
-    def __getattr__(self, name: str):
+    def _is_backend_array(self, x) -> bool:
+        return self._get_active_backend_module()._is_backend_array(x)
+
+    def _get_active_backend_module(self):
         if self.backend_name == "numpy":
             import spekk.ops._backend.included_backends.numpy as ops
         elif self.backend_name == "jax":
@@ -100,7 +103,10 @@ class Backend:
             import spekk.ops._backend.included_backends.mlx as ops
         elif self.backend_name == "torch":
             import spekk.ops._backend.included_backends.torch as ops
-        return getattr(ops, name)
+        return ops
+
+    def __getattr__(self, name: str):
+        return getattr(self._get_active_backend_module(), name)
 
     def __repr__(self):
         return f"Backend('{self.backend_name}')"
