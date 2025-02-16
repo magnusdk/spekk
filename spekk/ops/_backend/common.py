@@ -1,42 +1,23 @@
 import functools
-from typing import Any, List, Sequence, Union
+from typing import List, Sequence
 
-import numpy as np
-
-from spekk.module import trees
 from spekk.ops._types import undefined_dim
 
 
-def _get_key(static_xs: Sequence[Any]):
-    from spekk import ops
-
-    key = []
-    for x in static_xs:
-        if isinstance(x, ops.array):
-            # Use the memory address (id for CPython) as key for static arrays
-            key.append(hash((id(x), id(x.data))))
-        elif ops.backend._is_backend_array(x):
-            # Use the memory address (id for CPython) as key for static arrays
-            key.append(id(x))
-        elif x is undefined_dim:
-            key.append(hash(x))
-        else:
-            try:
-                x = trees.Tree(x)
-                key.append((hash(tuple(x.keys())), _get_key(x.children())))
-            except trees.NotTreeLikeError:
-                key.append(hash(x))
-    return tuple(key)
-
-
 def get_vmap_fn(vmap_impl):
+
     @functools.wraps(vmap_impl)
     def vmap(f, in_axes):
-        cache = {}
+        from spekk import Dim, ops
+        from spekk.module import flatten
+
+        if not isinstance(in_axes, Dim):
+            raise NotImplementedError()
+
+        CACHE = {}
 
         @functools.wraps(f)
         def wrapped_outer(*original_positional_args, **original_kwargs):
-            from spekk import Dim, ops
 
             if in_axes is undefined_dim:
                 raise ValueError(f"Can not vmap over an UndefinedDim: {in_axes=}")
@@ -67,32 +48,14 @@ def get_vmap_fn(vmap_impl):
             else:
                 positional_args = False
                 original_args = original_kwargs
-                if not isinstance(in_axes, (dict, str)):
-                    raise ValueError(
-                        "Passing keyword arguments to a vmapped function, where the "
-                        f"in_axes is of type {type(in_axes)} is not allowed. Try passing "
-                        "in only positional arguments instead."
-                    )
 
-            # Flatten the arguments down to only arrays and numbers. We do this so that
-            # the backend vmap implementation only need to handle arrays and numbers :)
-            # It doesn't need to know about custom Module objects, or the like.
-            def is_tree_like_but_not_array(x):
-                return trees.Tree.is_tree_like(x) and not isinstance(x, ops.array)
-
-            flattened_arguments = trees.flatten(
-                original_args, is_tree_like=is_tree_like_but_not_array
-            )
+            flattened_arguments = flatten(original_args)
 
             # Calculate the cache key. It is used to recompile the vmapped function if
             # the static parts of the arguments have changed.
-            cache_key = _get_key(flattened_arguments.static)
-
-            # We have already compiled this function: just run the compiled version!
-            if cache_key in cache:
-                wrapped_inner, unflatten_result_inner = cache[cache_key]
-                result_inner = wrapped_inner(*flattened_arguments.dynamic)
-                return unflatten_result_inner(result_inner)
+            cache_key = flattened_arguments.static
+            if flattened_arguments.static in CACHE:
+                return CACHE[cache_key](*flattened_arguments.dynamic)
 
             # Else, we need to compile the function.
             else:
@@ -103,24 +66,11 @@ def get_vmap_fn(vmap_impl):
                 # correspond to the flattened arguments when running the backend vmap
                 # implementation.
                 flattened_in_axes = []
-                if isinstance(in_axes, Dim):
-                    for x in flattened_arguments.dynamic:
-                        if isinstance(x, ops.array) and in_axes in x.dims:
-                            flattened_in_axes.append(x.dims.index(in_axes))
-                        else:
-                            flattened_in_axes.append(None)
-                else:
-                    for path in flattened_arguments.paths:
-                        a = in_axes
-                        for step in path:
-                            if isinstance(a, int):
-                                break
-                            try:
-                                a = a[step]
-                            except Exception:
-                                a = None
-                                break
-                        flattened_in_axes.append(a)
+                for x in flattened_arguments.dynamic:
+                    if isinstance(x, ops.array) and in_axes in x.dims:
+                        flattened_in_axes.append(x.dims.index(in_axes))
+                    else:
+                        flattened_in_axes.append(None)
                 flattened_in_axes = tuple(flattened_in_axes)
 
                 # Get the (underlying backend-) data and dims separately from the
@@ -169,7 +119,7 @@ def get_vmap_fn(vmap_impl):
                 # flatten_result_inner handles. Since the result of f is unknown until
                 # it has actually been called, flatten_result_inner is set dynamically
                 # inside wrapped_inner.
-                flattened_result_inner: trees.FlattenedResult = None
+                flattened_result_inner = None
                 flattened_dynamic_dims_inner: List[ops.Dim]
 
                 # wrapped_inner is a function that takes flattened arguments of arrays
@@ -195,11 +145,9 @@ def get_vmap_fn(vmap_impl):
                     ]
 
                     # Unflatten args, call f, and flatten the result.
-                    args = flattened_arguments.treedef.unflatten(flattened_args)
+                    args = flattened_arguments.unflatten(flattened_args)
                     result_inner = f(*args) if positional_args else f(**args)
-                    flattened_result_inner = trees.flatten(
-                        result_inner, is_tree_like=is_tree_like_but_not_array
-                    )
+                    flattened_result_inner = flatten(result_inner)
 
                     # Return the flattened result. It will be unflattened outside of
                     # this function using flattened_result_inner.
@@ -223,10 +171,12 @@ def get_vmap_fn(vmap_impl):
                         ops.array(x, [vmapped_dim, *dims]) if dims is not None else x
                         for x, dims in zip(result_inner, flattened_dynamic_dims_inner)
                     ]
-                    return flattened_result_inner.treedef.unflatten(result_inner)
+                    return flattened_result_inner.unflatten(result_inner)
 
                 # Cache the compiled function
-                cache[cache_key] = wrapped_inner, unflatten_result_inner
+                CACHE[cache_key] = lambda *dynamic_args: unflatten_result_inner(
+                    wrapped_inner(*dynamic_args)
+                )
 
                 # Unflatten the flattened result of calling vmap(f).
                 return unflatten_result_inner(result_inner)
@@ -237,31 +187,39 @@ def get_vmap_fn(vmap_impl):
 
 
 def get_scan_fn(scan_impl):
+
     def scan(f, init, xs):
-        flattened_carry = trees.flatten(init)
+        from spekk.module.base import _Flattened, flatten
+
+        flattened_carry = flatten(init, flatten_spekk_arrays=True)
+        flattened_y: _Flattened = None
 
         def wrapped_f(carry, x):
-            nonlocal flattened_carry
-            carry = flattened_carry.treedef.unflatten(carry)
+            nonlocal flattened_carry, flattened_y
+            carry = flattened_carry.unflatten(carry)
 
             new_carry, y = f(carry, x)
-            flattened_carry = trees.flatten(new_carry)
-            return flattened_carry.dynamic, y
+            flattened_carry = flatten(new_carry, flatten_spekk_arrays=True)
+            flattened_y = flatten(y, flatten_spekk_arrays=True)
+            return flattened_carry.dynamic, flattened_y.dynamic
 
         carry, ys = scan_impl(wrapped_f, flattened_carry.dynamic, xs)
-        return flattened_carry.treedef.unflatten(carry), ys
+        return flattened_carry.unflatten(carry), flattened_y.unflatten(ys)
 
     return scan
 
 
 def get_jit_fn(jit_impl):
+
     @functools.wraps(jit_impl)
     def jit(f):
         "Our custom jit-function which filters out static fields."
+        from spekk.module.base import _Flattened, flatten
 
         # We cache the jitted function (wrapped_inner) by the static fields. When the
         # static fields changes, the function is re-compiled.
-        cache = {}
+        # TODO: Make it a dict from tuple of static args to functools.lru_cache'd jitted function
+        CACHE = {}
 
         @functools.wraps(f)
         def wrapped_outer(*original_args, **original_kwargs):
@@ -271,15 +229,14 @@ def get_jit_fn(jit_impl):
             #   This is why it is important to recompile the function when static
             # fields changes, otherwise the function runs with the old values for those
             # fields.
-            flatten_result_outer = trees.flatten((original_args, original_kwargs))
+            flattened_args = flatten(
+                (original_args, original_kwargs), flatten_spekk_arrays=True
+            )
 
             # Try to find an already-compiled version for the given static fields.
-            cache_key = _get_key(flatten_result_outer.static)
-            if cache_key in cache:
-                # Cache hit!
-                wrapped_inner, unflatten = cache[cache_key]
-                result_outer = wrapped_inner(*flatten_result_outer.dynamic)
-                return unflatten(result_outer)
+            cache_key = flattened_args.static
+            if flattened_args.static in CACHE:
+                return CACHE[cache_key](*flattened_args.dynamic)
             else:
                 # Cache miss! Now we have to compile it. This is simply done by
                 # wrapping the function with the jit_impl.
@@ -288,49 +245,27 @@ def get_jit_fn(jit_impl):
                 # flatten the result of calling f as well, such that backends only sees
                 # arrays as outputs as well. We need to unflatten the result after, and
                 # for that we use flatten_result_inner.
-                flatten_result_inner: trees.FlattenedResult = None
+                flatten_result_inner: _Flattened = None
 
                 @jit_impl
-                def wrapped_inner(*flattened_args):
+                def wrapped_inner(*args):
                     nonlocal flatten_result_inner
-                    args, kwargs = flatten_result_outer.treedef.unflatten(
-                        flattened_args
-                    )
+                    args, kwargs = flattened_args.unflatten(args)
                     result_inner = f(*args, **kwargs)
-                    flatten_result_inner = trees.flatten(result_inner)
+                    flatten_result_inner = flatten(
+                        result_inner, flatten_spekk_arrays=True
+                    )
                     return flatten_result_inner.dynamic
 
-                result_outer = wrapped_inner(*flatten_result_outer.dynamic)
+                result_outer = wrapped_inner(*flattened_args.dynamic)
                 # Make sure to cache the function until next time. It is important to
                 # cache flatten_result_inner AFTER calling wrapped_inner; otherwise it
                 # will be stored as None.
-                cache[cache_key] = wrapped_inner, flatten_result_inner.treedef.unflatten
-                return flatten_result_inner.treedef.unflatten(result_outer)
+                CACHE[cache_key] = lambda *dynamic_args: flatten_result_inner.unflatten(
+                    wrapped_inner(*dynamic_args)
+                )
+                return flatten_result_inner.unflatten(result_outer)
 
         return wrapped_outer
 
     return jit
-
-
-def getitem_along_axis(x, axis: int, i: int):
-    slice_ = tuple([slice(None)] * axis + [i, ...])
-    try:
-        return x.__getitem__(slice_)
-    except TypeError:
-        try:
-            return np.array(x).__getitem__(slice_)
-        except Exception:
-            raise ValueError(
-                f"Cannot get item at index {i} along axis {axis} for {x!r}"
-            )
-
-
-def get_args_for_index(
-    args: Sequence,
-    in_axes: Sequence[Union[int, None]],
-    i: int,
-) -> Sequence:
-    return [
-        getitem_along_axis(arg, a, i) if a is not None else arg
-        for arg, a in zip(args, in_axes)
-    ]
