@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 import warnings
 from typing import Any, Dict, Optional, Tuple, Union
 
@@ -66,14 +67,17 @@ class array:
         # Set the dtype and device (if given)
         args, kwargs = [], {}
         if dtype is not None:
-            args.append(dtype)
-        if device is not None:
+            dtype = _DType._to_backend_dtype(dtype)
+            if dtype != data.dtype:
+                kwargs["dtype"] = dtype
+        if device is not None and device != getattr(data, "device", None):
             kwargs["device"] = device
         if args or kwargs:
             data = backend.astype(data, *args, **kwargs)
 
         self._data = data
         self._dims = dims
+        self._id = uuid.uuid4()
 
     @property
     def dtype(self: array) -> Dtype:
@@ -1230,32 +1234,11 @@ class array:
         value: Union[int, float, bool, array],
         /,
     ) -> None:
-        """
-        Sets ``self[key]`` to ``value``.
-
-        See :ref:`indexing` for details on supported indexing semantics.
-
-        Parameters
-        ----------
-        self: array
-            array instance.
-        key: Union[int, slice, ellipsis, Tuple[Union[int, slice, ellipsis], ...], array]
-            index key.
-        value: Union[int, float, bool, array]
-            value(s) to set. Must be compatible with ``self[key]`` (see :ref:`broadcasting`).
-
-
-        .. note::
-
-           Setting array values must not affect the data type of ``self``.
-
-           When ``value`` is a Python scalar (i.e., ``int``, ``float``, ``bool``), behavior must follow specification guidance on mixing arrays with Python scalars (see :ref:`type-promotion`).
-
-           When ``value`` is an ``array`` of a different data type than ``self``, how values are cast to the data type of ``self`` is implementation defined.
-        """
-        result = self.at.__getitem__(key).set(value)
-        self._data = result.data
-        self._dims = result.dims
+        # Same error message as in JAX.
+        raise TypeError(
+            "spekk arrays are immutable and do not support in-place item assignment. "
+            "Instead of x[idx] = y, use x = x.at[idx].set(y) or another .at[] method."
+        )
 
     def __sub__(self: array, other: Union[int, float, array], /) -> array:
         """
@@ -1433,6 +1416,8 @@ class array:
         """
         return array(self._data.to_device(device, stream=stream), self._dims)
 
+    # We use the _sentinel as default values instead of None, because None has a
+    # semantic meaning in Numpy's __array__ implementation.
     def __array__(self, dtype=_sentinel, copy=_sentinel) -> np.ndarray:
         kwargs = {}
         if dtype is not _sentinel:
@@ -1518,6 +1503,9 @@ class array:
     @property
     def at(self) -> "ArrayIndexUpdateHelper":
         return ArrayIndexUpdateHelper(self)
+
+    def __hash__(self):
+        return hash(self._id)
 
     def __repr__(self):
         return (

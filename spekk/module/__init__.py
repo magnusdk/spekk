@@ -1,23 +1,21 @@
-from spekk.module.abstract_classes import AbstractClassVar, AbstractVar
-from spekk.module.base import Module, field
-from spekk.module.trees import (
-    Tree,
+from spekk.module.base import (
+    Module,
+    cache_module_methods,
+    field,
     flatten,
+    replace,
+    replace_at,
     traverse,
-    traverse_iter,
-    traverse_leaves,
-    traverse_leaves_iter,
+    update_at,
 )
 
 __all__ = [
-    "AbstractClassVar",
-    "AbstractVar",
     "Module",
+    "cache_module_methods",
     "field",
-    "Tree",
     "flatten",
+    "replace",
+    "replace_at",
     "traverse",
-    "traverse_iter",
-    "traverse_leaves",
-    "traverse_leaves_iter",
+    "update_at",
 ]

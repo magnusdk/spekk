@@ -1,6 +1,7 @@
+import functools
 from typing import Callable, Literal, Optional, Sequence, Tuple, TypeVar, Union
 
-from spekk import ops
+from spekk import module, ops
 from spekk.module.base import Module
 from spekk.ops._backend import backend
 from spekk.ops._types import Dim, undefined_dim
@@ -25,6 +26,7 @@ def rad2deg(x: array) -> array:
 def angle(x: array) -> array:
     data = backend.angle(x.data)
     return array(data, dims=x.dims)
+
 
 def flatten(x: array, dim: Optional[Dim] = None) -> array:
     data = backend.flatten(x.data)
@@ -77,7 +79,7 @@ def _get_conv_mode_slice(
 
 def convolve1d(
     x: array,
-    filter: array, #1D array
+    filter: array,  # 1D array
     *,
     mode: Literal["full", "same", "valid"],
     axis: Dim,
@@ -91,13 +93,14 @@ def convolve1d(
 
     return array(data_filtered, dims=dims)
 
+
 def dilation1d(
-        x: array,
-        dilation_factor: int,
-        value: float,
-        *,
-        axis: Dim,        
-    ):
+    x: array,
+    dilation_factor: int,
+    value: float,
+    *,
+    axis: Dim,
+):
 
     # Number of zeros to interleave
     axis_idx = x.dim_index(axis)
@@ -105,18 +108,19 @@ def dilation1d(
     # Calculate the new shape after interleaving zeros
     new_shape = list(x.shape)
     new_shape[axis_idx] = x.shape[axis_idx] + (x.shape[axis_idx] - 1) * dilation_factor
-    
+
     # Create an array of zeros with the new shape
-    result = ops.ones(new_shape, dtype=x.dtype, dims=x.dims)*value
-    
+    result = ops.ones(new_shape, dtype=x.dtype, dims=x.dims) * value
+
     # Create an index array to place the original values
     indices = [slice(None)] * x.ndim
     indices[axis_idx] = slice(0, new_shape[axis_idx], dilation_factor + 1)
-    
+
     # Place the original values into the zeros array
     result[tuple(indices)] = x
 
     return result
+
 
 def fftconvolve(
     x: array,
@@ -229,7 +233,15 @@ def expand_slice_to_axis(s: Union[slice, int, array], axis: int):
     return (slice(None),) * axis + (s, ...)
 
 
-def jit(f: TFunc) -> TFunc:
+def jit(f: TFunc, *, cache_module_methods: bool = False) -> TFunc:
+    if cache_module_methods:
+        original_f = f
+
+        @functools.wraps(original_f)
+        def f(*args, **kwargs):
+            with module.cache_module_methods():
+                return original_f(*args, **kwargs)
+
     return backend.jit(f)
 
 
@@ -286,10 +298,10 @@ def map_reduce_over_dim(
     include_index: bool = False,
 ) -> TReducedOutputData:
     def scan_fn(carry, i):
-        x = map_f(data.slice_dim(dim)[array(i)])
+        x = map_f(data.at[dim, array(i)].get())
         args = [carry, x]
         if include_index:
-            args.append(i)
+            args.append(ops.array(i))
         return reduce_f(*args), i
 
     init, _ = scan_fn(init, 0)
