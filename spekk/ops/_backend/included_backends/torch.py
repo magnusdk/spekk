@@ -1,3 +1,4 @@
+import numpy
 import torch
 from torch import *
 from array_api_compat.torch import *
@@ -29,3 +30,6 @@ def _is_backend_array(x):
 
 def flatten(x: torch.Tensor) -> torch.Tensor:
     return x.flatten()    
+
+def to_numpy(x: torch.Tensor) -> numpy.ndarray:
+    return x.cpu().numpy()

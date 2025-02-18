@@ -1,6 +1,7 @@
 from typing import Literal
 
 import jax
+import numpy
 from jax.numpy import *
 
 import spekk.ops._backend.common as common
@@ -33,3 +34,6 @@ def convolve1d(
 
 def flatten(x: jax.Array) -> jax.Array:
     return x.flatten()
+
+def to_numpy(x: jax.Array) -> numpy.ndarray:
+    return numpy.array(x)

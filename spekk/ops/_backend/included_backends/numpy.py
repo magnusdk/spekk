@@ -53,3 +53,6 @@ def _is_backend_array(x):
     
 def flatten(x: np.ndarray) -> np.ndarray:
     return x.flatten()
+
+def to_numpy(x: np.ndarray) -> np.ndarray:
+    return x

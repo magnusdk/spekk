@@ -32,6 +32,8 @@ def flatten(x: array, dim: Optional[Dim] = None) -> array:
         dim = undefined_dim
     return array(data, dims=[dim])
 
+def to_numpy(x: array):
+    return backend.to_numpy(x.data)
 
 def nan_to_num(
     x: array,
