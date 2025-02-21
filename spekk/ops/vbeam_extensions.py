@@ -84,7 +84,6 @@ def convolve1d(
     mode: Literal["full", "same", "valid"],
     axis: Dim,
 ):
-
     dims = x.dims
     filter = filter.rename_dim(filter.dims[0], axis)
     axis_idx = x.dims.index(axis)
@@ -101,7 +100,6 @@ def dilation1d(
     *,
     axis: Dim,
 ):
-
     # Number of zeros to interleave
     axis_idx = x.dim_index(axis)
 
@@ -277,9 +275,9 @@ def reduce_over_dim(
     include_index: bool = False,
 ):
     def scan_fn(carry, i):
-        args = [carry, data.slice_dim(dim)[i]]
+        args = [carry, data.at[dim, array(i)].get()]
         if include_index:
-            args.append(i)
+            args.append(ops.array(i))
         return f(*args), i
 
     init, _ = scan_fn(init, 0)
