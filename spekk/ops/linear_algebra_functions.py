@@ -2,13 +2,13 @@ __all__ = ["matmul", "matrix_transpose", "tensordot", "vecdot"]
 
 
 from spekk.ops._backend import backend
-from spekk.ops._types import Dim, Sequence, Tuple, Union, _UndefinedDim
+from spekk.ops._types import Dim, Sequence, Tuple, Union
 from spekk.ops._util import ensure_backend_compatible_data, ensure_broadcastable
 from spekk.ops.array_object import array
 from spekk.ops.exceptions import MismatchedDimensionsError
 
 
-def matmul(x1: array, x2: array, /) -> array:
+def matmul(x1: array, x2: array) -> array:
     """
     Computes the matrix product.
 
@@ -54,6 +54,8 @@ def matmul(x1: array, x2: array, /) -> array:
     -   if ``x1`` is an array having shape ``(..., M, K)``, ``x2`` is an array having shape ``(..., L, N)``, and ``K != L``.
 
     """
+    from spekk import ops
+
     general_error_message = (
         f"Incorrect axes for matmul: x1.shape={x1.shape}, x2.shape={x2.shape}"
     )
@@ -63,42 +65,41 @@ def matmul(x1: array, x2: array, /) -> array:
 
     # Both are one-dimensional -> inner product
     if x1.ndim == 1 and x2.ndim == 1:
-        if x1._dims != x2._dims:
+        if x1.shape != x2.shape:
             raise MismatchedDimensionsError(general_error_message)
-        return array(backend.matmul(x1._data, x2._data), [])
+        return array(backend.matmul(x1.data, x2.data), [])
 
     # Both are two-dimensional
     if x1.ndim == 2 and x2.ndim == 2:
-        if (x1._dims[1] != x2._dims[0]):
-            if not (isinstance(x1._dims[1], _UndefinedDim) and isinstance(x2._dims[0], _UndefinedDim)):
-                raise MismatchedDimensionsError(general_error_message)
-        return array(
-            backend.matmul(x1._data, x2._data),
-            [x1._dims[0], x2._dims[1]],
-        )
-    
-    # x1 is one-dimensional, x2 isn't
-    if x1.ndim == 1 and x2.ndim != 1:
-        if x1._dims[0] != x2._dims[-2]:
+        if x1.shape[0] != x2.shape[0]:
             raise MismatchedDimensionsError(general_error_message)
-        dims = list(x2._dims)
-        dims.pop(-2)
-        return array(backend.matmul(x1._data, x2._data), dims)
+        return array(backend.matmul(x1.data, x2.data), [x1.dims[0], x2.dims[1]])
+
+    # x1 is one-dimensional, x2 isn't
+    if x1.ndim == 1 and x2.ndim > 1:
+        if x1.shape[0] != x2.shape[-1]:
+            raise MismatchedDimensionsError(general_error_message)
+        dims = list(x2.dims)
+        dims.pop(-1)
+        return array(backend.matmul(x1.data, x2.data), dims)
 
     # x1 isn't one-dimensional, x2 is
-    if x1.ndim != 1 and x2.ndim == 1:
-        if x1._dims[-2] != x2._dims[0]:
+    if x1.ndim > 1 and x2.ndim == 1:
+        if x1.shape[-1] != x2.shape[0]:
             raise MismatchedDimensionsError(general_error_message)
-        dims = list(x1._dims)
-        dims.pop(-2)
-        return array(backend.matmul(x1._data, x2._data), dims)
+        dims = list(x1.dims)
+        dims.pop(-1)
+        return array(backend.matmul(x1.data, x2.data), dims)
 
-    # Else, stacked matmul
-    if (x1._dims[-1] != x2._dims[-2]) or (x1._dims[:-2] != x2._dims[:-2]):
+    # Else, both are stacked matrices
+    if x1.shape[-2:] != x2.shape[-2:]:
         raise MismatchedDimensionsError(general_error_message)
-    dims = list(x1._dims)[:-1]
-    dims.append(x2._dims[-1])
-    return array(backend.matmul(x1._data, x2._data), dims)
+    x1_matmul_dims, x2_matmul_dims = x1.dims[-2:], x2.dims[-2:]
+    dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    if x1.dims != dims:
+        x1 = ops.moveaxis(x1, x1_matmul_dims, dims[-2:])
+        x2 = ops.moveaxis(x2, x2_matmul_dims, dims[-2:])
+    return array(backend.matmul(x1.data, x2.data), x1.dims)
 
 
 def matrix_transpose(x: array, /) -> array:
@@ -116,8 +117,8 @@ def matrix_transpose(x: array, /) -> array:
         an array containing the transpose for each matrix and having shape ``(..., N, M)``. The returned array must have the same data type as ``x``.
     """
     # Reverse the last two dimensions
-    dims = [*x._dims[:-2], x._dims[-1], x._dims[-2]]
-    return array(backend.matrix_transpose(x._data), dims)
+    dims = [*x.dims[:-2], x.dims[-1], x.dims[-2]]
+    return array(backend.matrix_transpose(x.data), dims)
 
 
 def tensordot(
@@ -175,21 +176,21 @@ def tensordot(
     general_error_message = f"Incorrect axes for tensordor: x1.shape={x1.shape}, x2.shape={x2.shape}, axes={axes}"
 
     if isinstance(axes, int):
-        if len(set(x1._dims) & set(x2._dims)) != axes:
+        if len(set(x1.dims) & set(x2.dims)) != axes:
             raise MismatchedDimensionsError(general_error_message)
-        if x1._dims[-axes:] != x2._dims[:axes]:
+        if x1.dims[-axes:] != x2.dims[:axes]:
             raise MismatchedDimensionsError(general_error_message)
-        dims = x1._dims[:-axes] + x2._dims[axes:]
+        dims = x1.dims[:-axes] + x2.dims[axes:]
         return array(backend.tensordot(x1, x2, axes=axes), dims)
 
     # xarray semantics (assumes named dimensions): sum over all common dimensions.
     if axes is None:
-        common_dims = set(x1._dims) & set(x2._dims)
+        common_dims = set(x1.dims) & set(x2.dims)
         axes = [
-            [x1._dims.index(dim) for dim in common_dims],
-            [x2._dims.index(dim) for dim in common_dims],
+            [x1.dims.index(dim) for dim in common_dims],
+            [x2.dims.index(dim) for dim in common_dims],
         ]
-        dims = [dim for dim in (x1._dims + x2._dims) if dim not in common_dims]
+        dims = [dim for dim in (x1.dims + x2.dims) if dim not in common_dims]
         return array(backend.tensordot(x1, x2, axes=axes), dims)
 
 
