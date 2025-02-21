@@ -78,7 +78,11 @@ def _wrap_method_as_cacheable(f):
     return wrapped
 
 
-@dataclass_transform(frozen_default=True, field_specifiers=(dataclasses.field, field))
+@dataclass_transform(
+    frozen_default=True,
+    eq_default=False,
+    field_specifiers=(dataclasses.field, field),
+)
 class _ModuleMeta(abc.ABCMeta):
     def __new__(mcls, name: str, bases, namespace: Dict[str, Any], **kwargs):
         new_namespace = {}
@@ -100,7 +104,7 @@ class _ModuleMeta(abc.ABCMeta):
             new_namespace[attr_name] = attr_value
 
         cls = super().__new__(mcls, name, bases, new_namespace, **kwargs)
-        cls = dataclasses.dataclass(cls, frozen=True, init=True)
+        cls = dataclasses.dataclass(cls, frozen=True, eq=False, init=True)
         return cls
 
     def __call__(cls, *args, **kwargs):
@@ -168,6 +172,27 @@ class Module(metaclass=_ModuleMeta):
     @property
     def at(self):
         return _ModuleAtHelper(self)
+
+    def __eq__(self, other):
+        if self is other:
+            return True
+        if self.__class__ is other.__class__:
+            return all(
+                getattr(self, _field.name) == getattr(other, _field.name)
+                for _field in dataclasses.fields(self)
+            )
+        return NotImplemented
+
+    def __hash__(self):
+        fields = []
+        for _field in dataclasses.fields(self):
+            value = getattr(self, _field.name)
+            if isinstance(value, dict):
+                value = tuple(value.keys()) + tuple(value.values())
+            elif isinstance(value, list):
+                value = tuple(value)
+            fields.append(value)
+        return hash(tuple(fields))
 
 
 replace = dataclasses.replace
