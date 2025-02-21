@@ -193,8 +193,8 @@ def flip(x: array, /, *, axis: Optional[Union[Dim, Tuple[Dim, ...]]] = None) -> 
 
 def moveaxis(
     x: array,
-    source: Union[Dim, Tuple[Dim, ...]],
-    destination: Union[Dim, Tuple[Dim, ...]],
+    source: Union[Dim, Tuple[Dim, ...], List[Dim]],
+    destination: Union[Dim, Tuple[Dim, ...], List[Dim]],
     /,
 ) -> array:
     """
@@ -222,10 +222,10 @@ def moveaxis(
     x = ensure_array(x)
 
     # Ensure a tuple of sources and a tuple of destinations
-    if not isinstance(source, tuple):
-        source = (source,)
-    if not isinstance(destination, tuple):
-        destination = (destination,)
+    if not isinstance(source, (tuple, list)):
+        source = [source]
+    if not isinstance(destination, (tuple, list)):
+        destination = [destination]
 
     # Convert all to integers (axes)
     source = tuple(x._dims.index(d) if isinstance(d, Dim) else d for d in source)
@@ -234,10 +234,9 @@ def moveaxis(
     )
 
     data = backend.moveaxis(x._data, source, destination)
-    dims = list(x._dims)
+    dims = [dim for i, dim in enumerate(x.dims) if i not in source]
     for src, dest in zip(source, destination):
-        dims.remove(x._dims[src])
-        dims.insert(dest, x._dims[src])
+        dims.insert(dest, x.dims[src])
     return array(data, dims)
 
 
