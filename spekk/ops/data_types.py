@@ -26,7 +26,7 @@ class _DType:
         return f"_DType('{self.name}')"
 
     def __hash__(self):
-        return hash(self.name)
+        return hash((_DType, self.name))
 
     def __call__(self, x):
         from spekk import ops
