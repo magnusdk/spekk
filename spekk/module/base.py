@@ -198,7 +198,7 @@ class Module(metaclass=_ModuleMeta):
             elif isinstance(value, list):
                 value = tuple(value)
             fields.append(value)
-        return hash(tuple(fields))
+        return hash((self.__class__, *fields))
 
 
 replace = dataclasses.replace
