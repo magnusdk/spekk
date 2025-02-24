@@ -177,10 +177,16 @@ class Module(metaclass=_ModuleMeta):
         if self is other:
             return True
         if self.__class__ is other.__class__:
-            return all(
-                getattr(self, _field.name) == getattr(other, _field.name)
-                for _field in dataclasses.fields(self)
-            )
+            from spekk import ops
+
+            for _field in dataclasses.fields(self):
+                a = getattr(self, _field.name)
+                b = getattr(other, _field.name)
+                if isinstance(a, ops.array) and isinstance(b, ops.array):
+                    return a._id == b._id
+                elif a != b:
+                    return False
+            return True
         return NotImplemented
 
     def __hash__(self):
