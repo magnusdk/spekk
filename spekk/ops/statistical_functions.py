@@ -3,11 +3,16 @@ __all__ = ["cumulative_sum", "max", "mean", "min", "prod", "std", "sum", "var"]
 
 from spekk.ops._backend import backend
 from spekk.ops._types import Dim, Optional, Tuple, Union, dtype
-from spekk.ops._util import ensure_array, get_reduction_axes_and_resulting_dims
+from spekk.ops._util import (
+    cacheable,
+    ensure_array,
+    get_reduction_axes_and_resulting_dims,
+)
 from spekk.ops.array_object import array
 from spekk.ops.data_types import _DType
 
 
+@cacheable
 def cumulative_sum(
     x: array,
     /,
@@ -73,6 +78,7 @@ def cumulative_sum(
     return array(data, list(x.dims))
 
 
+@cacheable
 def max(
     x: array,
     /,
@@ -121,6 +127,7 @@ def max(
     return array(data, dims)
 
 
+@cacheable
 def mean(
     x: array,
     /,
@@ -164,6 +171,7 @@ def mean(
     return array(data, dims)
 
 
+@cacheable
 def min(
     x: array,
     /,
@@ -212,6 +220,7 @@ def min(
     return array(data, dims)
 
 
+@cacheable
 def prod(
     x: array,
     /,
@@ -271,6 +280,7 @@ def prod(
     return array(data, dims)
 
 
+@cacheable
 def std(
     x: array,
     /,
@@ -317,6 +327,7 @@ def std(
     return array(data, dims)
 
 
+@cacheable
 def sum(
     x: array,
     /,
@@ -376,6 +387,7 @@ def sum(
     return array(data, dims)
 
 
+@cacheable
 def var(
     x: array,
     /,

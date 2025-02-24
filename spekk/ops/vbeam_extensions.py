@@ -5,7 +5,7 @@ from spekk import module, ops
 from spekk.module.base import Module
 from spekk.ops._backend import backend
 from spekk.ops._types import Dim, undefined_dim
-from spekk.ops._util import prepare_slicing_along_dim
+from spekk.ops._util import cacheable, prepare_slicing_along_dim
 from spekk.ops.array_object import array
 
 TFunc = TypeVar("TFunc", bound=Callable)
@@ -15,19 +15,23 @@ TOutputData = TypeVar("TOutputData")
 TReducedOutputData = TypeVar("TReducedOutputData")
 
 
+@cacheable
 def deg2rad(x: array) -> array:
     return x / 180 * backend.pi
 
 
+@cacheable
 def rad2deg(x: array) -> array:
     return x * 180 / backend.pi
 
 
+@cacheable
 def angle(x: array) -> array:
     data = backend.angle(x.data)
     return array(data, dims=x.dims)
 
 
+@cacheable
 def flatten(x: array, dim: Optional[Dim] = None) -> array:
     data = backend.flatten(x.data)
     if dim is None:
@@ -35,6 +39,7 @@ def flatten(x: array, dim: Optional[Dim] = None) -> array:
     return array(data, dims=[dim])
 
 
+@cacheable
 def nan_to_num(
     x: array,
     nan: Optional[float] = 0.0,
@@ -77,6 +82,7 @@ def _get_conv_mode_slice(
     return slice(start, stop)
 
 
+@cacheable
 def convolve1d(
     x: array,
     filter: array,  # 1D array
@@ -93,6 +99,7 @@ def convolve1d(
     return array(data_filtered, dims=dims)
 
 
+@cacheable
 def dilation1d(
     x: array,
     dilation_factor: int,
@@ -120,6 +127,7 @@ def dilation1d(
     return result
 
 
+@cacheable
 def fftconvolve(
     x: array,
     filter: array,
@@ -148,6 +156,7 @@ def fftconvolve(
     return convolved
 
 
+@cacheable
 def reshape_at_dim(
     x: array,
     dim: Dim,
@@ -170,6 +179,7 @@ def reshape_at_dim(
     return ops.reshape(x, new_shape, new_dims)
 
 
+@cacheable
 def merge_dims(
     x: array,
     merged_dims: Sequence[Dim],
@@ -190,12 +200,14 @@ def merge_dims(
     return ops.reshape(x, new_shape, new_dims)
 
 
+@cacheable
 def take_along_dim(x: array, i: array, dim: Dim) -> array:
     x, slices, dims = prepare_slicing_along_dim(x, i, dim)
     data = x.data[slices]
     return array(data, dims)
 
 
+@cacheable
 def update_indices_along_dim(
     f: Callable[[array], array], x: array, i: array, x_dim: Dim, i_dim: Dim
 ) -> array:
@@ -209,6 +221,7 @@ def update_indices_along_dim(
     return array(updated_data, x.dims)
 
 
+@cacheable
 def expand_slice_to_axis(s: Union[slice, int, array], axis: int):
     """Make a given slice s work along a given axis.
 

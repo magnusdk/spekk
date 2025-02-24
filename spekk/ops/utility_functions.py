@@ -3,11 +3,12 @@ __all__ = ["all", "any"]
 
 from typing import Optional, Tuple, Union
 
-from spekk.ops._util import get_reduction_axes_and_resulting_dims
-from spekk.ops.array_object import array
 from spekk.ops._backend import backend
+from spekk.ops._util import cacheable, get_reduction_axes_and_resulting_dims
+from spekk.ops.array_object import array
 
 
+@cacheable
 def all(
     x: array,
     /,
@@ -52,6 +53,7 @@ def all(
     return array(data, dims)
 
 
+@cacheable
 def any(
     x: array,
     /,

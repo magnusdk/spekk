@@ -12,10 +12,12 @@ from spekk.ops._types import (
     finfo_object,
     iinfo_object,
 )
+from spekk.ops._util import cacheable
 from spekk.ops.array_object import array
 from spekk.ops.data_types import _DType
 
 
+@cacheable
 def astype(
     x: array, dtype: dtype, /, *, copy: bool = True, device: Optional[device] = None
 ) -> array:
@@ -75,6 +77,7 @@ def astype(
     return array(data, x._dims)
 
 
+@cacheable
 def can_cast(from_: Union[dtype, array], to: dtype, /) -> bool:
     """
     Determines if one data type can be cast to another data type according :ref:`type-promotion` rules.
@@ -117,6 +120,7 @@ class iinfo_object:
     dtype: _DType
 
 
+@cacheable
 def finfo(type: Union[dtype, array], /) -> finfo_object:
     """
     Machine limits for floating-point data types.
@@ -181,6 +185,7 @@ def finfo(type: Union[dtype, array], /) -> finfo_object:
     )
 
 
+@cacheable
 def iinfo(type: Union[dtype, array], /) -> iinfo_object:
     """
     Machine limits for integer data types.

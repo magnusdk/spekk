@@ -29,6 +29,7 @@ from spekk.ops._types import (
     undefined_dim,
 )
 from spekk.ops._util import (
+    cacheable,
     ensure_array,
     ensure_backend_compatible_data,
     ensure_broadcastable,
@@ -37,6 +38,7 @@ from spekk.ops.array_object import array
 from spekk.ops.data_types import _DType
 
 
+@cacheable
 def arange(
     start: Union[int, float],
     /,
@@ -85,6 +87,7 @@ def arange(
     )
 
 
+@cacheable
 def asarray(
     obj: Union[
         array, bool, int, float, complex, NestedSequence, SupportsBufferProtocol
@@ -156,6 +159,7 @@ def asarray(
     return array(data, dims)
 
 
+@cacheable
 def empty(
     shape: Union[int, Tuple[int, ...]],
     *,
@@ -189,6 +193,7 @@ def empty(
     return array(backend.empty(shape, dtype=dtype, device=device), dims)
 
 
+@cacheable
 def empty_like(
     x: array,
     /,
@@ -219,6 +224,7 @@ def empty_like(
     return array(backend.empty_like(x._data, dtype=dtype, device=device), x._dims)
 
 
+@cacheable
 def eye(
     n_rows: int,
     n_cols: Optional[int] = None,
@@ -357,6 +363,7 @@ def from_dlpack(
     return array(data, dims)
 
 
+@cacheable
 def full(
     shape: Union[int, Tuple[int, ...]],
     fill_value: Union[bool, int, float, complex],
@@ -408,6 +415,7 @@ def full(
     return array(backend.full(shape, fill_value, dtype=dtype, device=device), dims)
 
 
+@cacheable
 def full_like(
     x: array,
     /,
@@ -457,6 +465,7 @@ def full_like(
     )
 
 
+@cacheable
 def linspace(
     start: Union[int, float, complex],
     stop: Union[int, float, complex],
@@ -543,6 +552,7 @@ def linspace(
     )
 
 
+@cacheable
 def meshgrid(*arrays: array, indexing: str = "xy") -> List[array]:
     """
     Returns coordinate matrices from coordinate vectors.
@@ -585,6 +595,7 @@ def meshgrid(*arrays: array, indexing: str = "xy") -> List[array]:
     return tuple(array(data, dims) for data in result)
 
 
+@cacheable
 def ones(
     shape: Union[int, Tuple[int, ...]],
     *,
@@ -627,6 +638,7 @@ def ones(
     return array(backend.ones(shape, dtype=dtype, device=device), dims)
 
 
+@cacheable
 def ones_like(
     x: array, /, *, dtype: Optional[dtype] = None, device: Optional[device] = None
 ) -> array:
@@ -662,6 +674,7 @@ def ones_like(
     return array(backend.ones_like(x._data, dtype=dtype, device=device), x._dims)
 
 
+@cacheable
 def tril(x: array, /, *, k: int = 0) -> array:
     """
     Returns the lower triangular part of a matrix (or a stack of matrices) ``x``.
@@ -687,6 +700,7 @@ def tril(x: array, /, *, k: int = 0) -> array:
     return array(backend.tril(x._data, k=k), x._dims)
 
 
+@cacheable
 def triu(x: array, /, *, k: int = 0) -> array:
     """
     Returns the upper triangular part of a matrix (or a stack of matrices) ``x``.
@@ -712,6 +726,7 @@ def triu(x: array, /, *, k: int = 0) -> array:
     return array(backend.triu(x._data, k=k), x._dims)
 
 
+@cacheable
 def zeros(
     shape: Union[int, Tuple[int, ...]],
     *,
@@ -745,6 +760,7 @@ def zeros(
     return array(backend.zeros(shape, dtype=dtype, device=device), dims)
 
 
+@cacheable
 def zeros_like(
     x: array, /, *, dtype: Optional[dtype] = None, device: Optional[device] = None
 ) -> array:

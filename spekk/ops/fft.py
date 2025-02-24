@@ -26,9 +26,11 @@ from spekk.ops._types import (
     device,
     undefined_dim,
 )
+from spekk.ops._util import cacheable
 from spekk.ops.array_object import array
 
 
+@cacheable
 def fft(
     x: array,
     /,
@@ -88,6 +90,7 @@ def fft(
     return array(backend.fft.fft(x.data, n=n, axis=axis, norm=norm), dims)
 
 
+@cacheable
 def ifft(
     x: array,
     /,
@@ -147,6 +150,7 @@ def ifft(
     return array(backend.fft.ifft(x.data, n=n, axis=axis, norm=norm), dims)
 
 
+@cacheable
 def fftn(
     x: array,
     /,
@@ -213,6 +217,7 @@ def fftn(
     return array(backend.fft.fftn(x.data, s=s, axes=axes, norm=norm), dims)
 
 
+@cacheable
 def ifftn(
     x: array,
     /,
@@ -279,6 +284,7 @@ def ifftn(
     return array(backend.fft.ifftn(x.data, s=s, axes=axes, norm=norm), dims)
 
 
+@cacheable
 def rfft(
     x: array,
     /,
@@ -335,6 +341,7 @@ def rfft(
     return array(backend.fft.rfft(x.data, n=n, axis=axis, norm=norm), dims)
 
 
+@cacheable
 def irfft(
     x: array,
     /,
@@ -396,6 +403,7 @@ def irfft(
     return array(backend.fft.irfft(x.data, n=n, axis=axis, norm=norm), dims)
 
 
+@cacheable
 def rfftn(
     x: array,
     /,
@@ -459,6 +467,7 @@ def rfftn(
     return array(backend.fft.rfftn(x.data, s=s, axes=axes, norm=norm), dims)
 
 
+@cacheable
 def irfftn(
     x: array,
     /,
@@ -527,6 +536,7 @@ def irfftn(
     return array(backend.fft.irfftn(x.data, s=s, axes=axes, norm=norm), dims)
 
 
+@cacheable
 def hfft(
     x: array,
     /,
@@ -583,6 +593,7 @@ def hfft(
     return array(backend.fft.hfft(x.data, n=n, axis=axis, norm=norm), dims)
 
 
+@cacheable
 def ihfft(
     x: array,
     /,
@@ -636,6 +647,7 @@ def ihfft(
     return array(backend.fft.ihfft(x.data, n=n, axis=axis, norm=norm), dims)
 
 
+@cacheable
 def fftfreq(
     n: int,
     /,
@@ -681,6 +693,7 @@ def fftfreq(
     return array(backend.fft.fftfreq(n, d=d, device=device), [dim])
 
 
+@cacheable
 def rfftfreq(
     n: int,
     /,
@@ -728,6 +741,7 @@ def rfftfreq(
     return array(backend.fft.rfftfreq(n, d=d, device=device), [dim])
 
 
+@cacheable
 def fftshift(
     x: array,
     /,
@@ -773,6 +787,7 @@ def fftshift(
     return array(backend.fft.fftshift(x.data, axes=axes), dims)
 
 
+@cacheable
 def ifftshift(
     x: array,
     /,

@@ -1,3 +1,4 @@
+import functools
 from collections import defaultdict
 from typing import Callable, List, Optional, Sequence, Tuple, Union
 
@@ -244,6 +245,30 @@ def get_dims(obj) -> Dims:
     elif isinstance(obj, (list, tuple)):
         raise NotImplementedError()
     return []
+
+
+def cacheable(f: Callable) -> Callable:
+    return f
+
+    @functools.wraps(f)
+    def wrapped(*args, **kwargs):
+        from spekk.module.base import _MODULE_METHODS_CACHE
+
+        for v in [*args, *kwargs.values()]:
+            try:
+                hash(v)
+            except Exception:
+                return f(*args, **kwargs)
+
+        if _MODULE_METHODS_CACHE is not None:
+            if f not in _MODULE_METHODS_CACHE:
+                _MODULE_METHODS_CACHE[f] = functools.lru_cache(
+                    maxsize=None, typed=True
+                )(f)
+            return _MODULE_METHODS_CACHE[f](*args, **kwargs)
+        return f(*args, **kwargs)
+
+    return wrapped
 
 
 if __name__ == "__main__":

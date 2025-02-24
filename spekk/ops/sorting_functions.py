@@ -1,11 +1,11 @@
 __all__ = ["argsort", "sort"]
-
-
-from spekk.ops._types import Dim
-from spekk.ops.array_object import array
 from spekk.ops._backend import backend
+from spekk.ops._types import Dim
+from spekk.ops._util import cacheable
+from spekk.ops.array_object import array
 
 
+@cacheable
 def argsort(
     x: array, /, *, axis: int = -1, descending: bool = False, stable: bool = True
 ) -> array:
@@ -38,6 +38,7 @@ def argsort(
     )
 
 
+@cacheable
 def sort(
     x: array, /, *, axis: int = -1, descending: bool = False, stable: bool = True
 ) -> array:

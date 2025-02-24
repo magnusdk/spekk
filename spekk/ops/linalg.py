@@ -38,6 +38,7 @@ from spekk.ops._types import (
     undefined_dim,
 )
 from spekk.ops._util import (
+    cacheable,
     ensure_array,
     ensure_backend_compatible_data,
     ensure_broadcastable,
@@ -47,6 +48,7 @@ from spekk.ops.constants import inf
 from spekk.ops.manipulation_functions import permute_dims
 
 
+@cacheable
 def cholesky(x: array, /, *, upper: bool = False) -> array:
     r"""
     Returns the lower (upper) Cholesky decomposition of a complex Hermitian or real symmetric positive-definite matrix ``x``.
@@ -93,6 +95,7 @@ def cholesky(x: array, /, *, upper: bool = False) -> array:
     return array(backend.linalg.cholesky(x._data, upper=upper), x._dims)
 
 
+@cacheable
 def cross(x1: array, x2: array, /, *, axis: int = -1) -> array:
     """
     Returns the cross product of 3-element vectors.
@@ -141,6 +144,7 @@ def cross(x1: array, x2: array, /, *, axis: int = -1) -> array:
     return array(backend.linalg.cross(x1, x2, axis=axis), broadcasted_dims)
 
 
+@cacheable
 def det(x: array, /, *, axes: Tuple[int, int]) -> array:
     """
     Returns the determinant of a square matrix (or a stack of square matrices) ``x``.
@@ -169,6 +173,7 @@ def det(x: array, /, *, axes: Tuple[int, int]) -> array:
     return array(data, dims)
 
 
+@cacheable
 def diagonal(
     x: array,
     /,
@@ -208,6 +213,7 @@ def diagonal(
 # return array(data, dims)
 
 
+@cacheable
 def eigh(x: array, /) -> Tuple[array]:
     r"""
     Returns an eigenvalue decomposition of a complex Hermitian or real symmetric matrix (or a stack of matrices) ``x``.
@@ -260,6 +266,7 @@ def eigh(x: array, /) -> Tuple[array]:
     raise NotImplementedError("Please help me implement this!")
 
 
+@cacheable
 def eigvalsh(x: array, /) -> array:
     r"""
     Returns the eigenvalues of a complex Hermitian or real symmetric matrix (or a stack of matrices) ``x``.
@@ -304,6 +311,7 @@ def eigvalsh(x: array, /) -> array:
     raise NotImplementedError("Please help me implement this!")
 
 
+@cacheable
 def inv(x: array, /) -> array:
     r"""
     Returns the multiplicative inverse of a square matrix (or a stack of square matrices) ``x``.
@@ -340,11 +348,13 @@ def inv(x: array, /) -> array:
     raise NotImplementedError("Please help me implement this!")
 
 
+@cacheable
 def matmul(x1: array, x2: array, /) -> array:
     """Alias for :func:`~array_api.matmul`."""
     return linear_algebra_functions.matmul(x1, x2)
 
 
+@cacheable
 def matrix_norm(
     x: array,
     /,
@@ -412,6 +422,8 @@ def matrix_norm(
     raise NotImplementedError("Please help me implement this!")
 
 
+@cacheable
+@cacheable
 def matrix_power(x: array, n: int, /) -> array:
     """
     Raises a square matrix (or a stack of square matrices) ``x`` to an integer power ``n``.
@@ -464,11 +476,13 @@ def matrix_rank(x: array, /, *, rtol: Optional[Union[float, array]] = None) -> a
     raise NotImplementedError("Please help me implement this!")
 
 
+@cacheable
 def matrix_transpose(x: array, /) -> array:
     """Alias for :func:`~array_api.matrix_transpose`."""
     return linear_algebra_functions.matrix_transpose(x)
 
 
+@cacheable
 def outer(x1: array, x2: array, /) -> array:
     """
     Returns the outer product of two vectors ``x1`` and ``x2``.
@@ -494,6 +508,7 @@ def outer(x1: array, x2: array, /) -> array:
     raise NotImplementedError("Please help me implement this!")
 
 
+@cacheable
 def pinv(x: array, /, *, rtol: Optional[Union[float, array]] = None) -> array:
     r"""
     Returns the (Moore-Penrose) pseudo-inverse of a matrix (or a stack of matrices) ``x``.
@@ -535,6 +550,7 @@ def pinv(x: array, /, *, rtol: Optional[Union[float, array]] = None) -> array:
     raise NotImplementedError("Please help me implement this!")
 
 
+@cacheable
 def qr(
     x: array,
     /,
@@ -621,12 +637,13 @@ def qr(
             raise ValueError(
                 f"Argument 'rename_dims' must be of length three. 'rename_dims' is {rename_dims}"
             )
-    
+
     from array_api_compat.common._linalg import QRResult
 
     return QRResult(array(q, dims_q), array(r, dims_r))
 
 
+@cacheable
 def slogdet(x: array, /) -> Tuple[array, array]:
     r"""
     Returns the sign and the natural logarithm of the absolute value of the determinant of a square matrix (or a stack of square matrices) ``x``.
@@ -683,6 +700,7 @@ def slogdet(x: array, /) -> Tuple[array, array]:
     raise NotImplementedError("Please help me implement this!")
 
 
+@cacheable
 def solve(x1: array, x2: array, /) -> array:
     r"""
     Returns the solution of a square system of linear equations with a unique solution.
@@ -722,6 +740,7 @@ def solve(x1: array, x2: array, /) -> array:
     raise NotImplementedError("Please help me implement this!")
 
 
+@cacheable
 def svd(x: array, /, *, full_matrices: bool = True) -> Tuple[array, array, array]:
     r"""
     Returns a singular value decomposition (SVD) of a matrix (or a stack of matrices) ``x``.
@@ -778,6 +797,7 @@ def svd(x: array, /, *, full_matrices: bool = True) -> Tuple[array, array, array
     raise NotImplementedError("Please help me implement this!")
 
 
+@cacheable
 def svdvals(x: array, /) -> array:
     """
     Returns the singular values of a matrix (or a stack of matrices) ``x``.
@@ -803,6 +823,7 @@ def svdvals(x: array, /) -> array:
     raise NotImplementedError("Please help me implement this!")
 
 
+@cacheable
 def tensordot(
     x1: array,
     x2: array,
@@ -814,6 +835,7 @@ def tensordot(
     return linear_algebra_functions.tensordot(x1, x2, axes=axes)
 
 
+@cacheable
 def trace(x: array, /, *, offset: int = 0, dtype: Optional[dtype] = None) -> array:
     """
     Returns the sum along the specified diagonals of a matrix (or a stack of matrices) ``x``.
@@ -869,11 +891,13 @@ def trace(x: array, /, *, offset: int = 0, dtype: Optional[dtype] = None) -> arr
     raise NotImplementedError("Please help me implement this!")
 
 
+@cacheable
 def vecdot(x1: array, x2: array, /, *, axis: int = None) -> array:
     """Alias for :func:`~array_api.vecdot`."""
     return linear_algebra_functions.vecdot(x1, x2, axis=axis)
 
 
+@cacheable
 def vector_norm(
     x: array,
     /,

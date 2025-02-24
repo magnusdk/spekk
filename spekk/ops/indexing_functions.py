@@ -3,11 +3,12 @@ __all__ = ["take"]
 from typing import Union
 
 from spekk.ops._backend import backend
-from spekk.ops._util import ensure_array
 from spekk.ops._types import Dim, Optional
+from spekk.ops._util import cacheable, ensure_array
 from spekk.ops.array_object import array
 
 
+@cacheable
 def take(
     x: array,
     indices: array,

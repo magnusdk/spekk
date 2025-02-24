@@ -3,11 +3,16 @@ __all__ = ["matmul", "matrix_transpose", "tensordot", "vecdot"]
 
 from spekk.ops._backend import backend
 from spekk.ops._types import Dim, Sequence, Tuple, Union
-from spekk.ops._util import ensure_backend_compatible_data, ensure_broadcastable
+from spekk.ops._util import (
+    cacheable,
+    ensure_backend_compatible_data,
+    ensure_broadcastable,
+)
 from spekk.ops.array_object import array
 from spekk.ops.exceptions import MismatchedDimensionsError
 
 
+@cacheable
 def matmul(x1: array, x2: array) -> array:
     """
     Computes the matrix product.
@@ -102,6 +107,7 @@ def matmul(x1: array, x2: array) -> array:
     return array(backend.matmul(x1.data, x2.data), x1.dims)
 
 
+@cacheable
 def matrix_transpose(x: array, /) -> array:
     """
     Transposes a matrix (or a stack of matrices) ``x``.
@@ -121,6 +127,7 @@ def matrix_transpose(x: array, /) -> array:
     return array(backend.matrix_transpose(x.data), dims)
 
 
+@cacheable
 def tensordot(
     x1: array,
     x2: array,
@@ -194,6 +201,7 @@ def tensordot(
         return array(backend.tensordot(x1, x2, axes=axes), dims)
 
 
+@cacheable
 def vecdot(x1: array, x2: array, /, *, axis: int = -1) -> array:
     r"""
     Computes the (vector) dot product of two arrays.

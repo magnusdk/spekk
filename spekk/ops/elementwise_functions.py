@@ -70,6 +70,7 @@ __all__ = [
 from spekk.ops._backend import backend
 from spekk.ops._types import Optional, Union
 from spekk.ops._util import (
+    cacheable,
     ensure_backend_compatible_data,
     ensure_broadcastable,
     get_dims,
@@ -77,6 +78,7 @@ from spekk.ops._util import (
 from spekk.ops.array_object import array
 
 
+@cacheable
 def abs(x: array, /) -> array:
     r"""
     Calculates the absolute value for each element ``x_i`` of the input array ``x``.
@@ -137,6 +139,7 @@ def abs(x: array, /) -> array:
     return array(backend.abs(x), dims)
 
 
+@cacheable
 def acos(x: array, /) -> array:
     r"""
     Calculates an implementation-dependent approximation of the principal value of the inverse cosine for each element ``x_i`` of the input array ``x``.
@@ -209,6 +212,7 @@ def acos(x: array, /) -> array:
     return array(backend.acos(x), dims)
 
 
+@cacheable
 def acosh(x: array, /) -> array:
     r"""
     Calculates an implementation-dependent approximation to the inverse hyperbolic cosine for each element ``x_i`` of the input array ``x``.
@@ -286,6 +290,7 @@ def acosh(x: array, /) -> array:
     return array(backend.acosh(x), dims)
 
 
+@cacheable
 def add(x1: array, x2: array, /) -> array:
     """
     Calculates the sum for each element ``x1_i`` of the input array ``x1`` with the respective element ``x2_i`` of the input array ``x2``.
@@ -357,6 +362,7 @@ def add(x1: array, x2: array, /) -> array:
     return array(backend.add(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def asin(x: array, /) -> array:
     r"""
     Calculates an implementation-dependent approximation of the principal value of the inverse sine for each element ``x_i`` of the input array ``x``.
@@ -417,6 +423,7 @@ def asin(x: array, /) -> array:
     return array(backend.asin(x), dims)
 
 
+@cacheable
 def asinh(x: array, /) -> array:
     r"""
     Calculates an implementation-dependent approximation to the inverse hyperbolic sine for each element ``x_i`` in the input array ``x``.
@@ -485,6 +492,7 @@ def asinh(x: array, /) -> array:
     return array(backend.asinh(x), dims)
 
 
+@cacheable
 def atan(x: array, /) -> array:
     r"""
     Calculates an implementation-dependent approximation of the principal value of the inverse tangent for each element ``x_i`` of the input array ``x``.
@@ -539,7 +547,7 @@ def atan(x: array, /) -> array:
     (x,) = ensure_backend_compatible_data(x)
     return array(backend.atan(x), dims)
 
-
+@cacheable
 def atan2(x1: array, x2: array, /) -> array:
     """
     Calculates an implementation-dependent approximation of the inverse tangent of the quotient ``x1/x2``, having domain ``[-infinity, +infinity] x [-infinity, +infinity]`` (where the ``x`` notation denotes the set of ordered pairs of elements ``(x1_i, x2_i)``) and codomain ``[-π, +π]``, for each pair of elements ``(x1_i, x2_i)`` of the input arrays ``x1`` and ``x2``, respectively. Each element-wise result is expressed in radians.
@@ -599,6 +607,7 @@ def atan2(x1: array, x2: array, /) -> array:
     return array(backend.atan2(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def atanh(x: array, /) -> array:
     r"""
     Calculates an implementation-dependent approximation to the inverse hyperbolic tangent for each element ``x_i`` of the input array ``x``.
@@ -671,6 +680,7 @@ def atanh(x: array, /) -> array:
     return array(backend.atanh(x), dims)
 
 
+@cacheable
 def bitwise_and(x1: array, x2: array, /) -> array:
     """
     Computes the bitwise AND of the underlying binary representation of each element ``x1_i`` of the input array ``x1`` with the respective element ``x2_i`` of the input array ``x2``.
@@ -692,6 +702,7 @@ def bitwise_and(x1: array, x2: array, /) -> array:
     return array(backend.bitwise_and(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def bitwise_left_shift(x1: array, x2: array, /) -> array:
     """
     Shifts the bits of each element ``x1_i`` of the input array ``x1`` to the left by appending ``x2_i`` (i.e., the respective element in the input array ``x2``) zeros to the right of ``x1_i``.
@@ -713,6 +724,7 @@ def bitwise_left_shift(x1: array, x2: array, /) -> array:
     return array(backend.bitwise_left_shift(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def bitwise_invert(x: array, /) -> array:
     """
     Inverts (flips) each bit for each element ``x_i`` of the input array ``x``.
@@ -732,6 +744,7 @@ def bitwise_invert(x: array, /) -> array:
     return array(backend.bitwise_invert(x), dims)
 
 
+@cacheable
 def bitwise_or(x1: array, x2: array, /) -> array:
     """
     Computes the bitwise OR of the underlying binary representation of each element ``x1_i`` of the input array ``x1`` with the respective element ``x2_i`` of the input array ``x2``.
@@ -753,6 +766,7 @@ def bitwise_or(x1: array, x2: array, /) -> array:
     return array(backend.bitwise_or(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def bitwise_right_shift(x1: array, x2: array, /) -> array:
     """
     Shifts the bits of each element ``x1_i`` of the input array ``x1`` to the right according to the respective element ``x2_i`` of the input array ``x2``.
@@ -777,6 +791,7 @@ def bitwise_right_shift(x1: array, x2: array, /) -> array:
     return array(backend.bitwise_right_shift(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def bitwise_xor(x1: array, x2: array, /) -> array:
     """
     Computes the bitwise XOR of the underlying binary representation of each element ``x1_i`` of the input array ``x1`` with the respective element ``x2_i`` of the input array ``x2``.
@@ -798,6 +813,7 @@ def bitwise_xor(x1: array, x2: array, /) -> array:
     return array(backend.bitwise_xor(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def ceil(x: array, /) -> array:
     """
     Rounds each element ``x_i`` of the input array ``x`` to the smallest (i.e., closest to ``-infinity``) integer-valued number that is not less than ``x_i``.
@@ -832,6 +848,7 @@ def ceil(x: array, /) -> array:
     return array(backend.ceil(x), dims)
 
 
+@cacheable
 def clip(
     x: array,
     /,
@@ -881,6 +898,7 @@ def clip(
     return array(backend.clip(x, min=min, max=max), dims)
 
 
+@cacheable
 def conj(x: array, /) -> array:
     """
     Returns the complex conjugate for each element ``x_i`` of the input array ``x``.
@@ -917,6 +935,7 @@ def conj(x: array, /) -> array:
     return array(backend.conj(x), dims)
 
 
+@cacheable
 def copysign(x1: array, x2: array, /) -> array:
     r"""
     Composes a floating-point value with the magnitude of ``x1_i`` and the sign of ``x2_i`` for each element of the input array ``x1``.
@@ -961,6 +980,7 @@ def copysign(x1: array, x2: array, /) -> array:
     return array(backend.copysign(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def cos(x: array, /) -> array:
     r"""
     Calculates an implementation-dependent approximation to the cosine for each element ``x_i`` of the input array ``x``.
@@ -1011,6 +1031,7 @@ def cos(x: array, /) -> array:
     return array(backend.cos(x), dims)
 
 
+@cacheable
 def cosh(x: array, /) -> array:
     r"""
     Calculates an implementation-dependent approximation to the hyperbolic cosine for each element ``x_i`` in the input array ``x``.
@@ -1077,6 +1098,7 @@ def cosh(x: array, /) -> array:
     return array(backend.cosh(x), dims)
 
 
+@cacheable
 def divide(x1: array, x2: array, /) -> array:
     r"""
     Calculates the division of each element ``x1_i`` of the input array ``x1`` with the respective element ``x2_i`` of the input array ``x2``.
@@ -1163,6 +1185,7 @@ def divide(x1: array, x2: array, /) -> array:
     return array(backend.divide(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def equal(x1: array, x2: array, /) -> array:
     r"""
     Computes the truth value of ``x1_i == x2_i`` for each element ``x1_i`` of the input array ``x1`` with the respective element ``x2_i`` of the input array ``x2``.
@@ -1210,6 +1233,7 @@ def equal(x1: array, x2: array, /) -> array:
     return array(backend.equal(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def exp(x: array, /) -> array:
     """
     Calculates an implementation-dependent approximation to the exponential function for each element ``x_i`` of the input array ``x`` (``e`` raised to the power of ``x_i``, where ``e`` is the base of the natural logarithm).
@@ -1269,6 +1293,7 @@ def exp(x: array, /) -> array:
     return array(backend.exp(x), dims)
 
 
+@cacheable
 def expm1(x: array, /) -> array:
     """
     Calculates an implementation-dependent approximation to ``exp(x)-1`` for each element ``x_i`` of the input array ``x``.
@@ -1331,6 +1356,7 @@ def expm1(x: array, /) -> array:
     return array(backend.expm1(x), dims)
 
 
+@cacheable
 def floor(x: array, /) -> array:
     """
     Rounds each element ``x_i`` of the input array ``x`` to the greatest (i.e., closest to ``+infinity``) integer-valued number that is not greater than ``x_i``.
@@ -1365,6 +1391,7 @@ def floor(x: array, /) -> array:
     return array(backend.floor(x), dims)
 
 
+@cacheable
 def floor_divide(x1: array, x2: array, /) -> array:
     r"""
     Rounds the result of dividing each element ``x1_i`` of the input array ``x1`` by the respective element ``x2_i`` of the input array ``x2`` to the greatest (i.e., closest to `+infinity`) integer-value number that is not greater than the division result.
@@ -1428,6 +1455,7 @@ def floor_divide(x1: array, x2: array, /) -> array:
     return array(backend.floor_divide(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def greater(x1: array, x2: array, /) -> array:
     """
     Computes the truth value of ``x1_i > x2_i`` for each element ``x1_i`` of the input array ``x1`` with the respective element ``x2_i`` of the input array ``x2``.
@@ -1452,6 +1480,7 @@ def greater(x1: array, x2: array, /) -> array:
     return array(backend.greater(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def greater_equal(x1: array, x2: array, /) -> array:
     """
     Computes the truth value of ``x1_i >= x2_i`` for each element ``x1_i`` of the input array ``x1`` with the respective element ``x2_i`` of the input array ``x2``.
@@ -1476,6 +1505,7 @@ def greater_equal(x1: array, x2: array, /) -> array:
     return array(backend.greater_equal(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def hypot(x1: array, x2: array, /) -> array:
     r"""
     Computes the square root of the sum of squares for each element ``x1_i`` of the input array ``x1`` with the respective element ``x2_i`` of the input array ``x2``.
@@ -1526,6 +1556,7 @@ def hypot(x1: array, x2: array, /) -> array:
     return array(backend.hypot(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def imag(x: array, /) -> array:
     """
     Returns the imaginary component of a complex number for each element ``x_i`` of the input array ``x``.
@@ -1550,6 +1581,7 @@ def imag(x: array, /) -> array:
     return array(backend.imag(x), dims)
 
 
+@cacheable
 def isfinite(x: array, /) -> array:
     """
     Tests each element ``x_i`` of the input array ``x`` to determine if finite.
@@ -1590,6 +1622,7 @@ def isfinite(x: array, /) -> array:
     return array(backend.isfinite(x), dims)
 
 
+@cacheable
 def isinf(x: array, /) -> array:
     """
     Tests each element ``x_i`` of the input array ``x`` to determine if equal to positive or negative infinity.
@@ -1628,6 +1661,7 @@ def isinf(x: array, /) -> array:
     return array(backend.isinf(x), dims)
 
 
+@cacheable
 def isnan(x: array, /) -> array:
     """
     Tests each element ``x_i`` of the input array ``x`` to determine whether the element is ``NaN``.
@@ -1665,6 +1699,7 @@ def isnan(x: array, /) -> array:
     return array(backend.isnan(x), dims)
 
 
+@cacheable
 def less(x1: array, x2: array, /) -> array:
     """
     Computes the truth value of ``x1_i < x2_i`` for each element ``x1_i`` of the input array ``x1`` with the respective element ``x2_i`` of the input array ``x2``.
@@ -1689,6 +1724,7 @@ def less(x1: array, x2: array, /) -> array:
     return array(backend.less(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def less_equal(x1: array, x2: array, /) -> array:
     """
     Computes the truth value of ``x1_i <= x2_i`` for each element ``x1_i`` of the input array ``x1`` with the respective element ``x2_i`` of the input array ``x2``.
@@ -1713,6 +1749,7 @@ def less_equal(x1: array, x2: array, /) -> array:
     return array(backend.less_equal(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def log(x: array, /) -> array:
     r"""
     Calculates an implementation-dependent approximation to the natural (base ``e``) logarithm for each element ``x_i`` of the input array ``x``.
@@ -1778,6 +1815,7 @@ def log(x: array, /) -> array:
     return array(backend.log(x), dims)
 
 
+@cacheable
 def log1p(x: array, /) -> array:
     r"""
     Calculates an implementation-dependent approximation to ``log(1+x)``, where ``log`` refers to the natural (base ``e``) logarithm, for each element ``x_i`` of the input array ``x``.
@@ -1843,6 +1881,7 @@ def log1p(x: array, /) -> array:
     return array(backend.log1p(x), dims)
 
 
+@cacheable
 def log2(x: array, /) -> array:
     r"""
     Calculates an implementation-dependent approximation to the base ``2`` logarithm for each element ``x_i`` of the input array ``x``.
@@ -1888,6 +1927,7 @@ def log2(x: array, /) -> array:
     return array(backend.log2(x), dims)
 
 
+@cacheable
 def log10(x: array, /) -> array:
     r"""
     Calculates an implementation-dependent approximation to the base ``10`` logarithm for each element ``x_i`` of the input array ``x``.
@@ -1933,6 +1973,7 @@ def log10(x: array, /) -> array:
     return array(backend.log10(x), dims)
 
 
+@cacheable
 def logaddexp(x1: array, x2: array, /) -> array:
     """
     Calculates the logarithm of the sum of exponentiations ``log(exp(x1) + exp(x2))`` for each element ``x1_i`` of the input array ``x1`` with the respective element ``x2_i`` of the input array ``x2``.
@@ -1965,6 +2006,7 @@ def logaddexp(x1: array, x2: array, /) -> array:
     return array(backend.logaddexp(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def logical_and(x1: array, x2: array, /) -> array:
     """
     Computes the logical AND for each element ``x1_i`` of the input array ``x1`` with the respective element ``x2_i`` of the input array ``x2``.
@@ -1989,6 +2031,7 @@ def logical_and(x1: array, x2: array, /) -> array:
     return array(backend.logical_and(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def logical_not(x: array, /) -> array:
     """
     Computes the logical NOT for each element ``x_i`` of the input array ``x``.
@@ -2011,6 +2054,7 @@ def logical_not(x: array, /) -> array:
     return array(backend.logical_not(x), dims)
 
 
+@cacheable
 def logical_or(x1: array, x2: array, /) -> array:
     """
     Computes the logical OR for each element ``x1_i`` of the input array ``x1`` with the respective element ``x2_i`` of the input array ``x2``.
@@ -2035,6 +2079,7 @@ def logical_or(x1: array, x2: array, /) -> array:
     return array(backend.logical_or(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def logical_xor(x1: array, x2: array, /) -> array:
     """
     Computes the logical XOR for each element ``x1_i`` of the input array ``x1`` with the respective element ``x2_i`` of the input array ``x2``.
@@ -2059,6 +2104,7 @@ def logical_xor(x1: array, x2: array, /) -> array:
     return array(backend.logical_xor(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def maximum(x1: array, x2: array, /) -> array:
     r"""
     Computes the maximum value for each element ``x1_i`` of the input array ``x1`` relative to the respective element ``x2_i`` of the input array ``x2``.
@@ -2095,6 +2141,7 @@ def maximum(x1: array, x2: array, /) -> array:
     return array(backend.maximum(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def minimum(x1: array, x2: array, /) -> array:
     r"""
     Computes the minimum value for each element ``x1_i`` of the input array ``x1`` relative to the respective element ``x2_i`` of the input array ``x2``.
@@ -2131,6 +2178,7 @@ def minimum(x1: array, x2: array, /) -> array:
     return array(backend.minimum(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def multiply(x1: array, x2: array, /) -> array:
     r"""
     Calculates the product for each element ``x1_i`` of the input array ``x1`` with the respective element ``x2_i`` of the input array ``x2``.
@@ -2202,6 +2250,7 @@ def multiply(x1: array, x2: array, /) -> array:
     return array(backend.multiply(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def negative(x: array, /) -> array:
     """
     Computes the numerical negative of each element ``x_i`` (i.e., ``y_i = -x_i``) of the input array ``x``.
@@ -2233,6 +2282,7 @@ def negative(x: array, /) -> array:
     return array(backend.negative(x), dims)
 
 
+@cacheable
 def not_equal(x1: array, x2: array, /) -> array:
     """
     Computes the truth value of ``x1_i != x2_i`` for each element ``x1_i`` of the input array ``x1`` with the respective element ``x2_i`` of the input array ``x2``.
@@ -2278,6 +2328,7 @@ def not_equal(x1: array, x2: array, /) -> array:
     return array(backend.not_equal(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def positive(x: array, /) -> array:
     """
     Computes the numerical positive of each element ``x_i`` (i.e., ``y_i = +x_i``) of the input array ``x``.
@@ -2303,6 +2354,7 @@ def positive(x: array, /) -> array:
     return array(backend.positive(x), dims)
 
 
+@cacheable
 def pow(x1: array, x2: array, /) -> array:
     r"""
     Calculates an implementation-dependent approximation of exponentiation by raising each element ``x1_i`` (the base) of the input array ``x1`` to the power of ``x2_i`` (the exponent), where ``x2_i`` is the corresponding element of the input array ``x2``.
@@ -2376,6 +2428,7 @@ def pow(x1: array, x2: array, /) -> array:
     return array(backend.pow(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def real(x: array, /) -> array:
     """
     Returns the real component of a complex number for each element ``x_i`` of the input array ``x``.
@@ -2400,6 +2453,7 @@ def real(x: array, /) -> array:
     return array(backend.real(x), dims)
 
 
+@cacheable
 def remainder(x1: array, x2: array, /) -> array:
     """
     Returns the remainder of division for each element ``x1_i`` of the input array ``x1`` and the respective element ``x2_i`` of the input array ``x2``.
@@ -2458,6 +2512,7 @@ def remainder(x1: array, x2: array, /) -> array:
     return array(backend.remainder(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def round(x: array, /) -> array:
     """
     Rounds each element ``x_i`` of the input array ``x`` to the nearest integer-valued number.
@@ -2504,6 +2559,7 @@ def round(x: array, /) -> array:
     return array(backend.round(x), dims)
 
 
+@cacheable
 def sign(x: array, /) -> array:
     r"""
     Returns an indication of the sign of a number for each element ``x_i`` of the input array ``x``.
@@ -2554,6 +2610,7 @@ def sign(x: array, /) -> array:
     return array(backend.sign(x), dims)
 
 
+@cacheable
 def signbit(x: array, /) -> array:
     r"""
     Determines whether the sign bit is set for each element ``x_i`` of the input array ``x``.
@@ -2593,6 +2650,7 @@ def signbit(x: array, /) -> array:
     return array(backend.signbit(x), dims)
 
 
+@cacheable
 def sin(x: array, /) -> array:
     r"""
     Calculates an implementation-dependent approximation to the sine for each element ``x_i`` of the input array ``x``.
@@ -2642,6 +2700,7 @@ def sin(x: array, /) -> array:
     return array(backend.sin(x), dims)
 
 
+@cacheable
 def sinh(x: array, /) -> array:
     r"""
     Calculates an implementation-dependent approximation to the hyperbolic sine for each element ``x_i`` of the input array ``x``.
@@ -2708,6 +2767,7 @@ def sinh(x: array, /) -> array:
     return array(backend.sinh(x), dims)
 
 
+@cacheable
 def square(x: array, /) -> array:
     r"""
     Squares each element ``x_i`` of the input array ``x``.
@@ -2742,6 +2802,7 @@ def square(x: array, /) -> array:
     return array(backend.square(x), dims)
 
 
+@cacheable
 def sqrt(x: array, /) -> array:
     r"""
     Calculates the principal square root for each element ``x_i`` of the input array ``x``.
@@ -2804,6 +2865,7 @@ def sqrt(x: array, /) -> array:
     return array(backend.sqrt(x), dims)
 
 
+@cacheable
 def subtract(x1: array, x2: array, /) -> array:
     """
     Calculates the difference for each element ``x1_i`` of the input array ``x1`` with the respective element ``x2_i`` of the input array ``x2``.
@@ -2833,6 +2895,7 @@ def subtract(x1: array, x2: array, /) -> array:
     return array(backend.subtract(x1, x2), broadcasted_dims)
 
 
+@cacheable
 def tan(x: array, /) -> array:
     r"""
     Calculates an implementation-dependent approximation to the tangent for each element ``x_i`` of the input array ``x``.
@@ -2882,6 +2945,7 @@ def tan(x: array, /) -> array:
     return array(backend.tan(x), dims)
 
 
+@cacheable
 def tanh(x: array, /) -> array:
     r"""
     Calculates an implementation-dependent approximation to the hyperbolic tangent for each element ``x_i`` of the input array ``x``.
@@ -2952,6 +3016,7 @@ def tanh(x: array, /) -> array:
     return array(backend.tanh(x), dims)
 
 
+@cacheable
 def trunc(x: array, /) -> array:
     """
     Rounds each element ``x_i`` of the input array ``x`` to the nearest integer-valued number that is closer to zero than ``x_i``.

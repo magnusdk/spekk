@@ -47,6 +47,20 @@ def cache_module_methods():
     try:
         yield
     finally:
+        if False:
+            print(len(_MODULE_METHODS_CACHE))
+            n_misses = 0
+            n_hits = 0
+            for a in _MODULE_METHODS_CACHE.values():
+                n_misses += a.cache_info().misses
+                n_hits += a.cache_info().hits
+            print(f"{n_misses=}")
+            print(f"{n_hits=}")
+            a = {k: v.cache_info().hits for k, v in _MODULE_METHODS_CACHE.items()}
+            a = sorted(list(a.items()), key=lambda item: item[1], reverse=True)
+            for f, hits in a:
+                print(hits, f)
+
         for cache in _MODULE_METHODS_CACHE.values():
             cache.cache_clear()
         _MODULE_METHODS_CACHE = previous_cache
@@ -67,6 +81,8 @@ def field(*, static: bool = False, **kwargs):
 
 
 def _wrap_method_as_cacheable(f):
+    return f
+
     @functools.wraps(f)
     def wrapped(*args, **kwargs):
         if _MODULE_METHODS_CACHE is None:

@@ -29,6 +29,7 @@ from spekk.ops._types import (
     undefined_dim,
 )
 from spekk.ops._util import (
+    cacheable,
     canonicalize_axis,
     ensure_array,
     ensure_broadcastable_with,
@@ -37,6 +38,7 @@ from spekk.ops._util import (
 from spekk.ops.array_object import array
 
 
+@cacheable
 def broadcast_arrays(*arrays: array) -> List[array]:
     """
     Broadcasts one or more arrays against one another.
@@ -56,6 +58,7 @@ def broadcast_arrays(*arrays: array) -> List[array]:
     return [broadcast_array(arr) for arr in arrays]
 
 
+@cacheable
 def broadcast_to(
     x: array, /, shape: Tuple[int, ...], dims: Optional[Dims] = None
 ) -> array:
@@ -94,6 +97,7 @@ def broadcast_to(
     return array(data, dims)
 
 
+@cacheable
 def concat(
     arrays: Union[Tuple[array, ...], List[array]],
     /,
@@ -127,6 +131,7 @@ def concat(
     return array(data, broadcasted_dims)
 
 
+@cacheable
 def expand_dims(x: array, /, *, axis: Union[Dim, int] = 0) -> array:
     """
     Expands the shape of an array by inserting a new axis (dimension) of size one at the position specified by ``axis``.
@@ -165,6 +170,7 @@ def expand_dims(x: array, /, *, axis: Union[Dim, int] = 0) -> array:
     return array(data, dims)
 
 
+@cacheable
 def flip(x: array, /, *, axis: Optional[Union[Dim, Tuple[Dim, ...]]] = None) -> array:
     """
     Reverses the order of elements in an array along the given axis. The shape of the array must be preserved.
@@ -191,6 +197,7 @@ def flip(x: array, /, *, axis: Optional[Union[Dim, Tuple[Dim, ...]]] = None) -> 
     return array(backend.flip(x._data, axis=axis), x._dims)
 
 
+@cacheable
 def moveaxis(
     x: array,
     source: Union[Dim, Tuple[Dim, ...], List[Dim]],
@@ -240,6 +247,7 @@ def moveaxis(
     return array(data, dims)
 
 
+@cacheable
 def permute_dims(x: array, /, axes: Tuple[Dim, ...]) -> array:
     """
     Permutes the axes (dimensions) of an array ``x``.
@@ -266,6 +274,7 @@ def permute_dims(x: array, /, axes: Tuple[Dim, ...]) -> array:
     return array(data, dims)
 
 
+@cacheable
 def repeat(
     x: array,
     repeats: int,
@@ -324,6 +333,7 @@ def repeat(
     return array(data, dims)
 
 
+@cacheable
 def reshape(
     x: array,
     /,
@@ -368,6 +378,7 @@ def reshape(
     return array(backend.reshape(x._data, shape, copy=copy), dims)
 
 
+@cacheable
 def roll(
     x: array,
     /,
@@ -402,6 +413,7 @@ def roll(
     return array(backend.roll(x._data, shift=shift, axis=axis), x._dims)
 
 
+@cacheable
 def squeeze(
     x: ArrayLike,
     /,
@@ -449,6 +461,7 @@ def squeeze(
     return array(data, dims)
 
 
+@cacheable
 def stack(
     arrays: Union[Tuple[array, ...], List[array]],
     /,
@@ -491,6 +504,7 @@ def stack(
     return array(data, broadcasted_dims)
 
 
+@cacheable
 def tile(x: array, repetitions: Tuple[int, ...], /) -> array:
     """
     Constructs an array by tiling an input array.
@@ -524,6 +538,7 @@ def tile(x: array, repetitions: Tuple[int, ...], /) -> array:
     return array(data, dims)
 
 
+@cacheable
 def unstack(x: array, /, *, axis: Union[int, Dim] = 0) -> Tuple[array, ...]:
     """
     Splits an array into a sequence of arrays along the given axis.

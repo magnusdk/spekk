@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Literal, TypeVar
 from spekk.ops._backend import backend
 from spekk.ops._types import Dim, Optional, Tuple, undefined_dim
 from spekk.ops._util import (
+    cacheable,
     ensure_array,
     ensure_backend_compatible_data,
     ensure_broadcastable,
@@ -13,6 +14,7 @@ from spekk.ops.array_object import array
 from spekk.ops.exceptions import MismatchedDimensionsError
 
 
+@cacheable
 def argmax(x: array, /, *, axis: Optional[Dim] = None, keepdims: bool = False) -> array:
     """
     Returns the indices of the maximum values along a specified axis.
@@ -48,6 +50,7 @@ def argmax(x: array, /, *, axis: Optional[Dim] = None, keepdims: bool = False) -
     return array(backend.argmax(x._data, axis=axis, keepdims=keepdims), dims)
 
 
+@cacheable
 def argmin(x: array, /, *, axis: Optional[int] = None, keepdims: bool = False) -> array:
     """
     Returns the indices of the minimum values along a specified axis.
@@ -83,6 +86,7 @@ def argmin(x: array, /, *, axis: Optional[int] = None, keepdims: bool = False) -
     return array(backend.argmin(x._data, axis=axis, keepdims=keepdims), dims)
 
 
+@cacheable
 def nonzero(x: array, /) -> Tuple[array, ...]:
     """
     Returns the indices of the array elements which are non-zero.
@@ -117,6 +121,7 @@ def nonzero(x: array, /) -> Tuple[array, ...]:
     return tuple(array(result, [undefined_dim]) for result in backend.nonzero(x._data))
 
 
+@cacheable
 def searchsorted(
     x1: array,
     x2: array,
@@ -185,7 +190,7 @@ if TYPE_CHECKING:
     TModule = TypeVar("TModule", bound=Module)
 
 
-
+@cacheable
 def where(condition: array, x1: array, x2: array, /) -> array:
     """
     Returns elements chosen from ``x1`` or ``x2`` depending on ``condition``.
