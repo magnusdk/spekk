@@ -1,6 +1,14 @@
 import spekk.ops as ops
 import spekk.util as util
-from spekk.module import Module, field, flatten, replace, replace_at, update_at
+from spekk.module import (
+    Module,
+    field,
+    flatten,
+    replace,
+    replace_at,
+    traverse,
+    update_at,
+)
 from spekk.ops._types import Dim, Dims
 
 __all__ = [
@@ -11,6 +19,7 @@ __all__ = [
     "flatten",
     "replace",
     "replace_at",
+    "traverse",
     "update_at",
     "Dim",
     "Dims",
