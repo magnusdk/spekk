@@ -11,6 +11,7 @@ from spekk.ops.array_object import array
 TFunc = TypeVar("TFunc", bound=Callable)
 TCarry = TypeVar("TCarry")
 TInputData = TypeVar("TInputData", bound=Module)
+TMappedInputData = TypeVar("TMappedInputData")
 TOutputData = TypeVar("TOutputData")
 TReducedOutputData = TypeVar("TReducedOutputData")
 
@@ -269,45 +270,80 @@ def scan_over_dim(
 
 
 def reduce_over_dim(
-    f: Callable[[TCarry, TInputData], Tuple[TCarry, TOutputData]],
+    reduce_f: Callable[[TCarry, TInputData], TCarry],
     data: TInputData,
-    dim: Dim,
     *,
     init: TCarry,
+    dim: Dim,
     include_index: bool = False,
-):
-    def scan_fn(carry, i):
-        args = [carry, data.at[dim, array(i)].get()]
-        if include_index:
-            args.append(ops.array(i))
-        return f(*args), i
+) -> TCarry:
+    from spekk.module import flatten as flatten_tree
 
-    init, _ = scan_fn(init, 0)
-    n = data.dim_sizes[dim]
-    result, _ = backend.scan(scan_fn, init, backend.arange(1, n))
-    return result
+    dim_sizes = data.dim_sizes
+    if dim not in dim_sizes:
+        raise ValueError(f"Dimension {dim} not found in the data.")
+
+    # Optionally include an index array to the data.
+    if include_index:
+        data = (ops.arange(dim_sizes[dim], dim=dim), data)
+
+    # Flatten the initial carry state.
+    flat_carry = flatten_tree(init, flatten_spekk_arrays=True)
+
+    # Flatten the object that we want to reduce over into a sequence of arrays that has
+    # dim in its dimensions.
+    flat_outer = flatten_tree(data).filter_dynamic(
+        lambda x: isinstance(x, ops.array) and (dim in x.dims)
+    )
+    # Ensure that the dimension being reduced over is at the first axis.
+    dynamic = [ops.moveaxis(x, dim, 0) for x in flat_outer.dynamic]
+
+    # Extract underlying data and dims
+    dynamic_data = tuple(x.data for x in dynamic)
+    dynamic_dims = tuple(x.dims for x in dynamic)
+
+    def _scan_f(carry, dyn_data):
+        nonlocal flat_carry
+        # Reconstruct the carry from its flattened version.
+        carry = flat_carry.unflatten(carry)
+
+        # Rebuild the current dynamic arrays for this time step without the leading
+        # dimension. It does not have the leading dimension because that is what we are
+        # "iterating" over.
+        current_dynamic = [
+            ops.array(data, dims[1:]) for data, dims in zip(dyn_data, dynamic_dims)
+        ]
+        # Unflatten the data, call reduce_f, and flatten the result
+        flat_carry = flatten_tree(
+            reduce_f(carry, flat_outer.unflatten(current_dynamic)),
+            flatten_spekk_arrays=True,
+        )
+        return flat_carry.dynamic, None
+
+    # Run the backend scan implementation on the dynamic backend data.
+    new_dynamic_0, _ = _scan_f(flat_carry.dynamic, [x[0] for x in dynamic_data])
+    new_dynamic, _ = ops.backend.scan(
+        _scan_f, new_dynamic_0, [x[1:] for x in dynamic_data]
+    )
+    return flat_carry.unflatten(new_dynamic)
 
 
 def map_reduce_over_dim(
-    map_f: Callable[[TInputData], TOutputData],
-    reduce_f: Callable[[TReducedOutputData, TOutputData], TReducedOutputData],
+    map_f: Callable[[TInputData], TMappedInputData],
+    reduce_f: Callable[[TCarry, TMappedInputData], TCarry],
     data: TInputData,
-    dim: Dim,
     *,
     init: TCarry,
-    include_index: bool = False,
-) -> TReducedOutputData:
-    def scan_fn(carry, i):
-        x = map_f(data.at[dim, array(i)].get())
-        args = [carry, x]
-        if include_index:
-            args.append(ops.array(i))
-        return reduce_f(*args), i
-
-    init, _ = scan_fn(init, 0)
-    n = data.dim_sizes[dim]
-    carry, _ = backend.scan(scan_fn, init, backend.arange(1, n))
-    return carry
+    dim: Dim,
+    include_index_in_reduce: bool = False,
+) -> TCarry:
+    if include_index_in_reduce:
+        f = lambda carry, x: reduce_f(carry, (x[0], map_f(x[1])))
+    else:
+        f = lambda carry, x: reduce_f(carry, map_f(x))
+    return reduce_over_dim(
+        f, data, init=init, dim=dim, include_index=include_index_in_reduce
+    )
 
 
 def vmap(f, in_axes):
