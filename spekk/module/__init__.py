@@ -1,6 +1,5 @@
 from spekk.module.base import (
     Module,
-    cache_module_methods,
     field,
     flatten,
     replace,
@@ -11,7 +10,6 @@ from spekk.module.base import (
 
 __all__ = [
     "Module",
-    "cache_module_methods",
     "field",
     "flatten",
     "replace",

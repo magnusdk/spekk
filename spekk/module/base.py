@@ -1,8 +1,7 @@
 import abc
-import contextlib
 import dataclasses
 import functools
-import operator
+from collections import defaultdict
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -28,97 +27,122 @@ T = TypeVar("T")
 V = TypeVar("V")
 
 
-def is_array_like(x) -> bool:
-    import spekk.ops as ops
-
-    return isinstance(
-        x, (int, float, complex, ops.array)
-    ) or ops.backend._is_backend_array(x)
-
-
-_MODULE_METHODS_CACHE = None
-
-
-@contextlib.contextmanager
-def cache_module_methods():
-    global _MODULE_METHODS_CACHE
-    previous_cache = _MODULE_METHODS_CACHE
-    _MODULE_METHODS_CACHE = {}
-    try:
-        yield
-    finally:
-        for cache in _MODULE_METHODS_CACHE.values():
-            cache.cache_clear()
-        _MODULE_METHODS_CACHE = previous_cache
-
-
 @functools.wraps(dataclasses.field)
 def field(*, static: bool = False, **kwargs):
-    try:
-        metadata = dict(kwargs.pop("metadata"))  # safety copy
-    except KeyError:
-        metadata = {}
+    metadata = dict(kwargs.pop("metadata", {}))  # Copy to new dict
     if "static" in metadata:
         raise ValueError("Cannot use metadata with `static` already set.")
-
     if static:
         metadata["static"] = True
     return dataclasses.field(metadata=metadata, **kwargs)
 
 
-def _wrap_method_as_cacheable(f):
-    @functools.wraps(f)
-    def wrapped(*args, **kwargs):
-        if _MODULE_METHODS_CACHE is None:
-            return f(*args, **kwargs)
-        if f not in _MODULE_METHODS_CACHE:
-            _MODULE_METHODS_CACHE[f] = functools.lru_cache(maxsize=None, typed=True)(f)
-        return _MODULE_METHODS_CACHE[f](*args, **kwargs)
-
-    return wrapped
-
-
-@dataclass_transform(
-    frozen_default=True,
-    eq_default=False,
-    field_specifiers=(dataclasses.field, field),
-)
+@dataclass_transform(eq_default=False, field_specifiers=(dataclasses.field, field))
 class _ModuleMeta(abc.ABCMeta):
-    def __new__(mcls, name: str, bases, namespace: Dict[str, Any], **kwargs):
-        new_namespace = {}
-        for attr_name, attr_value in namespace.items():
-            if not attr_name.startswith("__"):
-                if isinstance(attr_value, staticmethod):
-                    attr_value = staticmethod(
-                        _wrap_method_as_cacheable(attr_value.__func__)
-                    )
-                elif isinstance(attr_value, property):
-                    attr_value = property(
-                        _wrap_method_as_cacheable(attr_value.fget),
-                        fset=attr_value.fset,
-                        fdel=attr_value.fdel,
-                        doc=attr_value.__doc__,
-                    )
-                elif callable(attr_value):
-                    attr_value = _wrap_method_as_cacheable(attr_value)
-            new_namespace[attr_name] = attr_value
+    """Metaclass for the Module base class.
 
-        cls = super().__new__(mcls, name, bases, new_namespace, **kwargs)
-        cls = dataclasses.dataclass(cls, frozen=True, eq=False, init=True)
+    Wraps classes with dataclass during class creation and ensures that all backend
+    arrays are converted to spekk arrays during object instantiation.
+    """
+
+    # __new__ is called whenever a class that inherits from Module is defined.
+    def __new__(mcls, name: str, bases, namespace: Dict[str, Any], **kwargs):
+        cls = super().__new__(mcls, name, bases, namespace, **kwargs)
+        # Wrap the new class in dataclass.
+        cls = dataclasses.dataclass(cls, eq=False, init=True)
         return cls
 
+    # __call__ is called whenever we create a new instance of a class that uses
+    # _ModuleMeta as the metaclass or inherits from Module (defined below).
     def __call__(cls, *args, **kwargs):
         import spekk.ops as ops
 
+        # Ensure that the arguments are arrays and not backend arrays.
         args = [
-            ops.array(arg) if ops.backend._is_backend_array(arg) else arg
+            (ops.array(arg) if ops.backend._is_backend_array(arg) else arg)
             for arg in args
         ]
         kwargs = {
-            key: ops.array(value) if ops.backend._is_backend_array(value) else value
+            key: (ops.array(value) if ops.backend._is_backend_array(value) else value)
             for key, value in kwargs.items()
         }
         return super(_ModuleMeta, cls).__call__(*args, **kwargs)
+
+
+class Module(metaclass=_ModuleMeta):
+    """Base class for custom classes that are understood by spekk.
+
+    Classes that inherit from Module are dataclasses:
+    >>> class MyClass(Module):
+    ...     foo: float
+    ...     bar: ops.array
+    ...     quiz: int = field(static=True)
+
+    Fields that are marked as static are filtered out during backend function
+    compilation, similar to Equinox.
+    """
+
+    @property
+    def dim_sizes(self) -> Dict["Dim", int]:
+        """Return a dictionary of the dimensions and corresponding sizes of all arrays
+        in self.
+        """
+        from spekk import ops
+        from spekk.ops._types import _UndefinedDim
+
+        # Gather the size(s) for each dimension for each array in self. Store the sizes
+        # for each dimension in a set.
+        dim_size_sets = defaultdict(set)
+        flattened = flatten(self)
+        for x in flattened.dynamic + flattened.static:
+            if isinstance(x, ops.array):
+                for dim, size in x.dim_sizes.items():
+                    if isinstance(dim, _UndefinedDim):
+                        raise ValueError(
+                            "Can not calculated dimension sizes when some arrays have "
+                            "undefined dimensions."
+                        )
+                    dim_size_sets[dim].add(size)
+
+        # Go through all dimensions and correpsonding set of sizes. Raise a ValueError
+        # if a dimension has more than one corresponding size. If no error was raised,
+        # return a dictionary from dim to the size from the set.
+        dim_sizes = {}
+        for dim, sizes in dim_size_sets.items():
+            if len(sizes) > 1:
+                raise ValueError(
+                    f"Inconsistent sizes for dimension {dim}. Sizes: {sizes}."
+                )
+            # Get the single size from the set of sizes.
+            size = next(iter(sizes))
+            dim_sizes[dim] = size
+        return dim_sizes
+
+    @property
+    def at(self):
+        """Helper for updating slices of _all_ arrays in the object that have the
+        sliced dimension(s)."""
+        return _ModuleAtHelper(self)
+
+    def __eq__(self, other):
+        if self is other:
+            return True
+        if self.__class__ is other.__class__:
+            from spekk import ops
+
+            for _field in dataclasses.fields(self):
+                a = getattr(self, _field.name)
+                b = getattr(other, _field.name)
+                if isinstance(a, ops.array) and isinstance(b, ops.array):
+                    return a._id == b._id
+                elif a != b:
+                    return False
+            return True
+        return NotImplemented
+
+
+####
+# Helpers for slicing arrays in Module objects:
 
 
 class _ModuleAtHelper:
@@ -157,49 +181,8 @@ class _ModuleAtUpdateRef:
         )
 
 
-class Module(metaclass=_ModuleMeta):
-    @property
-    def dim_sizes(self) -> Dict["Dim", int]:
-        from spekk import ops
-
-        dim_sizes = {}
-        flattened = flatten(self)
-        for x in flattened.dynamic + flattened.static:
-            if isinstance(x, ops.array):
-                dim_sizes.update(x.dim_sizes)
-        return dim_sizes
-
-    @property
-    def at(self):
-        return _ModuleAtHelper(self)
-
-    def __eq__(self, other):
-        if self is other:
-            return True
-        if self.__class__ is other.__class__:
-            from spekk import ops
-
-            for _field in dataclasses.fields(self):
-                a = getattr(self, _field.name)
-                b = getattr(other, _field.name)
-                if isinstance(a, ops.array) and isinstance(b, ops.array):
-                    return a._id == b._id
-                elif a != b:
-                    return False
-            return True
-        return NotImplemented
-
-    def __hash__(self):
-        fields = []
-        for _field in dataclasses.fields(self):
-            value = getattr(self, _field.name)
-            if isinstance(value, dict):
-                value = tuple(value.keys()) + tuple(value.values())
-            elif isinstance(value, list):
-                value = tuple(value)
-            fields.append(value)
-        return hash((self.__class__, *fields))
-
+####
+# Helper functions for updating Modules in an immutably fashion:
 
 replace = dataclasses.replace
 
@@ -278,6 +261,10 @@ def traverse(
     return map_leaf(obj)
 
 
+####
+# Functions and helpers for flattening a Module into dynamic and static components:
+
+
 class _Arg:
     is_dynamic: bool
 
@@ -315,6 +302,30 @@ class _Flattened:
 
         return _eval(self.unflatten_ops)
 
+    def filter_dynamic(self, f: Callable, *args, **kwargs) -> "_Flattened":
+        dynamic = []
+        static = []
+        unflatten_ops = [lambda *args: self.unflatten(args)]
+
+        for obj in self.dynamic:
+            if f(obj, *args, **kwargs):
+                dynamic.append(obj)
+                unflatten_ops.append(_Arg.dynamic())
+            else:
+                static.append(obj)
+                unflatten_ops.append(_Arg.static())
+
+        static.extend(self.static)
+        return _Flattened(dynamic, static, unflatten_ops)
+
+
+def _is_array_like(x) -> bool:
+    import spekk.ops as ops
+
+    return isinstance(
+        x, (int, float, complex, ops.array)
+    ) or ops.backend._is_backend_array(x)
+
 
 def flatten(obj: TModule, *, flatten_spekk_arrays: bool = False) -> _Flattened:
     from spekk import ops
@@ -323,7 +334,7 @@ def flatten(obj: TModule, *, flatten_spekk_arrays: bool = False) -> _Flattened:
     static = []
 
     def map_leaf(leaf):
-        if is_array_like(leaf):
+        if _is_array_like(leaf):
             if flatten_spekk_arrays and isinstance(leaf, ops.array):
                 dynamic.append(leaf.data)
                 static.append(tuple(leaf.dims))
@@ -349,55 +360,3 @@ def flatten(obj: TModule, *, flatten_spekk_arrays: bool = False) -> _Flattened:
         map_static_field=map_static_field,
     )
     return _Flattened(tuple(dynamic), tuple(static), unflatten_ops)
-
-
-if __name__ == "__main__":
-    import spekk.ops as ops
-
-    ops.backend.set_backend("numpy")
-
-    class Foo(Module):
-        a: ops.array
-        b: str
-
-        @abc.abstractmethod
-        def bar(self): ...
-
-    class Bar(Foo):
-        c: int
-
-        def bar(self):
-            print("Hello, Method!")
-            return 2
-
-        @property
-        def my_property(self):
-            print("Hello, Property!")
-            return 3
-
-    class Quiz(Module):
-        d: Bar
-        e: int
-
-    obj = Quiz(Bar(ops.ones((2, 5), dims=["rx", "tx"]), "abc", 2), 3)
-
-    with cache_module_methods():
-        print(obj.d.bar(), obj.d.bar(), obj.d.my_property, obj.d.my_property)
-    print()
-    print(obj.d.bar(), obj.d.bar(), obj.d.my_property, obj.d.my_property)
-    print()
-
-    print(obj)
-    print(replace(obj, e=30_000))
-    print(replace_at(obj, ["d", "a"], 1.1))
-    print(update_at(obj, ["d", "a"], operator.add, 0.2))
-    print(obj)
-    flattened_obj = flatten(obj)
-    print(flattened_obj)
-    print(flattened_obj.unflatten((100, "foobar") + flattened_obj.dynamic[2:]))
-
-    print()
-    print()
-    print(obj.dim_sizes)
-    print(obj)
-    print(obj.at["tx", ::2].set(10))
