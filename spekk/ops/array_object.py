@@ -1453,8 +1453,8 @@ class array:
 
     @property
     def dims(self):
-        return self._dims
-
+        return self._dims.copy()
+    
     @property
     def dim_sizes(self) -> Dict[Dim, int]:
         return {d: s for d, s in zip(self.dims, self.shape)}
