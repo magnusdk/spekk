@@ -1,7 +1,30 @@
+import dataclasses
 import functools
 from typing import List, Sequence
 
 from spekk.ops._types import undefined_dim
+
+
+def _get_hashable_key(x):
+    from spekk import Module
+
+    if isinstance(x, (list, tuple)):
+        return (type(x), *(_get_hashable_key(element) for element in x))
+    elif isinstance(x, dict):
+        return (
+            dict,
+            *x.keys(),
+            *(_get_hashable_key(element) for element in x.values()),
+        )
+    elif isinstance(x, Module):
+        field_names = [field.name for field in dataclasses.fields(x)]
+        return (
+            type(x),
+            *field_names,
+            *(_get_hashable_key(getattr(x, name)) for name in field_names),
+        )
+    else:
+        return x
 
 
 def get_vmap_fn(vmap_impl):
@@ -53,8 +76,8 @@ def get_vmap_fn(vmap_impl):
 
             # Calculate the cache key. It is used to recompile the vmapped function if
             # the static parts of the arguments have changed.
-            cache_key = flattened_arguments.static
-            if flattened_arguments.static in CACHE:
+            cache_key = _get_hashable_key(flattened_arguments.static)
+            if cache_key in CACHE:
                 return CACHE[cache_key](*flattened_arguments.dynamic)
 
             # Else, we need to compile the function.
@@ -234,8 +257,8 @@ def get_jit_fn(jit_impl):
             )
 
             # Try to find an already-compiled version for the given static fields.
-            cache_key = flattened_args.static
-            if flattened_args.static in CACHE:
+            cache_key = _get_hashable_key(flattened_args.static)
+            if cache_key in CACHE:
                 return CACHE[cache_key](*flattened_args.dynamic)
             else:
                 # Cache miss! Now we have to compile it. This is simply done by
