@@ -1,10 +1,9 @@
 import functools
 
-from spekk import module
 from spekk.module import flatten
 
 
-def make_jaxpr(f, *, cache_module_methods: bool = False):
+def make_jaxpr(f):
     import jax
 
     @functools.wraps(f)
@@ -24,10 +23,6 @@ def make_jaxpr(f, *, cache_module_methods: bool = False):
             )
             return flattened_result.dynamic
 
-        if cache_module_methods:
-            with module.cache_module_methods():
-                return wrapped_inner(*flattened_args_outer.dynamic)
-        else:
-            return wrapped_inner(*flattened_args_outer.dynamic)
+        return wrapped_inner(*flattened_args_outer.dynamic)
 
     return wrapped_outer
