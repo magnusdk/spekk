@@ -94,7 +94,8 @@ def matmul(x1: array, x2: array, /) -> array:
         return array(backend.matmul(x1._data, x2._data), dims)
 
     # Else, stacked matmul
-    if (x1._dims[-1] != x2._dims[-2]) or (x1._dims[:-2] != x2._dims[:-2]):
+
+    if (x1._dims[-1] != x2._dims[-2]):        
         raise MismatchedDimensionsError(general_error_message)
     dims = list(x1._dims)[:-1]
     dims.append(x2._dims[-1])
