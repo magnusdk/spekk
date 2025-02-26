@@ -1,11 +1,9 @@
-import functools
 from typing import Callable, Literal, Optional, Sequence, Tuple, TypeVar, Union
 
-from spekk import module, ops
+from spekk import ops
 from spekk.module.base import Module
 from spekk.ops._backend import backend
 from spekk.ops._types import Dim, undefined_dim
-from spekk.ops._util import prepare_slicing_along_dim
 from spekk.ops.array_object import array
 
 TFunc = TypeVar("TFunc", bound=Callable)
@@ -193,25 +191,6 @@ def merge_dims(
     return ops.reshape(x, new_shape, new_dims)
 
 
-def take_along_dim(x: array, i: array, dim: Dim) -> array:
-    x, slices, dims = prepare_slicing_along_dim(x, i, dim)
-    data = x.data[slices]
-    return array(data, dims)
-
-
-def update_indices_along_dim(
-    f: Callable[[array], array], x: array, i: array, x_dim: Dim, i_dim: Dim
-) -> array:
-    from spekk import ops
-
-    x, slices, dims = prepare_slicing_along_dim(x, i, x_dim)
-    updated_x_slices = f(array(x.data[slices], dims))
-    updated_x_slices._dims = [x_dim if d == i_dim else d for d in updated_x_slices.dims]
-    x, updated_x_slices = ops.broadcast_arrays(x, updated_x_slices)
-    updated_data = backend._setitem_impl(x.data, slices, updated_x_slices.data)
-    return array(updated_data, x.dims)
-
-
 def expand_slice_to_axis(s: Union[slice, int, array], axis: int):
     """Make a given slice s work along a given axis.
 
@@ -234,39 +213,8 @@ def expand_slice_to_axis(s: Union[slice, int, array], axis: int):
     return (slice(None),) * axis + (s, ...)
 
 
-def jit(f: TFunc, *, cache_module_methods: bool = False) -> TFunc:
-    if cache_module_methods:
-        original_f = f
-
-        @functools.wraps(original_f)
-        def f(*args, **kwargs):
-            with module.cache_module_methods():
-                return original_f(*args, **kwargs)
-
+def jit(f: TFunc) -> TFunc:
     return backend.jit(f)
-
-
-def scan_over_dim(
-    f: Callable[[TCarry, TInputData], Tuple[TCarry, TOutputData]],
-    data: TInputData,
-    dim: Dim,
-    *,
-    init: TCarry,
-    include_index: bool = False,
-) -> Tuple[TCarry, TOutputData]:
-    from spekk import ops
-
-    def scan_fn(carry, i):
-        args = [carry, data.slice_dim(dim)[i]]
-        if include_index:
-            args.append(i)
-        return f(*args)
-
-    init, y0 = scan_fn(init, 0)
-    n = data.dim_sizes[dim]
-    result, ys = backend.scan(scan_fn, init, backend.arange(1, n))
-    ys = ops.concat([ops.array([y0]), ys])
-    return result, ys
 
 
 def reduce_over_dim(
