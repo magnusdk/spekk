@@ -29,6 +29,7 @@ V = TypeVar("V")
 
 @functools.wraps(dataclasses.field)
 def field(*, static: bool = False, **kwargs):
+    "Return an object to identify dataclass fields, and optionally mark them as static."
     metadata = dict(kwargs.pop("metadata", {}))  # Copy to new dict
     if "static" in metadata:
         raise ValueError("Cannot use metadata with `static` already set.")
@@ -302,19 +303,22 @@ class _Flattened:
 
         return _eval(self.unflatten_ops)
 
-    def filter_dynamic(self, f: Callable, *args, **kwargs) -> "_Flattened":
+    def filter_dynamic(self, predicate: Callable, *args, **kwargs) -> "_Flattened":
+        """Return a new _Flattened object where all dynamic fields for which predicate
+        returns False are made static instead."""
         dynamic = []
         static = []
         unflatten_ops = [lambda *args: self.unflatten(args)]
 
         for obj in self.dynamic:
-            if f(obj, *args, **kwargs):
+            if predicate(obj, *args, **kwargs):
                 dynamic.append(obj)
                 unflatten_ops.append(_Arg.dynamic())
             else:
                 static.append(obj)
                 unflatten_ops.append(_Arg.static())
 
+        # Add the existing static fields to the end of the new tuple of static fields.
         static.extend(self.static)
         return _Flattened(dynamic, static, unflatten_ops)
 
@@ -328,6 +332,26 @@ def _is_array_like(x) -> bool:
 
 
 def flatten(obj: TModule, *, flatten_spekk_arrays: bool = False) -> _Flattened:
+    """Flatten the Module recursively and put dynamic and static attributes into
+    separate tuples.
+
+    This is useful when we want to pass custom Module objects into traced functions,
+    e.g.: functions that have been wrapped with jax.jit. Flattening the object first
+    lets us input only the tuple of dynamic fields and the backend doesn't have to know
+    about our classes. Static fields are meant to be baked into the computation and if
+    they change then it is assumed that the computation also meaningfully changes.
+
+    Args:
+        obj (TModule): An instance of a class that inherits from Module.
+        flatten_spekk_arrays (bool): Whether to also flatten arrays into "data"
+            (dynamic) and "dims" (static). If False (default), then arrays are
+            considered as leaves and as dynamic attributes.
+
+    Returns:
+        An object containing the dynamic and static fields as separate tuples and that
+        has an unflatten method for getting back the original object. See
+        :class:`~spekk.module.base._Flattened` for more information.
+    """
     from spekk import ops
 
     dynamic = []
