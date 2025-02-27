@@ -301,9 +301,11 @@ def getitem(x: "ops.array", indexing_objects: tuple) -> "ops.array":
     elif any(ops.is_undefined_dim(dim) for dim in tmp_all_indexing_dims):
         data = x.data.__getitem__(
             tuple(
-                indexing_object.data
-                if isinstance(indexing_object, ops.array)
-                else indexing_object
+                (
+                    indexing_object.data
+                    if isinstance(indexing_object, ops.array)
+                    else indexing_object
+                )
                 for indexing_object in indexing_objects
             )
         )
@@ -376,9 +378,11 @@ def setitem(x: "ops.array", indexing_objects: tuple, value: "ops.array") -> "ops
         data = ops.backend._setitem_impl(
             x.data,
             tuple(
-                indexing_object.data
-                if isinstance(indexing_object, ops.array)
-                else indexing_object
+                (
+                    indexing_object.data
+                    if isinstance(indexing_object, ops.array)
+                    else indexing_object
+                )
                 for indexing_object in indexing_objects
             ),
             *ensure_backend_compatible_data(value),
@@ -424,7 +428,7 @@ def setitem(x: "ops.array", indexing_objects: tuple, value: "ops.array") -> "ops
             start, stop, step = indexing_object.indices(size)
             indexing_objects[i] = ops.arange(start, stop, step, dim=dim)
             indexing_objects[i] = ensure_broadcastable_with(
-                indexing_objects[i], indexing_sizes
+                indexing_objects[i], list(indexing_sizes.keys())
             )
     _, indexing_objects = ensure_broadcastable(*indexing_objects)
 
