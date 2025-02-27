@@ -236,12 +236,12 @@ def vecdot(x1: array, x2: array, /, *, axis: int = -1) -> array:
     .. versionchanged:: 2023.12
        Restricted ``axis`` to only negative integers.
     """
-    broadcasted_dims, (x1, x2) = ensure_broadcastable(x1, x2)
+    dims, (x1, x2) = ensure_broadcastable(x1, x2, must_have_same_ndim=True)
     if isinstance(axis, Dim):
         dim = axis
-        axis = broadcasted_dims.index(axis)
+        axis = dims.index(axis)
     else:
-        dim = broadcasted_dims[axis]
-    broadcasted_dims.remove(dim)
+        dim = dims[axis]
+    dims.remove(dim)
     x1, x2 = ensure_backend_compatible_data(x1, x2)
-    return array(backend.vecdot(x1, x2, axis=axis), broadcasted_dims)
+    return array(backend.vecdot(x1, x2, axis=axis), dims)

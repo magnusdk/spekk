@@ -31,6 +31,7 @@ from spekk.ops._types import (
 from spekk.ops._util import (
     canonicalize_axis,
     ensure_array,
+    ensure_broadcastable,
     ensure_broadcastable_with,
     get_broadcast_array_fn,
 )
@@ -119,8 +120,7 @@ def concat(
            This specification leaves type promotion between data type families (i.e., ``intxx`` and ``floatxx``) unspecified.
     """
     # TODO: What to do with 'UndefinedDims's arrays? Then we shouldn't broadcast here.
-    arrays = broadcast_arrays(*arrays)
-    broadcasted_dims = list(arrays[0].dims)
+    broadcasted_dims, arrays = ensure_broadcastable(*arrays, ensure_same_ndim=True)
     if isinstance(axis, Dim):
         axis = broadcasted_dims.index(axis)
     data = backend.concat([arr._data for arr in arrays], axis=axis)

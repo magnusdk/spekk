@@ -73,35 +73,11 @@ def get_reduction_axes_and_resulting_dims(
     return axis, dims
 
 
-def prepare_slicing_along_dim(
-    x: array, i: array, dim: Dim
-) -> Tuple[array, Tuple[slice, array], Dims]:
-    from spekk import ops
-
-    x, i = ensure_array(x), ensure_array(i)
-
-    # Ensure dim is the first axis. This makes it easier to keep track of dimensions.
-    if x.dims.index(dim) != 0:
-        x = ops.moveaxis(x, dim, 0)
-
-    common_dims = set(x.dims) & set(i.dims) - {dim}
-    slices = [slice(None)] * x.ndim
-    slices[x.dims.index(dim)] = i.data
-    for d in common_dims:
-        dim_idx = x.dims.index(d)
-        dim_size = x.shape[dim_idx]
-        broadcastable_shape = [1] * i.ndim
-        broadcastable_shape[i.dims.index(d)] = dim_size
-        slices[dim_idx] = backend.reshape(backend.arange(dim_size), broadcastable_shape)
-
-    resulting_dims = i.dims + [d for d in x.dims if d not in i.dims and d != dim]
-    return x, tuple(slices), resulting_dims
-
-
 def ensure_array(x: ArrayLike, dtype: _DType = None) -> array:
     if not isinstance(x, array):
         dtype = dtype._to_backend_dtype() if dtype is not None else None
-        x = backend.asarray(x, dtype=dtype)
+        if not backend._is_backend_array(x) or x.dtype != dtype._to_backend_dtype():
+            x = backend.asarray(x, dtype=dtype)
         x = array(x, [undefined_dim] * x.ndim)
     return x
 
@@ -140,6 +116,27 @@ def get_broadcast_array_fn(*arrays: array) -> Callable[[array], array]:
     output_dims = {dim: sizes.pop() for dim, sizes in output_dims.items()}
 
     def broadcast_array(arr: ops.array) -> ops.array:
+        arr_dims_in_order = [dim for dim in output_dims if dim in arr.dims]
+        if arr.dims != arr_dims_in_order:
+            arr = ops.permute_dims(arr, arr_dims_in_order)
+
+        new_shape = []
+        for dim in output_dims:
+            if dim in arr.dims:
+                new_shape.append(arr.dim_sizes[dim])
+            else:
+                new_shape.append(1)
+        new_shape = tuple(new_shape)
+        if arr.shape != new_shape:
+            arr = ops.reshape(arr, shape=new_shape, dims=list(output_dims.keys()))
+
+        broadcasted_shape = tuple(output_dims.values())
+        if arr.shape != broadcasted_shape:
+            arr = ops.broadcast_to(
+                arr, shape=broadcasted_shape, dims=list(output_dims.keys())
+            )
+        return arr
+
         # Find the dimensions that need to be added to the array in order to be broadcastable with all other arrays. missing_dims is a dictionary from the name of the dimension to the size of that dimension.
         missing_dims = {
             dim: size for dim, size in output_dims.items() if dim not in arr._dims
@@ -147,22 +144,30 @@ def get_broadcast_array_fn(*arrays: array) -> Callable[[array], array]:
 
         # Add the new dimensions to the array's data, making it broadcastable.
         new_shape_broadcastable = arr._data.shape + (1,) * len(missing_dims)
-        new_data = ops.backend.reshape(arr._data, new_shape_broadcastable)
+        new_data = arr._data
+        if arr.shape != new_shape_broadcastable:
+            new_data = ops.backend.reshape(new_data, new_shape_broadcastable)
 
         # Add the correct sizes to the corresponding dimensions
         new_shape = (*arr._data.shape, *missing_dims.values())
-        new_data = ops.backend.broadcast_to(new_data, new_shape)
+        if new_data.shape != new_shape:
+            new_data = ops.backend.broadcast_to(new_data, new_shape)
         # Also add them to the dimensions list
         new_dims = [*arr._dims, *missing_dims.keys()]
 
         # Put the dimensions in the correct order (same as all other arrays)
-        arr = ops.permute_dims(ops.array(new_data, new_dims), list(output_dims.keys()))
+        if new_dims != output_dims:
+            arr = ops.permute_dims(
+                ops.array(new_data, new_dims), list(output_dims.keys())
+            )
         return arr
 
     return broadcast_array
 
 
-def ensure_broadcastable(*arrays: array) -> Tuple[List[Dim], List[array]]:
+def ensure_broadcastable(
+    *arrays: array, ensure_same_ndim: bool = False
+) -> Tuple[List[Dim], List[array]]:
     from spekk import ops
 
     # Check if the arrays have any undefined dimensions. If all the dimensions are
@@ -194,36 +199,39 @@ def ensure_broadcastable(*arrays: array) -> Tuple[List[Dim], List[array]]:
                 if dim not in output_dims:
                     output_dims.append(dim)
 
-    # Expand dimensions if needed (using reshape) in the correct order.
-    resulting_arrays = []
-    for arr in arrays:
-        if isinstance(arr, array):
-            if arr.dims != output_dims:
-                arr_dims_in_order = [dim for dim in output_dims if dim in arr.dims]
-                arr = ops.permute_dims(arr, arr_dims_in_order)
-            if len(arr.dims) != len(output_dims):
-                # Add the new dimensions to the array's data, making it broadcastable.
-                broadcastable_shape = [
-                    arr.dim_sizes[dim] if dim in arr.dims else 1 for dim in output_dims
-                ]
-                arr = ops.reshape(arr, broadcastable_shape, output_dims)
-        resulting_arrays.append(arr)
-
-    return output_dims, resulting_arrays
+    # Ensure that they are broadcastable :)
+    broadcastable_arrays = [
+        ensure_broadcastable_with(
+            x, output_dims, ensure_same_ndim=ensure_same_ndim
+        )
+        for x in arrays
+    ]
+    return output_dims, broadcastable_arrays
 
 
-def ensure_broadcastable_with(x: array, dims: Dims) -> array:
+def ensure_broadcastable_with(
+    x: array, dims: Dims, *, ensure_same_ndim: bool = False
+) -> array:
     from spekk import ops
 
-    x_dims = get_dims(x)
-    assert all(dim in dims for dim in x_dims)
-    if x_dims != dims:
-        x_dims_in_order = [dim for dim in dims if dim in x_dims]
-        x = ops.permute_dims(x, x_dims_in_order)
-    if len(x_dims) != len(dims):
-        # Add the new dimensions to the array's data, making it broadcastable.
-        broadcastable_shape = [x.dim_sizes[dim] if dim in x_dims else 1 for dim in dims]
-        x = ops.reshape(x, broadcastable_shape, dims)
+    if isinstance(x, array):
+        x_dims = get_dims(x)
+        # Permute arr's dims if they are not in the same order as output_dims
+        arr_dims_in_order = [dim for dim in dims if dim in x_dims]
+        if x_dims != arr_dims_in_order:
+            x = ops.permute_dims(x, arr_dims_in_order)
+
+        # Make arr broadcastable with output_dims if it isn't already. It is
+        # broadcastable if its dimensions equal the last dimensions of output_dims.
+        start_index = len(dims) - len(arr_dims_in_order)
+        if (
+            ensure_same_ndim and len(dims) != len(x_dims)
+        ) or arr_dims_in_order != dims[start_index:]:
+            # Add the new dimensions to the array's data, making it broadcastable.
+            broadcastable_shape = [
+                x.dim_sizes[dim] if dim in x_dims else 1 for dim in dims
+            ]
+            x = ops.reshape(x, broadcastable_shape, dims)
     return x
 
 
