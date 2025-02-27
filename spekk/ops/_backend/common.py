@@ -241,7 +241,6 @@ def get_jit_fn(jit_impl):
 
         # We cache the jitted function (wrapped_inner) by the static fields. When the
         # static fields changes, the function is re-compiled.
-        # TODO: Make it a dict from tuple of static args to functools.lru_cache'd jitted function
         CACHE = {}
 
         @functools.wraps(f)
