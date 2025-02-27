@@ -127,6 +127,14 @@ def _parse_indexing_objects_by_dim(data_dims: "Dims", indexing_objects: tuple) -
             "Every other element of slices, starting from the second, must be an "
             "index-like object."
         )
+    dims_not_in_data = {dim for dim in dims if dim not in data_dims}
+    if len(dims_not_in_data) != 0:
+        raise IndexError(
+            f"Indexing dimensions {dims_not_in_data} does not exist in the data with "
+            f"dimensions {data_dims}."
+        )
+    if len(set(dims)) != len(dims):
+        raise IndexError(f"Got duplicate indexed dimensions: {dims}")
 
     _idx_dict = dict(zip(dims, indexing_objects))
     indexing_objects = tuple(_idx_dict.get(dim, slice(None)) for dim in data_dims)
