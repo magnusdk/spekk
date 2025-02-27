@@ -63,42 +63,46 @@ def matmul(x1: array, x2: array, /) -> array:
 
     # Both are one-dimensional -> inner product
     if x1.ndim == 1 and x2.ndim == 1:
-        if x1._dims != x2._dims:
+        if x1.shape != x2.shape:
             raise MismatchedDimensionsError(general_error_message)
         return array(backend.matmul(x1._data, x2._data), [])
 
     # Both are two-dimensional
     if x1.ndim == 2 and x2.ndim == 2:
-        if (x1._dims[1] != x2._dims[0]):
-            if not (isinstance(x1._dims[1], _UndefinedDim) and isinstance(x2._dims[0], _UndefinedDim)):
+        if x1.shape[1] != x2.shape[0]:
+            if not (
+                isinstance(x1.shape[1], _UndefinedDim)
+                and isinstance(x2.shape[0], _UndefinedDim)
+            ):
                 raise MismatchedDimensionsError(general_error_message)
         return array(
             backend.matmul(x1._data, x2._data),
-            [x1._dims[0], x2._dims[1]],
+            [x1.dims[0], x2.dims[1]],
         )
-    
+
     # x1 is one-dimensional, x2 isn't
     if x1.ndim == 1 and x2.ndim != 1:
-        if x1._dims[0] != x2._dims[-2]:
+        if x1.shape[0] != x2.shape[-2]:
             raise MismatchedDimensionsError(general_error_message)
-        dims = list(x2._dims)
+        dims = list(x2.dims)
         dims.pop(-2)
         return array(backend.matmul(x1._data, x2._data), dims)
 
     # x1 isn't one-dimensional, x2 is
     if x1.ndim != 1 and x2.ndim == 1:
-        if x1._dims[-2] != x2._dims[0]:
+        if x1.shape[-1] != x2.shape[0]:
             raise MismatchedDimensionsError(general_error_message)
-        dims = list(x1._dims)
-        dims.pop(-2)
+        dims = list(x1.dims)
+        dims.pop(-1)
         return array(backend.matmul(x1._data, x2._data), dims)
 
     # Else, stacked matmul
 
-    if (x1._dims[-1] != x2._dims[-2]):        
+    if x1.shape[-1] != x2.shape[-2]:
         raise MismatchedDimensionsError(general_error_message)
-    dims = list(x1._dims)[:-1]
-    dims.append(x2._dims[-1])
+    dims = x1.dims[:-2] if len(x1.dims) > len(x2.dims) else x2.dims[:-2]
+    dims.append(x1.dims[-2])
+    dims.append(x2.dims[-1])
     return array(backend.matmul(x1._data, x2._data), dims)
 
 
