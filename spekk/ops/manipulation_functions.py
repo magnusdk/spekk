@@ -236,7 +236,6 @@ def moveaxis(
     data = backend.moveaxis(x._data, source, destination)
     dims = [dim for i, dim in enumerate(x.dims) if i not in source]
     for src, dest in zip(source, destination):
-        dims.remove(x.dims[src])
         dest_idx = canonicalize_axis(len(x.dims), dest)
         dims.insert(dest_idx, x.dims[src])
     return array(data, dims)
