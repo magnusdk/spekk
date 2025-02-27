@@ -1235,8 +1235,8 @@ class array:
         /,
     ) -> None:
         new_array = self.at.__getitem__(key).set(value)
-        self.data = new_array.data
-        self.dims = new_array.dims
+        self._data = new_array.data
+        self._dims = new_array.dims
         self._id = new_array._id
 
     def __sub__(self: array, other: Union[int, float, array], /) -> array:
