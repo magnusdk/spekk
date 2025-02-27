@@ -1234,11 +1234,10 @@ class array:
         value: Union[int, float, bool, array],
         /,
     ) -> None:
-        # Same error message as in JAX.
-        raise TypeError(
-            "spekk arrays are immutable and do not support in-place item assignment. "
-            "Instead of x[idx] = y, use x = x.at[idx].set(y) or another .at[] method."
-        )
+        new_array = self.at.__getitem__(key).set(value)
+        self.data = new_array.data
+        self.dims = new_array.dims
+        self._id = new_array._id
 
     def __sub__(self: array, other: Union[int, float, array], /) -> array:
         """
@@ -1439,7 +1438,7 @@ class array:
     @property
     def dims(self):
         return self._dims.copy()
-    
+
     @property
     def dim_sizes(self) -> Dict[Dim, int]:
         return {d: s for d, s in zip(self.dims, self.shape)}
@@ -1503,9 +1502,6 @@ class array:
     @property
     def at(self) -> "ArrayIndexUpdateHelper":
         return ArrayIndexUpdateHelper(self)
-
-    def __hash__(self):
-        return hash(self._id)
 
     def __repr__(self):
         return (
