@@ -240,7 +240,7 @@ def vecdot(x1: array, x2: array, /, *, axis: int = -1) -> array:
     .. versionchanged:: 2023.12
        Restricted ``axis`` to only negative integers.
     """
-    dims, (x1, x2) = ensure_broadcastable(x1, x2, must_have_same_ndim=True)
+    dims, (x1, x2) = ensure_broadcastable(x1, x2, ensure_same_ndim=True)
     if isinstance(axis, Dim):
         dim = axis
         axis = dims.index(axis)
