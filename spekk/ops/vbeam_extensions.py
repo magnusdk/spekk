@@ -116,7 +116,7 @@ def dilation1d(
     indices[axis_idx] = slice(0, new_shape[axis_idx], dilation_factor + 1)
 
     # Place the original values into the zeros array
-    result[tuple(indices)] = x
+    result[axis, ops.array(list(range(0, new_shape[axis_idx], dilation_factor + 1)), [axis])] = x
 
     return result
 
