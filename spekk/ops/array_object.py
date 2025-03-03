@@ -69,7 +69,7 @@ class array:
         if dtype is not None:
             dtype = _DType._to_backend_dtype(dtype)
             if dtype != data.dtype:
-                kwargs["dtype"] = dtype
+                args.append(dtype)
         if device is not None and device != getattr(data, "device", None):
             kwargs["device"] = device
         if args or kwargs:
