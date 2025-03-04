@@ -59,3 +59,10 @@ def flatten(x: torch.Tensor) -> torch.Tensor:
 
 def to_numpy(x: torch.Tensor) -> numpy.ndarray:
     return x.cpu().numpy()
+
+def correlate2d(x1, x2) -> torch.Tensor:
+    pad = (x2.shape[0]-1, x2.shape[1]-1)
+    x2 = torch.conj(x2)
+    a = torch.nn.functional.conv2d(x1[None, None, :,:], x2[None, None, :,:], padding=pad)[0,0]  
+    return a 
+

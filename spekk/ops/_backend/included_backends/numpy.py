@@ -105,3 +105,7 @@ def flatten(x: np.ndarray) -> np.ndarray:
 
 def to_numpy(x: np.ndarray) -> np.ndarray:
     return x
+
+def correlate2d(x1: np.ndarray, x2: np.ndarray) -> np.ndarray:
+    import scipy
+    return scipy.signal.correlate2d(x1, x2)

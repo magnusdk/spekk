@@ -93,6 +93,12 @@ def convolve1d(
 
     return array(data_filtered, dims=dims)
 
+def correlate2d(x1: array, x2: array):
+    if x1.ndim != 2 or x2.ndim != 2:
+        raise ValueError("Input arrays must be 2D arrays")
+    if x1.dims != x2.dims:
+        raise ValueError("Input arrays must have equal dims")
+    return ops.array(backend.correlate2d(x1.data, x2.data), dims=x1.dims)
 
 def dilation1d(
     x: array,

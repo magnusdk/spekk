@@ -37,3 +37,11 @@ def flatten(x: jax.Array) -> jax.Array:
 
 def to_numpy(x: jax.Array) -> numpy.ndarray:
     return numpy.array(x)
+
+def correlate2d(x1, x2) -> jax.Array:
+    from jax.scipy.signal import convolve2d
+    x2 = jax.numpy.flip(x2, axis=0)
+    x2 = jax.numpy.flip(x2, axis=1)
+    x2 = jax.numpy.conj(x2)
+    output = convolve2d(x1, x2, mode='full')
+    return output
