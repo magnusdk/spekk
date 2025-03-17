@@ -5,7 +5,7 @@ from typing import Literal, Optional
 import array_api_compat
 
 _env_backend = os.environ.get("SPEKK_BACKEND", None)
-_backend_priority = ["jax", "torch", "numpy"]
+_backend_priority = ["jax", "torch", "cupy", "numpy"]
 
 
 def _set_initial_backend(backend: "Backend"):
@@ -54,14 +54,14 @@ def _is_writeable_array(x) -> bool:
 
 class Backend:
     def __init__(
-        self, backend_name: Optional[Literal["numpy", "mlx", "jax", "torch"]] = None
+        self, backend_name: Optional[Literal["numpy", "mlx", "jax", "torch", "cupy"]] = None
     ):
         self.backend_name = backend_name
         if self.backend_name is None:
             _set_initial_backend(self)
 
-    def set_backend(self, backend_name: Literal["numpy", "mlx", "jax", "torch"]):
-        if backend_name not in ["numpy", "mlx", "jax", "torch"]:
+    def set_backend(self, backend_name: Literal["numpy", "mlx", "jax", "torch", "cupy"]):
+        if backend_name not in ["numpy", "mlx", "jax", "torch", "cupy"]:
             raise ValueError(f"Unknown backend '{backend_name}'")
         old_backend_name = self.backend_name
         self.backend_name = backend_name
@@ -75,7 +75,7 @@ class Backend:
             raise
 
     @contextlib.contextmanager
-    def temporary_backend(self, backend_name: Literal["numpy", "mlx", "jax", "torch"]):
+    def temporary_backend(self, backend_name: Literal["numpy", "mlx", "jax", "torch", "cupy"]):
         original_backend = self.backend_name
         self.set_backend(backend_name)
         try:
@@ -103,6 +103,8 @@ class Backend:
             import spekk.ops._backend.included_backends.mlx as ops
         elif self.backend_name == "torch":
             import spekk.ops._backend.included_backends.torch as ops
+        elif self.backend_name == "cupy":
+            import spekk.ops._backend.included_backends.cupy as ops
         return ops
 
     def __getattr__(self, name: str):
