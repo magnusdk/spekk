@@ -104,4 +104,5 @@ def flatten(x: cp.ndarray) -> cp.ndarray:
 
 
 def to_numpy(x: cp.ndarray) -> cp.ndarray:
-    return x
+    return x.get()
+
