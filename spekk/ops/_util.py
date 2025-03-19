@@ -5,7 +5,8 @@ from spekk.ops._backend import backend
 from spekk.ops._types import ArrayLike, Dim, Dims, _UndefinedDim, undefined_dim
 from spekk.ops.array_object import array
 from spekk.ops.data_types import _DType
-
+from spekk import ops
+import numbers
 
 def get_reduction_axes_and_resulting_dims(
     dim: Optional[Union[Dim, int, Tuple[Dim, ...], Tuple[int, ...]]],
@@ -232,12 +233,16 @@ def ensure_broadcastable_with(
             x = ops.reshape(x, broadcastable_shape, dims)
     return x
 
+def is_number(variable):
+    return isinstance(variable, numbers.Number)
 
 def ensure_backend_compatible_data(*data) -> list:
     new_data = []
     for item in data:
         if isinstance(item, array):
             item = item.data
+        elif is_number(item):
+            item = ops.array(item).data
         new_data.append(item)
     return new_data
 
