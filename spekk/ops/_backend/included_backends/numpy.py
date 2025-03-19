@@ -4,7 +4,6 @@ from typing import Sequence, Union
 import numpy as np
 from array_api_compat.numpy import *
 from array_api_compat.numpy import _info
-from numpy import *
 
 import spekk.ops._backend.common as common
 
