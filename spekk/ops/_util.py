@@ -75,9 +75,8 @@ def get_reduction_axes_and_resulting_dims(
 
 def ensure_array(x: ArrayLike, dtype: _DType = None) -> array:
     if not isinstance(x, array):
-        if dtype is not None:
-            dtype = _DType._to_backend_dtype(dtype)
-        if not backend._is_backend_array(x) or x.dtype != dtype:
+        dtype = _DType._to_backend_dtype(dtype) if dtype is not None else None
+        if not backend._is_backend_array(x) or (x.dtype != dtype and dtype is not None) :
             x = backend.asarray(x, dtype=dtype)
         x = array(x)
     return x
