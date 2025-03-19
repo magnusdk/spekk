@@ -878,6 +878,13 @@ def clip(
         _, (x, max) = ensure_broadcastable(x, max)
     dims = get_dims(x)
     x, min, max = ensure_backend_compatible_data(x, min, max)
+
+    #block below is needed due to a bug in array compat lib. Need to cast min/max to float when x.dtype is int
+    from spekk import ops
+    if not ops.isdtype(x.dtype, 'integral'):
+        min = float(min) if isinstance(min, int) else min
+        max = float(max) if isinstance(max, int) else max
+
     return array(backend.clip(x, min=min, max=max), dims)
 
 
@@ -2640,7 +2647,7 @@ def sin(x: array, /) -> array:
     dims = get_dims(x)
     (x,) = ensure_backend_compatible_data(x)
     return array(backend.sin(x), dims)
-
+    
 
 def sinh(x: array, /) -> array:
     r"""
