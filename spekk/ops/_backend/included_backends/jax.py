@@ -45,3 +45,9 @@ def correlate2d(x1, x2) -> jax.Array:
     x2 = jax.numpy.conj(x2)
     output = convolve2d(x1, x2, mode='full')
     return output
+
+def set_device(device):
+    global active_device
+    active_device = device
+
+active_device = None

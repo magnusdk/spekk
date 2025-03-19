@@ -59,6 +59,10 @@ class Backend:
         self.backend_name = backend_name
         if self.backend_name is None:
             _set_initial_backend(self)
+    
+    @property
+    def device(self):
+        return self.active_device
 
     def set_backend(self, backend_name: Literal["numpy", "mlx", "jax", "torch", "cupy"]):
         if backend_name not in ["numpy", "mlx", "jax", "torch", "cupy"]:

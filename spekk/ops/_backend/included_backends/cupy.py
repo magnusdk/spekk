@@ -106,3 +106,8 @@ def flatten(x: cp.ndarray) -> cp.ndarray:
 def to_numpy(x: cp.ndarray) -> cp.ndarray:
     return x.get()
 
+def set_device(device):
+    global active_device
+    active_device = device
+
+active_device = None

@@ -109,3 +109,9 @@ def to_numpy(x: np.ndarray) -> np.ndarray:
 def correlate2d(x1: np.ndarray, x2: np.ndarray) -> np.ndarray:
     import scipy
     return scipy.signal.correlate2d(x1, x2)
+
+def set_device(device):
+    global active_device
+    active_device = device
+
+active_device = None

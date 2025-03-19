@@ -66,3 +66,10 @@ def correlate2d(x1, x2) -> torch.Tensor:
     a = torch.nn.functional.conv2d(x1[None, None, :,:], x2[None, None, :,:], padding=pad)[0,0]  
     return a 
 
+
+
+def set_device(device):
+    global active_device
+    active_device = device
+
+active_device = "cuda"
