@@ -66,7 +66,22 @@ def correlate2d(x1, x2) -> torch.Tensor:
     a = torch.nn.functional.conv2d(x1[None, None, :,:], x2[None, None, :,:], padding=pad)[0,0]  
     return a 
 
+# "take" is part of array compat lib but there is a mismatch where numpy/jax squeezes the output 
+# array if indices is a number, whereas torch keep the singleton dimension.
+# def take(x: torch.Tensor, indices: torch.Tensor, /, *, axis: Optional[int] = None, **kwargs) -> torch.Tensor:
+def take(x: torch.Tensor, indices: torch.Tensor, /, *, axis = None, **kwargs) -> torch.Tensor:
+    if axis is None:
+        if x.ndim != 1:
+            raise ValueError("axis must be specified when ndim > 1")
+        axis = 0
 
+    arr = torch.index_select(x, axis, indices, **kwargs)
+
+    # Missing in array compat api
+    if arr.shape[axis]==1:
+        arr = arr.squeeze(axis)
+
+    return arr
 
 def set_device(device):
     global active_device
