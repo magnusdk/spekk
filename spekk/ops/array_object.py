@@ -25,6 +25,7 @@ from spekk.ops._types import (
     dtype as Dtype,
 )
 from spekk.ops.data_types import _DType
+from spekk import ops
 
 __all__ = ["array"]
 
@@ -41,12 +42,35 @@ class array:
         dtype: Optional[dtype] = None,
         device: Optional[device] = None,
     ):
+        
+        if device is None:
+            device = ops.backend.device
+
+        if dtype is not None:
+            dtype = _DType._to_backend_dtype(dtype)
+        # else:
+        #     if ops.backend.backend_name=="torch":
+        #         if isinstance(data, np.ndarray):
+        #             if data.dtype == np.float64:
+        #                 dtype = _DType._to_backend_dtype(ops.float32)
+        #             if data.dtype == np.complex128:
+        #                 dtype = _DType._to_backend_dtype(ops.complex64)                
+
         if isinstance(data, array):
             if dims is None:
                 dims = data._dims
             data = data._data
+
         if not backend._is_backend_array(data):
-            data = backend.asarray(data)
+            data = backend.asarray(data, dtype=dtype, device=device)
+        else:
+            if dtype is None:
+                dtype = data.dtype
+
+            # if dtype != data.dtype or (hasattr(data, "device") and device!=data.device):
+            # if dtype != data.dtype or device!=data.device:
+            if dtype != data.dtype:                
+                data = backend.astype(data, dtype, device=device)
 
         if dims is None:
             dims = [_UndefinedDim() for _ in range(data.ndim)]
@@ -63,17 +87,6 @@ class array:
             ]
         if len(set(dims)) != len(dims):
             raise ValueError(f"The dimensions must be unique, but got {dims=}")
-
-        # Set the dtype and device (if given)
-        args, kwargs = [], {}
-        if dtype is not None:
-            dtype = _DType._to_backend_dtype(dtype)
-            if dtype != data.dtype:
-                args.append(dtype)
-        if device is not None and device != getattr(data, "device", None):
-            kwargs["device"] = device
-        if args or kwargs:
-            data = backend.astype(data, *args, **kwargs)
 
         self._data = data
         self._dims = dims
