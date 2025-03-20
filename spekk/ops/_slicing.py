@@ -438,7 +438,9 @@ def setitem(
             dims=tuple(dim_sizes.keys()),
         )
 
-    indexing_objects = _parse_indexing_objects(x.dims, indexing_objects)
+    indexing_objects = _parse_indexing_objects(
+        x.dims, indexing_objects, indexing_behavior
+    )
 
     indexing_objects = list(indexing_objects)
     value_dim_sizes = value.dim_sizes if isinstance(value, ops.array) else {}
