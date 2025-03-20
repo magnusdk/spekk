@@ -1,3 +1,4 @@
+from typing import Optional
 import numpy
 import torch
 from torch import *
@@ -23,7 +24,8 @@ def scan(fn, init, xs):
     # Will hold the flattened outputs (list of lists of arrays) for each time step.
     results_flat = []
 
-    for t in range(T):
+    for t_np in numpy.arange(0, T, dtype=numpy.int64):
+        t = t_np.item()
         # For each dynamic array in xs, extract the t-th element along axis 0.
         xs_t_dynamic = [arr[t] for arr in flat_xs.dynamic]
         # Reconstruct the tree corresponding to the t-th slice.
@@ -36,7 +38,9 @@ def scan(fn, init, xs):
     # For each leaf, stack all T outputs along a new first axis.
     num_leaves = len(results_flat[0])
     dynamic_result = []
-    for leaf_idx in range(num_leaves):
+    # for leaf_idx in numpy.arange(0, num_leaves, dtype=int):
+    for leaf_idx_np in numpy.arange(0, num_leaves, dtype=numpy.int64):
+        leaf_idx = leaf_idx_np.item()        
         # Gather the same leaf from each time step.
         leaf_values = [results_flat[t][leaf_idx] for t in range(T)]
         dynamic_result.append(torch.stack(leaf_values, axis=0))
