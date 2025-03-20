@@ -1,10 +1,20 @@
 import collections
+import dataclasses
 from typing import TYPE_CHECKING, Callable, List, Sequence
 
 if TYPE_CHECKING:
     from spekk import Dim, Dims, ops
 
 import itertools
+
+
+@dataclasses.dataclass
+class _IndexingBehavior:
+    """A class defining how to handle special cases during indexing."""
+
+    # If True and indexing by dimension name, then an IndexError is raised if the
+    # indexed dimension does not exist in the array.
+    raise_if_slice_dim_not_in_x: bool = True
 
 
 def _index_of_first_ellipsis(objs) -> int:
@@ -95,7 +105,11 @@ def _validate_and_handle_indexing_with_undefined_dim_arrays(
     return tuple(new_indexing_objects)
 
 
-def _parse_indexing_objects_by_dim(data_dims: "Dims", indexing_objects: tuple) -> tuple:
+def _parse_indexing_objects_by_dim(
+    data_dims: "Dims",
+    indexing_objects: tuple,
+    indexing_behavior: _IndexingBehavior,
+) -> tuple:
     """Parse indexing objects when indexing by dimension names. The output is a tuple
     with an indexing object for each axis (i.e.: no longer indexed by dimension name).
 
@@ -127,12 +141,13 @@ def _parse_indexing_objects_by_dim(data_dims: "Dims", indexing_objects: tuple) -
             "Every other element of slices, starting from the second, must be an "
             "index-like object."
         )
-    dims_not_in_data = {dim for dim in dims if dim not in data_dims}
-    if len(dims_not_in_data) != 0:
-        raise IndexError(
-            f"Indexing dimensions {dims_not_in_data} does not exist in the data with "
-            f"dimensions {data_dims}."
-        )
+    if indexing_behavior.raise_if_slice_dim_not_in_x:
+        dims_not_in_data = {dim for dim in dims if dim not in data_dims}
+        if len(dims_not_in_data) != 0:
+            raise IndexError(
+                f"Indexing dimensions {dims_not_in_data} does not exist in the data with "
+                f"dimensions {data_dims}."
+            )
     if len(set(dims)) != len(dims):
         raise IndexError(f"Got duplicate indexed dimensions: {dims}")
 
@@ -141,13 +156,19 @@ def _parse_indexing_objects_by_dim(data_dims: "Dims", indexing_objects: tuple) -
     return indexing_objects
 
 
-def _parse_indexing_objects(data_dims: "Dims", indexing_objects: tuple) -> tuple:
+def _parse_indexing_objects(
+    data_dims: "Dims",
+    indexing_objects: tuple,
+    indexing_behavior: _IndexingBehavior,
+) -> tuple:
     from spekk import Dim, ops
 
     if len(indexing_objects) == 0:
         raise IndexError("You must index at least one axis.")
     if any(isinstance(dim, Dim) for dim in indexing_objects):
-        indexing_objects = _parse_indexing_objects_by_dim(data_dims, indexing_objects)
+        indexing_objects = _parse_indexing_objects_by_dim(
+            data_dims, indexing_objects, indexing_behavior
+        )
 
     # Handle Ellipsis (aka ...) and the case where not all axes are explicitly given,
     # e.g.: arr with shape (2,3) that were indexed like arr[0] (contra indexed as
@@ -270,15 +291,17 @@ def _get_advanced_indexing_output_dims(
     return unique_output_dims
 
 
-def getitem(x: "ops.array", indexing_objects: tuple) -> "ops.array":
+def getitem(
+    x: "ops.array",
+    indexing_objects: tuple,
+    indexing_behavior: _IndexingBehavior,
+) -> "ops.array":
     from spekk import ops
-    from spekk.ops._util import (
-        ensure_backend_compatible_data,
-        ensure_broadcastable,
-        ensure_broadcastable_with,
-    )
+    from spekk.ops._util import ensure_broadcastable, ensure_broadcastable_with
 
-    indexing_objects = _parse_indexing_objects(x.dims, indexing_objects)
+    indexing_objects = _parse_indexing_objects(
+        x.dims, indexing_objects, indexing_behavior
+    )
 
     # TODO: Clean up this hack
     # Short-circuit to NumPy broadcasting if:
@@ -343,7 +366,12 @@ def getitem(x: "ops.array", indexing_objects: tuple) -> "ops.array":
         return ops.array(x.data.__getitem__(indexing_objects), output_dims)
 
 
-def setitem(x: "ops.array", indexing_objects: tuple, value: "ops.array") -> "ops.array":
+def setitem(
+    x: "ops.array",
+    indexing_objects: tuple,
+    value: "ops.array",
+    indexing_behavior: _IndexingBehavior,
+) -> "ops.array":
     from spekk import ops
     from spekk.ops._util import (
         ensure_backend_compatible_data,
@@ -464,15 +492,25 @@ class ArrayIndexUpdateHelper:
 
 
 class _ArrayIndexUpdateRef:
-    def __init__(self, x: "ops.array", slices: tuple):
+    def __init__(
+        self,
+        x: "ops.array",
+        slices: tuple,
+        indexing_behavior: _IndexingBehavior = _IndexingBehavior(),
+    ):
         self.x = x
         self.slices = slices
+        self._indexing_behavior = indexing_behavior
+
+    def _with_indexing_behavior(self, **changes):
+        _indexing_behavior = dataclasses.replace(self._indexing_behavior, **changes)
+        return _ArrayIndexUpdateRef(self.x, self.slices, _indexing_behavior)
 
     def get(self) -> "ops.array":
-        return getitem(self.x, self.slices)
+        return getitem(self.x, self.slices, self._indexing_behavior)
 
     def set(self, value: "ops.array") -> "ops.array":
-        return setitem(self.x, self.slices, value)
+        return setitem(self.x, self.slices, value, self._indexing_behavior)
 
     def update(
         self, f: Callable[["ops.array"], "ops.array"], *args, **kwargs

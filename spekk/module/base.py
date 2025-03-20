@@ -164,7 +164,10 @@ class _ModuleAtUpdateRef:
 
         def map_leaf(leaf):
             if isinstance(leaf, ops.array):
-                leaf = getattr(leaf.at[self.slices], name)(*args, **kwargs)
+                indexing_ref = leaf.at[self.slices]._with_indexing_behavior(
+                    raise_if_slice_dim_not_in_x=False
+                )
+                leaf = getattr(indexing_ref, name)(*args, **kwargs)
             return leaf
 
         return map_leaf
