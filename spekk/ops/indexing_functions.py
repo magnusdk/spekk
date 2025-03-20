@@ -48,7 +48,11 @@ def take(
     .. versionchanged:: 2023.12
        Out-of-bounds behavior is explicitly left unspecified.
     """
-    x, indices = array(x, dtype=x.dtype, device=x.device), array(indices, dtype=x.dtype, device=x.device)
+
+
+    # x, indices = array(x, dtype=x.dtype, device=x.device), array(indices, dtype=int, device=x.device)
+    x, indices = array(x, dtype=x.dtype), array(indices, dtype=int)
+
     # array-api only allows indexing with 1D arrays. We differ because we also allow
     # 0D arrays (basically just int).
     if indices.ndim not in {0, 1}:

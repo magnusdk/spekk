@@ -34,6 +34,7 @@ from spekk.ops._util import (
 )
 from spekk.ops.array_object import array
 from spekk.ops.data_types import _DType
+from spekk import ops
 
 
 def arange(
@@ -78,9 +79,11 @@ def arange(
         dim = undefined_dim
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
+    if device is None:
+        device = ops.backend.device
     return array(
         backend.arange(start, stop, step, dtype=dtype, device=device),
-        [dim],
+        [dim], device=device
     )
 
 
@@ -144,15 +147,17 @@ def asarray(
     """
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
+    if device is None:
+        device = ops.backend.device
     if isinstance(obj, array):
         if dims is None:
             dims = obj.dims
         data = backend.asarray(obj.data, dtype=dtype, device=device, copy=copy)
-        return array(data, dims)
+        return array(data, dims, device=device)
 
     data = backend.asarray(obj, dtype=dtype, device=device, copy=copy)
     dims = [undefined_dim] * data.ndim
-    return array(data, dims)
+    return array(data, dims, device=device)
 
 
 def empty(
@@ -185,8 +190,9 @@ def empty(
         dims = [undefined_dim] * len(shape)
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
-    return array(backend.empty(shape, dtype=dtype, device=device), dims)
-
+    if device is None:
+        device = ops.backend.device        
+    return array(backend.empty(shape, dtype=dtype, device=device), dims, device=device)
 
 def empty_like(
     x: array,
@@ -212,10 +218,11 @@ def empty_like(
     out: array
         an array having the same shape as ``x`` and containing uninitialized data.
     """
-    x = array(x, dtype=dtype, device=device)
+    if device is None:
+        device = ops.backend.device   
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
-    return array(backend.empty_like(x._data, dtype=dtype, device=device), x._dims)
+    return array(backend.empty_like(x._data, dtype=dtype, device=device), x._dims, device=device)
 
 
 def eye(
@@ -262,9 +269,11 @@ def eye(
         dims = [undefined_dim, undefined_dim]
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
+    if device is None:
+        device = ops.backend.device           
     return array(
         backend.eye(n_rows, n_cols, k=k, dtype=dtype, device=device),
-        dims,
+        dims, device=device
     )
 
 
@@ -353,7 +362,9 @@ def from_dlpack(
     data = backend.from_dlpack(x, device=device, copy=copy)
     if dims is None:
         dims = [undefined_dim] * data.ndim
-    return array(data, dims)
+    if device is None:
+        device = ops.backend.device            
+    return array(data, dims, device=device)
 
 
 def full(
@@ -404,7 +415,9 @@ def full(
         dims = [undefined_dim] * len(shape)
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
-    return array(backend.full(shape, fill_value, dtype=dtype, device=device), dims)
+    if device is None:
+        device = ops.backend.device         
+    return array(backend.full(shape, fill_value, dtype=dtype, device=device), dims, device=device)
 
 
 def full_like(
@@ -450,9 +463,11 @@ def full_like(
     x = array(x, dtype=dtype, device=device)
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
+    if device is None:
+        device = ops.backend.device          
     return array(
         backend.full_like(x._data, fill_value, dtype=dtype, device=device),
-        x._dims,
+        x._dims, device=device
     )
 
 
@@ -534,11 +549,13 @@ def linspace(
     broadcasted_dims, (start, stop) = ensure_broadcastable(start, stop)
     dims = [dim, *broadcasted_dims]
     start, stop = ensure_backend_compatible_data(start, stop)
+    if device is None:
+        device = ops.backend.device       
     return array(
         backend.linspace(
             start, stop, num, dtype=dtype, device=device, endpoint=endpoint
         ),
-        dims,
+        dims, device=device
     )
 
 
@@ -623,7 +640,9 @@ def ones(
         dims = [undefined_dim] * len(shape)
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
-    return array(backend.ones(shape, dtype=dtype, device=device), dims)
+    if device is None:
+        device = ops.backend.device
+    return array(backend.ones(shape, dtype=dtype, device=device), dims, device=device)
 
 
 def ones_like(
@@ -658,7 +677,9 @@ def ones_like(
     x = array(x, dtype=dtype, device=device)
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
-    return array(backend.ones_like(x._data, dtype=dtype, device=device), x._dims)
+    if device is None:
+        device = ops.backend.device        
+    return array(backend.ones_like(x._data, dtype=dtype, device=device), x._dims, device=device)
 
 
 def tril(x: array, /, *, k: int = 0) -> array:
@@ -741,7 +762,9 @@ def zeros(
         dims = [undefined_dim] * len(shape)
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
-    return array(backend.zeros(shape, dtype=dtype, device=device), dims)
+    if device is None:
+        device = ops.backend.device
+    return array(backend.zeros(shape, dtype=dtype, device=device), dims, device=device)
 
 
 def zeros_like(
@@ -767,4 +790,6 @@ def zeros_like(
     x = array(x, dtype=dtype, device=device)
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
-    return array(backend.zeros_like(x._data, dtype=dtype, device=device), x._dims)
+    if device is None:
+        device = ops.backend.device        
+    return array(backend.zeros_like(x._data, dtype=dtype, device=device), x._dims, device=device)

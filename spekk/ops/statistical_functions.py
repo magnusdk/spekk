@@ -58,8 +58,6 @@ def cumulative_sum(
 
     .. versionadded:: 2023.12
     """
-    dtype = x.dtype if dtype is None else dtype
-    x = array(x, dtype=dtype, device=x.device)
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
     if axis is None:
@@ -116,7 +114,6 @@ def max(
     .. versionchanged:: 2023.12
        Clarified that the order of signed zeros is implementation-defined.
     """
-    x = array(x, dtype=x.dtype, device=x.device)
     axis, dims = get_reduction_axes_and_resulting_dims(axis, x._dims, keepdims)
     data = backend.max(x._data, axis=axis, keepdims=keepdims)
     return array(data, dims)
@@ -158,8 +155,7 @@ def mean(
 
     -   If ``N`` is ``0``, the arithmetic mean is ``NaN``.
     -   If ``x_i`` is ``NaN``, the arithmetic mean is ``NaN`` (i.e., ``NaN`` values propagate).
-    """
-    x = array(x, dtype=x.dtype, device=x.device)
+    """    
     axis, dims = get_reduction_axes_and_resulting_dims(axis, x._dims, keepdims)
     data = backend.mean(x._data, axis=axis, keepdims=keepdims)
     return array(data, dims)
@@ -207,7 +203,6 @@ def min(
     .. versionchanged:: 2023.12
        Clarified that the order of signed zeros is implementation-defined.
     """
-    x = array(x, dtype=x.dtype, device=x.device)
     axis, dims = get_reduction_axes_and_resulting_dims(axis, x._dims, keepdims)
     data = backend.min(x._data, axis=axis, keepdims=keepdims)
     return array(data, dims)
@@ -264,8 +259,6 @@ def prod(
     .. versionchanged:: 2023.12
        Required the function to return a floating-point array having the same data type as the input array when provided a floating-point array.
     """
-    dtype = x.dtype if dtype is None else dtype
-    x = array(x, dtype=dtype, device=x.device)
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
     axis, dims = get_reduction_axes_and_resulting_dims(axis, x._dims, keepdims)
@@ -313,7 +306,6 @@ def std(
     -   If ``N - correction`` is less than or equal to ``0``, the standard deviation is ``NaN``.
     -   If ``x_i`` is ``NaN``, the standard deviation is ``NaN`` (i.e., ``NaN`` values propagate).
     """
-    x = array(x, dtype=x.dtype, device=x.device)
     axis, dims = get_reduction_axes_and_resulting_dims(axis, x._dims, keepdims)
     data = backend.std(x._data, axis=axis, correction=correction, keepdims=keepdims)
     return array(data, dims)
@@ -370,8 +362,6 @@ def sum(
     .. versionchanged:: 2023.12
        Required the function to return a floating-point array having the same data type as the input array when provided a floating-point array.
     """
-    dtype = x.dtype if dtype is None else dtype
-    x = array(x, dtype=dtype, device=x.device)
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
     axis, dims = get_reduction_axes_and_resulting_dims(axis, x._dims, keepdims)
@@ -420,7 +410,6 @@ def var(
     -   If ``N - correction`` is less than or equal to ``0``, the variance is ``NaN``.
     -   If ``x_i`` is ``NaN``, the variance is ``NaN`` (i.e., ``NaN`` values propagate).
     """
-    x = array(x, dtype=x.dtype, device=x.device)
     axis, dims = get_reduction_axes_and_resulting_dims(axis, x._dims, keepdims)
     data = backend.var(x._data, axis=axis, correction=correction, keepdims=keepdims)
     return array(data, dims)

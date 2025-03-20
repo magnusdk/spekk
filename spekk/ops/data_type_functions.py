@@ -14,7 +14,7 @@ from spekk.ops._types import (
 )
 from spekk.ops.array_object import array
 from spekk.ops.data_types import _DType
-
+from spekk import ops
 
 def astype(
     x: array, dtype: dtype, /, *, copy: bool = True, device: Optional[device] = None
@@ -68,11 +68,13 @@ def astype(
     # NOTE: Hack to make it work with Numpy. Remove this (and just pass copy and device
     # directly to backend.astype) when it has been fixed.
     kwargs = dict(copy=copy)
+    if device is None:
+        device = ops.backend.device 
     if device is not None:
         kwargs["device"] = device
     dtype = _DType._to_backend_dtype(dtype)
     data = backend.astype(x._data, dtype, **kwargs)
-    return array(data, x._dims)
+    return array(data, x._dims, device=device)
 
 
 def can_cast(from_: Union[dtype, array], to: dtype, /) -> bool:

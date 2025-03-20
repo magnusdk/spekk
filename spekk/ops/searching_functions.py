@@ -35,7 +35,6 @@ def argmax(x: array, /, *, axis: Optional[Dim] = None, keepdims: bool = False) -
     out: array
         if ``axis`` is ``None``, a zero-dimensional array containing the index of the first occurrence of the maximum value; otherwise, a non-zero-dimensional array containing the indices of the maximum values. The returned array must have be the default array index data type.
     """
-    x = array(x, dtype=x.dtype, device=x.device)
     if isinstance(axis, Dim):
         axis = x._dims.index(axis)
     dims = list(x._dims)
@@ -70,7 +69,6 @@ def argmin(x: array, /, *, axis: Optional[int] = None, keepdims: bool = False) -
     out: array
         if ``axis`` is ``None``, a zero-dimensional array containing the index of the first occurrence of the minimum value; otherwise, a non-zero-dimensional array containing the indices of the minimum values. The returned array must have the default array index data type.
     """
-    x = array(x, dtype=x.dtype, device=x.device)
     if isinstance(axis, Dim):
         axis = x._dims.index(axis)
     dims = list(x._dims)

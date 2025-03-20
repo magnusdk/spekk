@@ -27,7 +27,7 @@ from spekk.ops._types import (
     undefined_dim,
 )
 from spekk.ops.array_object import array
-
+from spekk import ops
 
 def fft(
     x: array,
@@ -678,7 +678,9 @@ def fftfreq(
     """
     if dim is None:
         dim = undefined_dim
-    return array(backend.fft.fftfreq(n, d=d, device=device), [dim])
+    if device is None:
+        device = ops.backend.device           
+    return array(backend.fft.fftfreq(n, d=d, device=device), [dim], device=device)
 
 
 def rfftfreq(
@@ -725,7 +727,9 @@ def rfftfreq(
     """
     if dim is None:
         dim = undefined_dim
-    return array(backend.fft.rfftfreq(n, d=d, device=device), [dim])
+    if device is None:
+        device = ops.backend.device         
+    return array(backend.fft.rfftfreq(n, d=d, device=device), [dim], device=device)
 
 
 def fftshift(

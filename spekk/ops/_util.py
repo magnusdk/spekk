@@ -75,12 +75,12 @@ def get_reduction_axes_and_resulting_dims(
 
 
 def ensure_array(x: ArrayLike, dtype: _DType = None) -> array:
-    if not isinstance(x, array):
-        dtype = _DType._to_backend_dtype(dtype) if dtype is not None else None
-        if not backend._is_backend_array(x) or (x.dtype != dtype and dtype is not None) :
-            x = backend.asarray(x, dtype=dtype)
-        x = array(x)
-    return x
+    # if not isinstance(x, array):
+        # dtype = _DType._to_backend_dtype(dtype) if dtype is not None else None
+        # if not backend._is_backend_array(x) or (x.dtype != dtype and dtype is not None) :
+        #     x = backend.asarray(x, dtype=dtype)
+        # x = array(x, dtype=dtype)
+    return array(x, dtype=dtype)
 
 
 def canonicalize_axis(n: int, i: int) -> int:
@@ -241,7 +241,9 @@ def ensure_backend_compatible_data(*data) -> list:
     for item in data:
         if isinstance(item, array):
             item = item.data
-        elif is_number(item):
+
+        if ops.backend.backend_name=="torch" and is_number(item): # NOTE: Move logic to backends in future or disallow python ints/floats/etc
+            # item = backend.asarray(item)
             item = ops.array(item).data
         new_data.append(item)
     return new_data
