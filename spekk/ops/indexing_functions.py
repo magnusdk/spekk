@@ -60,4 +60,4 @@ def take(
     dims = list(x._dims)
     if indices.ndim == 0:
         del dims[axis]
-    return array(backend.take(x._data, indices=indices, axis=axis), dims)
+    return array(backend.take(x._data, indices, axis=axis), dims)
