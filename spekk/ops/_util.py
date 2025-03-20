@@ -75,10 +75,11 @@ def get_reduction_axes_and_resulting_dims(
 
 def ensure_array(x: ArrayLike, dtype: _DType = None) -> array:
     if not isinstance(x, array):
-        dtype = dtype._to_backend_dtype() if dtype is not None else None
-        if not backend._is_backend_array(x) or x.dtype != dtype._to_backend_dtype():
+        if dtype is not None:
+            dtype = _DType._to_backend_dtype(dtype)
+        if not backend._is_backend_array(x) or x.dtype != dtype:
             x = backend.asarray(x, dtype=dtype)
-        x = array(x, [undefined_dim] * x.ndim)
+        x = array(x)
     return x
 
 
@@ -201,9 +202,7 @@ def ensure_broadcastable(
 
     # Ensure that they are broadcastable :)
     broadcastable_arrays = [
-        ensure_broadcastable_with(
-            x, output_dims, ensure_same_ndim=ensure_same_ndim
-        )
+        ensure_broadcastable_with(x, output_dims, ensure_same_ndim=ensure_same_ndim)
         for x in arrays
     ]
     return output_dims, broadcastable_arrays
@@ -224,9 +223,9 @@ def ensure_broadcastable_with(
         # Make arr broadcastable with output_dims if it isn't already. It is
         # broadcastable if its dimensions equal the last dimensions of output_dims.
         start_index = len(dims) - len(arr_dims_in_order)
-        if (
-            ensure_same_ndim and len(dims) != len(x_dims)
-        ) or arr_dims_in_order != dims[start_index:]:
+        if (ensure_same_ndim and len(dims) != len(x_dims)) or arr_dims_in_order != dims[
+            start_index:
+        ]:
             # Add the new dimensions to the array's data, making it broadcastable.
             broadcastable_shape = [
                 x.dim_sizes[dim] if dim in x_dims else 1 for dim in dims
