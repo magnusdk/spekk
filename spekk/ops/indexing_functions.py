@@ -3,7 +3,6 @@ __all__ = ["take"]
 from typing import Union
 
 from spekk.ops._backend import backend
-from spekk.ops._util import ensure_array
 from spekk.ops._types import Dim, Optional
 from spekk.ops.array_object import array
 
@@ -49,7 +48,7 @@ def take(
     .. versionchanged:: 2023.12
        Out-of-bounds behavior is explicitly left unspecified.
     """
-    x, indices = ensure_array(x), ensure_array(indices)
+    x, indices = array(x, dtype=x.dtype, device=x.device), array(indices, dtype=x.dtype, device=x.device)
     # array-api only allows indexing with 1D arrays. We differ because we also allow
     # 0D arrays (basically just int).
     if indices.ndim not in {0, 1}:

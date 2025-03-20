@@ -30,7 +30,6 @@ from spekk.ops._types import (
 )
 from spekk.ops._util import (
     canonicalize_axis,
-    ensure_array,
     ensure_broadcastable,
     ensure_broadcastable_with,
     get_broadcast_array_fn,
@@ -52,7 +51,7 @@ def broadcast_arrays(*arrays: array) -> List[array]:
     out: List[array]
         a list of broadcasted arrays. Each array must have the same shape. Each array must have the same dtype as its corresponding input array.
     """
-    arrays = [ensure_array(x) for x in arrays]
+    arrays = [array(x) for x in arrays]
     broadcast_array = get_broadcast_array_fn(*arrays)
     return [broadcast_array(arr) for arr in arrays]
 
@@ -82,7 +81,7 @@ def broadcast_to(
     ValueError
         If shape and dims do not contain the same number of arguments, a "ValueError" is raised.
     """
-    x = ensure_array(x)
+    x = array(x)
     if dims is None:
         dims = [undefined_dim] * len(shape)
     elif len(dims) != len(shape):
@@ -152,7 +151,7 @@ def expand_dims(x: array, /, *, axis: Union[Dim, int] = 0) -> array:
     ValueError
         If the new dimension already exists.
     """
-    x = ensure_array(x)
+    x = array(x)
 
     if isinstance(axis, Dim):
         dim = axis
@@ -181,7 +180,7 @@ def flip(x: array, /, *, axis: Optional[Union[Dim, Tuple[Dim, ...]]] = None) -> 
     out: array
         an output array having the same data type and shape as ``x`` and whose elements, relative to ``x``, are reordered.
     """
-    x = ensure_array(x)
+    x = array(x)
     if isinstance(axis, Dim):
         axis = x._dims.index(axis)
     elif isinstance(axis, tuple):
@@ -219,7 +218,7 @@ def moveaxis(
 
     .. versionadded:: 2023.12
     """
-    x = ensure_array(x)
+    x = array(x)
 
     # Ensure a tuple of sources and a tuple of destinations
     if not isinstance(source, (tuple, list)):
@@ -257,7 +256,7 @@ def permute_dims(x: array, /, axes: Tuple[Dim, ...]) -> array:
     out: array
         an array containing the axes permutation. The returned array must have the same data type as ``x``.
     """
-    x = ensure_array(x)
+    x = array(x)
     if all(isinstance(axis, Dim) for axis in axes):
         dims = axes
         axes = [x._dims.index(dim) for dim in axes]
@@ -317,7 +316,7 @@ def repeat(
 
     .. versionadded:: 2023.12
     """
-    x = ensure_array(x)
+    x = array(x)
     dims = [undefined_dim] if axis is None else x.dims
     if isinstance(axis, Dim):
         axis = x._dims.index(axis)
@@ -359,7 +358,7 @@ def reshape(
         should be raised. Also, if shape and dims do not contain the same number of
         arguments, a "ValueError" is raised.
     """
-    x = ensure_array(x)
+    x = array(x)
     if dims is not None and len(dims) != len(shape):
         raise ValueError(
             "The number of dimensions must equal the number of axes when reshaping."
@@ -393,7 +392,7 @@ def roll(
     out: array
         an output array having the same data type as ``x`` and whose elements, relative to ``x``, are shifted.
     """
-    x = ensure_array(x)
+    x = array(x)
     if isinstance(axis, Dim):
         axis = x._dims.index(axis)
     elif isinstance(axis, tuple):
@@ -429,7 +428,7 @@ def squeeze(
         If a specified axis has a size greater than one (i.e., it is not a
         singleton dimension), a ``ValueError`` should be raised.
     """
-    x = ensure_array(x)
+    x = array(x)
 
     # Handle changes to dimensions and get actual axis (integer)
     dims = list(x._dims)
@@ -519,7 +518,7 @@ def tile(x: array, repetitions: Tuple[int, ...], /) -> array:
 
     .. versionadded:: 2023.12
     """
-    x = ensure_array(x)
+    x = array(x)
     data = backend.tile(x.data, repetitions)
     dims = [undefined_dim] * (len(repetitions) - x.ndim) + x.dims
     return array(data, dims)
@@ -546,7 +545,7 @@ def unstack(x: array, /, *, axis: Union[int, Dim] = 0) -> Tuple[array, ...]:
 
     .. versionadded:: 2023.12
     """
-    x = ensure_array(x)
+    x = array(x)
     if isinstance(axis, Dim):
         dim = axis
         axis = x._dims.index(axis)

@@ -29,7 +29,6 @@ from spekk.ops._types import (
     undefined_dim,
 )
 from spekk.ops._util import (
-    ensure_array,
     ensure_backend_compatible_data,
     ensure_broadcastable,
 )
@@ -213,7 +212,7 @@ def empty_like(
     out: array
         an array having the same shape as ``x`` and containing uninitialized data.
     """
-    x = ensure_array(x)
+    x = array(x, dtype=dtype, device=device)
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
     return array(backend.empty_like(x._data, dtype=dtype, device=device), x._dims)
@@ -448,7 +447,7 @@ def full_like(
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
-    x = ensure_array(x)
+    x = array(x, dtype=dtype, device=device)
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
     return array(
@@ -656,7 +655,7 @@ def ones_like(
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
-    x = ensure_array(x)
+    x = array(x, dtype=dtype, device=device)
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
     return array(backend.ones_like(x._data, dtype=dtype, device=device), x._dims)
@@ -765,7 +764,7 @@ def zeros_like(
     out: array
         an array having the same shape as ``x`` and filled with zeros.
     """
-    x = ensure_array(x)
+    x = array(x, dtype=dtype, device=device)
     if dtype is not None:
         dtype = _DType._to_backend_dtype(dtype)
     return array(backend.zeros_like(x._data, dtype=dtype, device=device), x._dims)

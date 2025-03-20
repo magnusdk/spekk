@@ -38,7 +38,6 @@ from spekk.ops._types import (
     undefined_dim,
 )
 from spekk.ops._util import (
-    ensure_array,
     ensure_backend_compatible_data,
     ensure_broadcastable,
 )
@@ -161,7 +160,7 @@ def det(x: array, /, *, axes: Tuple[int, int]) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
-    x = ensure_array(x)
+    x = array(x, dtype=x.dtype, device=x.device)
     # Place the axes last
     x = permute_dims(x, [d for d in x._dims if d not in axes] + list(axes))
     data = backend.linalg.det(x._data)
@@ -937,7 +936,7 @@ def vector_norm(
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
-    x = ensure_array(x)
+    x = array(x, dtype=x.dtype, device=x.device)
     if isinstance(axis, Dim):
         dim = axis
         axis = x.dims.index(axis)
