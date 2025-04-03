@@ -455,7 +455,7 @@ def setitem(
                     dims=indexing_object.dims + [dim],
                 )
         if isinstance(indexing_object, slice):
-            start, stop, step = indexing_object.indices(size)
+            start, stop, step = indexing_object.indices(x.dim_sizes[dim])
             indexing_objects[i] = ops.arange(start, stop, step, dim=dim)
             indexing_objects[i] = ensure_broadcastable_with(
                 indexing_objects[i], list(indexing_sizes.keys())
