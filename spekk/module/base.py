@@ -38,6 +38,18 @@ def field(*, static: bool = False, **kwargs):
     return dataclasses.field(metadata=metadata, **kwargs)
 
 
+@dataclasses.dataclass
+class _static_value:
+    """Internal class, do not use it (unless you really want to; noone can stop you).
+    Marker for letting spekk know that a value is considered static, and should trigger
+    JIT-recompilation when changed."""
+
+    value: Any
+
+    def __repr__(self):
+        return f"static_value({self.value})"
+
+
 @dataclass_transform(eq_default=False, field_specifiers=(dataclasses.field, field))
 class _ModuleMeta(abc.ABCMeta):
     """Metaclass for the Module base class.
@@ -361,7 +373,10 @@ def flatten(obj: TModule, *, flatten_spekk_arrays: bool = False) -> _Flattened:
     static = []
 
     def map_leaf(leaf):
-        if _is_array_like(leaf):
+        if isinstance(leaf, _static_value):
+            static.append(leaf.value)  # Unwrap the value
+            return _Arg.static()
+        elif _is_array_like(leaf):
             if flatten_spekk_arrays and isinstance(leaf, ops.array):
                 dynamic.append(leaf.data)
                 static.append(tuple(leaf.dims))

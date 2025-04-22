@@ -28,7 +28,6 @@ def _get_hashable_key(x):
 
 
 def get_vmap_fn(vmap_impl):
-
     @functools.wraps(vmap_impl)
     def vmap(f, in_axes):
         from spekk import Dim, ops
@@ -41,7 +40,6 @@ def get_vmap_fn(vmap_impl):
 
         @functools.wraps(f)
         def wrapped_outer(*original_positional_args, **original_kwargs):
-
             if in_axes is undefined_dim:
                 raise ValueError(f"Can not vmap over an UndefinedDim: {in_axes=}")
             if original_positional_args and original_kwargs:
@@ -210,7 +208,6 @@ def get_vmap_fn(vmap_impl):
 
 
 def get_scan_fn(scan_impl):
-
     def scan(f, init, xs):
         from spekk.module.base import _Flattened, flatten
 
@@ -233,11 +230,14 @@ def get_scan_fn(scan_impl):
 
 
 def get_jit_fn(jit_impl):
-
     @functools.wraps(jit_impl)
-    def jit(f):
+    def jit(
+        f,
+        static_argnums: Sequence[int] = (),
+        static_argnames: Sequence[str] = (),
+    ):
         "Our custom jit-function which filters out static fields."
-        from spekk.module.base import _Flattened, flatten
+        from spekk.module.base import _Flattened, flatten, _static_value
 
         # We cache the jitted function (wrapped_inner) by the static fields. When the
         # static fields changes, the function is re-compiled.
@@ -245,6 +245,17 @@ def get_jit_fn(jit_impl):
 
         @functools.wraps(f)
         def wrapped_outer(*original_args, **original_kwargs):
+            # Handle arguments explicitly marked as static
+            original_args = list(original_args)
+            for static_argnum in static_argnums:
+                original_args[static_argnum] = _static_value(
+                    original_args[static_argnum]
+                )
+            for static_argname in static_argnames:
+                original_kwargs[static_argname] = _static_value(
+                    original_kwargs[static_argname]
+                )
+
             # Flatten all args. flatten_result_outer knows which parts of the arguments
             # are static. The underlying jit_impl only ever sees non-static inputs; the
             # rest are baked into the function itself.

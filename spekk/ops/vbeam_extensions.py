@@ -1,4 +1,14 @@
-from typing import Callable, Literal, Optional, Sequence, Tuple, TypeVar, Union
+import functools
+from typing import (
+    Callable,
+    Literal,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+    overload,
+)
 
 from spekk import ops
 from spekk.module.base import Module
@@ -33,8 +43,10 @@ def flatten(x: array, dim: Optional[Dim] = None) -> array:
         dim = undefined_dim
     return array(data, dims=[dim])
 
+
 def to_numpy(x: array):
     return backend.to_numpy(x.data)
+
 
 def nan_to_num(
     x: array,
@@ -93,12 +105,14 @@ def convolve1d(
 
     return array(data_filtered, dims=dims)
 
+
 def correlate2d(x1: array, x2: array):
     if x1.ndim != 2 or x2.ndim != 2:
         raise ValueError("Input arrays must be 2D arrays")
     if x1.dims != x2.dims:
         raise ValueError("Input arrays must have equal dims")
     return ops.array(backend.correlate2d(x1.data, x2.data), dims=x1.dims)
+
 
 def dilation1d(
     x: array,
@@ -122,7 +136,10 @@ def dilation1d(
     indices[axis_idx] = slice(0, new_shape[axis_idx], dilation_factor + 1)
 
     # Place the original values into the zeros array
-    result[axis, ops.array(list(range(0, new_shape[axis_idx], dilation_factor + 1)), [axis])] = x
+    result[
+        axis,
+        ops.array(list(range(0, new_shape[axis_idx], dilation_factor + 1)), [axis]),
+    ] = x
 
     return result
 
@@ -219,8 +236,52 @@ def expand_slice_to_axis(s: Union[slice, int, array], axis: int):
     return (slice(None),) * axis + (s, ...)
 
 
-def jit(f: TFunc) -> TFunc:
-    return backend.jit(f)
+@overload
+def jit(
+    f: Optional[TFunc] = None,
+    /,
+    *,
+    static_argnums: Sequence[int] = (),
+    static_argnames: Sequence[str] = (),
+) -> TFunc: ...
+@overload
+def jit(
+    *,
+    static_argnums: Sequence[int] = (),
+    static_argnames: Sequence[str] = (),
+) -> Callable[[TFunc], TFunc]: ...
+def jit(
+    f: Optional[TFunc] = None,
+    /,
+    *,
+    static_argnums: Sequence[int] = (),
+    static_argnames: Sequence[str] = (),
+) -> Union[TFunc, Callable[[TFunc], TFunc]]:
+    """Just-in-time (JIT) compile `f` if the active backend supports it. Optionally
+    mark arguments as static via `static_argnums` and `static_argnames`. Marking
+    arguments as static means that the function is recompiled every time they change.
+    Static arguments have to be hashable or be a nested list/tuple/dict of hashable
+    arguments, or a `spekk.array`.
+
+    For backends that doesn't support JIT (like numpy), this is a no-op."""
+
+    if f is None:
+
+        @functools.wraps(f)
+        def wrapper(f: TFunc) -> TFunc:
+            return jit(
+                f, static_argnums=static_argnums, static_argnames=static_argnames
+            )
+
+        return wrapper
+    return backend.jit(
+        f,
+        static_argnums=static_argnums,
+        static_argnames=static_argnames,
+    )
+
+
+jit()
 
 
 def reduce_over_dim(
