@@ -6,7 +6,7 @@ from spekk.ops._types import undefined_dim
 
 
 def _get_hashable_key(x):
-    from spekk import Module
+    from spekk import Module, ops
 
     if isinstance(x, (list, tuple)):
         return (type(x), *(_get_hashable_key(element) for element in x))
@@ -23,6 +23,8 @@ def _get_hashable_key(x):
             *field_names,
             *(_get_hashable_key(getattr(x, name)) for name in field_names),
         )
+    elif isinstance(x, ops.array):
+        return hash(x._id)
     else:
         return x
 
@@ -237,7 +239,7 @@ def get_jit_fn(jit_impl):
         static_argnames: Sequence[str] = (),
     ):
         "Our custom jit-function which filters out static fields."
-        from spekk.module.base import _Flattened, flatten, _static_value
+        from spekk.module.base import _Flattened, _static_value, flatten
 
         # We cache the jitted function (wrapped_inner) by the static fields. When the
         # static fields changes, the function is re-compiled.
