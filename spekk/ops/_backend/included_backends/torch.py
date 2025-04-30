@@ -91,4 +91,11 @@ def set_device(device):
     global active_device
     active_device = device
 
-active_device = "cuda"
+
+# Set default active device. Tried in order: ["cuda", "mps", "cpu"].
+if torch.cuda.is_available():
+    active_device = "cuda"
+elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+    active_device = "mps"
+else:
+    active_device = "cpu"
