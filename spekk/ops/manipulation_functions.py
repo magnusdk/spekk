@@ -158,7 +158,7 @@ def expand_dims(x: array, /, *, axis: Union[Dim, int] = 0) -> array:
         axis = 0
     else:
         dim = undefined_dim
-    data = backend.expand_dims(x._data, axis)
+    data = backend.expand_dims(x._data, axis=axis)
     dims = list(x._dims)
     dims.insert(axis, dim)
     return array(data, dims)
