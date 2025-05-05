@@ -188,4 +188,4 @@ def unique_values(x: array, /) -> array:
     .. versionchanged:: 2023.12
        Required that the output array must be one-dimensional.
     """
-    raise NotImplementedError("Please help me implement this!")
+    return array(backend.unique_values(x.data))
