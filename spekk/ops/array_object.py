@@ -1471,6 +1471,16 @@ class array:
     def rename_dim(self, dim: Dim, new_dim: Dim) -> "array":
         dims = [new_dim if d == dim else d for d in self.dims]
         return array(self.data, dims)
+    
+    def clear_dims(self):
+        self._dims = [_UndefinedDim() for din in self.dims]
+        return self # return self for now to prevent updating array ID
+
+    def max(self):
+        return ops.max(self)
+
+    def min(self):
+        return ops.min(self)        
 
     # Methods for casting dtype
     def int8(self):
