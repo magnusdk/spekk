@@ -13,7 +13,7 @@ from typing import (
 from spekk import ops
 from spekk.module.base import Module
 from spekk.ops._backend import backend
-from spekk.ops._types import Dim, undefined_dim
+from spekk.ops._types import Dim, undefined_dim, Dims
 from spekk.ops.array_object import array
 
 TFunc = TypeVar("TFunc", bound=Callable)
@@ -47,6 +47,69 @@ def flatten(x: array, dim: Optional[Dim] = None) -> array:
 def to_numpy(x: array):
     return backend.to_numpy(x.data)
 
+def median(a, axis: Optional[Dim], out=None, keepdims: bool=False) -> array:
+    if axis is None:
+        arr = backend.median(a, axis, out=out, keepdims=keepdims)
+        dims = None        
+    else:
+        if isinstance(axis, int): 
+            arr = backend.median(a.data, axis, out=out, keepdims=keepdims)
+            dims = a.dims.pop(axis)
+        elif isinstance(axis[0], int):
+            arr = backend.median(a.data, axis, out=out, keepdims=keepdims)
+            dims = a.dims
+            for ax in axis:
+                dims = dims.pop(axis)
+        else:
+            axis_indices = []
+            dims = []
+            for idx, dim in enumerate(a.dims):
+                if dim in axis:
+                    axis_indices.append(idx)
+                    if keepdims:
+                        dims.append(dim)
+                else:
+                    dims.append(dim)
+            arr = backend.median(a.data, tuple(axis_indices), out=out, keepdims=keepdims)
+    return ops.array(arr, dims=dims)
+
+def pad(x: array, pad_width: tuple, mode: str='constant', reflect_type: Union[str, None]=None, dims: Dims=None) -> array:
+
+    if dims is None:
+        if reflect_type is None:
+            x_pad = backend.pad(x.data, pad_width, mode)
+        else:
+            x_pad = backend.pad(x.data, pad_width, mode, reflect_type=reflect_type)
+    else:
+        #check that all dims are in x.dims
+        if sum([dim in x.dims for dim in dims]) != len(dims):
+            raise ValueError(f"not all pad dims {dims} are present in arrays dims {x.dims}")
+        
+        # check state of pad_width. 
+        if dims is None and (isinstance(pad_width, int) or len(pad_width)==1):
+            pad_width_out = pad_width
+        elif dims is None and (len(pad_width)==2 and isinstance(pad_width[0], int)):
+            pad_width_out = pad_width
+        else:
+            # pad_width is individual for each axis
+            if len(pad_width)==len(x.dims):
+                # need to reorder dims and pad_width to match x.dims
+                sorted_indices = [x.dims.index(dim) for dim in dims]
+                pad_width_out = [pad_width[idx] for idx in sorted_indices]
+            else:
+                sorted_indices = [x.dims.index(dim) for dim in dims]
+                pad_width_out = [[0,0] for i in range(len(x.dims))]
+
+                for ii, pad in enumerate(pad_width):
+                    idx = sorted_indices[ii]
+                    pad_width_out[idx] = pad
+
+        if reflect_type is None:
+            x_pad = backend.pad(x.data, pad_width_out, mode)
+        else:
+            x_pad = backend.pad(x.data, pad_width_out, mode, reflect_type=reflect_type)
+
+    return array(x_pad, dims=x.dims)
 
 def nan_to_num(
     x: array,
@@ -102,7 +165,7 @@ def convolve1d(
     axis_idx = x.dims.index(axis)
 
     data_filtered = backend.convolve1d(x.data, filter.data, mode=mode, axis=axis_idx)
-
+    
     return array(data_filtered, dims=dims)
 
 

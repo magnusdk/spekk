@@ -18,7 +18,8 @@ from spekk.ops.set_functions import *
 from spekk.ops.sorting_functions import *
 from spekk.ops.statistical_functions import *
 from spekk.ops.utility_functions import *
-from spekk.ops.vbeam_extensions import *
+from spekk.ops.extensions.vbeam_extensions import *
+from spekk.ops.extensions import image
 
 __array_api_version__: str = "2023.12"
 """
