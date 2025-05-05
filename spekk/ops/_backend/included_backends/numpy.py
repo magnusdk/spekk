@@ -54,8 +54,9 @@ def _python_vmap(f, in_axes=None):
 
 
 vmap = common.get_vmap_fn(_python_vmap)
-jit = lambda f: f  # There is no Numpy jit; just return function as-is.
 
+def jit(f, static_argnums: Sequence[int] = (), static_argnames: Sequence[str] = ()):
+    return f
 
 def scan(fn, init, xs):
     from spekk.module import base as module_base
