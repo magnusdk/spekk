@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union
 import numpy
 import torch
 from torch import *
@@ -69,6 +69,34 @@ def correlate2d(x1, x2) -> torch.Tensor:
     x2 = torch.conj(x2)
     a = torch.nn.functional.conv2d(x1[None, None, :,:], x2[None, None, :,:], padding=pad)[0,0]  
     return a 
+
+def pad(x, pad_width: tuple, mode: str='constant', reflect_type: Union[str, None]=None):
+    
+    if mode=="edge":
+        mode = "replicate"
+
+    pad_width_flat = []
+    if isinstance(pad_width, builtins.int): 
+        for d in builtins.range(x.ndim):
+            pad_width_flat += [pad_width, pad_width]
+        pad_width = pad_width_flat
+
+    elif isinstance(pad_width[0], builtins.int):
+        for d in builtins.range(x.ndim):
+            pad_width_flat += [pad_width[0], pad_width[1]]
+        pad_width = pad_width_flat
+
+    else:
+        pad_width_flat = []
+        for ps in pad_width:
+            for p in ps[::-1]:
+                pad_width_flat.append(p)
+
+        # reverse order:
+        pad_width_flat.reverse()
+        pad_width = pad_width_flat
+
+    return torch.nn.functional.pad(x, pad=pad_width, mode=mode)
 
 # "take" is part of array compat lib but there is a mismatch where numpy/jax squeezes the output 
 # array if indices is a number, whereas torch keep the singleton dimension.

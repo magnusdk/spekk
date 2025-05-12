@@ -85,24 +85,21 @@ def pad(x: array, pad_width: tuple, mode: str='constant', reflect_type: Union[st
         if sum([dim in x.dims for dim in dims]) != len(dims):
             raise ValueError(f"not all pad dims {dims} are present in arrays dims {x.dims}")
         
-        # check state of pad_width. 
-        if dims is None and (isinstance(pad_width, int) or len(pad_width)==1):
-            pad_width_out = pad_width
-        elif dims is None and (len(pad_width)==2 and isinstance(pad_width[0], int)):
-            pad_width_out = pad_width
-        else:
-            # pad_width is individual for each axis
-            if len(pad_width)==len(x.dims):
-                # need to reorder dims and pad_width to match x.dims
-                sorted_indices = [x.dims.index(dim) for dim in dims]
-                pad_width_out = [pad_width[idx] for idx in sorted_indices]
-            else:
-                sorted_indices = [x.dims.index(dim) for dim in dims]
-                pad_width_out = [[0,0] for i in range(len(x.dims))]
-
-                for ii, pad in enumerate(pad_width):
-                    idx = sorted_indices[ii]
-                    pad_width_out[idx] = pad
+        # Standardise format to: ((before_1, after_1), (before_2, after_2), ... (before_N, after_N))
+        if isinstance(pad_width, int):
+            pad_width = [(pad_width, pad_width) for d in dims]
+        elif isinstance(pad_width[0], int):
+            if len(pad_width)==1:
+                pad_width = [(pad_width[0], pad_width[0]) for d in dims]
+            elif len(pad_width)==2:
+                pad_width = [(pad_width[0], pad_width[1]) for d in dims]
+                
+        # pad_width is individual for each axis
+        pad_width_out = [(0,0) for i in range(len(x.dims))]
+        sorted_indices = [x.dims.index(dim) for dim in dims]
+        for ii, pad in enumerate(pad_width):
+            idx = sorted_indices[ii]
+            pad_width_out[idx] = pad
 
         if reflect_type is None:
             x_pad = backend.pad(x.data, pad_width_out, mode)
