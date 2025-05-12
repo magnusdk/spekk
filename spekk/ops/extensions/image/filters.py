@@ -2,6 +2,7 @@ from spekk import ops, util
 from spekk.ops.array_object import array
 from spekk.ops._types import (
     Dim,
+    Dims,
 )
 from typing import Union
 from functools import partial
@@ -106,22 +107,33 @@ def bilateral_filter_kernel(
 
     return out
 
-@function_profiling
-def convNd(image: array, kernel: array) -> array:
-    f = partial(convNd_kernel, kernel=kernel)
+# @function_profiling
+def convNd(image: array, kernel: array, pad_mode="edge") -> array:
+    """
+    Args:
+        image: Input array
+        kernel: The kernel used, note that if the kernel includes an axis not present in image, 
+                that axis will be seen as different set of convolution filters.
     
+    """    
+    window_sizes = {}
+    for dim in kernel.dims:
+        if dim in image.dims:
+            window_sizes[dim] = kernel.dim_sizes[dim]
+
     # window_sizes should be odd
-    window_sizes = kernel.dim_sizes
-    check_odd_items(window_sizes)
+    check_odd_items(window_sizes)    
 
-    return windowed(f, window_sizes, pad_mode="edge")(image)
+    f = partial(convNd_kernel, kernel=kernel)
 
+    return windowed(f, window_sizes, pad_mode=pad_mode)(image)
 
 def convNd_kernel(img_pad: array, axis: tuple, kernel: array) -> array:
     # rename axis in "kernel" to match new axis in "img_pad"
     for dim in kernel.dims:
-        dim_index = img_pad.dims.index(dim) + 1
-        kernel = kernel.rename_dim(dim, img_pad.dims[dim_index])
+        if dim in img_pad.dims:
+            dim_index = img_pad.dims.index(dim) + 1
+            kernel = kernel.rename_dim(dim, img_pad.dims[dim_index])
 
     return ops.sum(img_pad * kernel, axis=axis)
 
