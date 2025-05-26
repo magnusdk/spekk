@@ -20,6 +20,7 @@ from spekk.ops.statistical_functions import *
 from spekk.ops.utility_functions import *
 from spekk.ops.extensions.vbeam_extensions import *
 from spekk.ops.extensions import image
+from spekk.ops.extensions import signal
 
 __array_api_version__: str = "2023.12"
 """
