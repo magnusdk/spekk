@@ -24,6 +24,11 @@ TOutputData = TypeVar("TOutputData")
 TReducedOutputData = TypeVar("TReducedOutputData")
 
 
+def lerp(a: array, b: array, p: array) -> array:
+    "Linearly interpolate between a and b, using p which is a number between 0 and 1."
+    return a + (b - a) * p
+
+
 def deg2rad(x: array) -> array:
     return x / 180 * backend.pi
 
@@ -47,12 +52,13 @@ def flatten(x: array, dim: Optional[Dim] = None) -> array:
 def to_numpy(x: array):
     return backend.to_numpy(x.data)
 
-def median(a, axis: Optional[Dim], out=None, keepdims: bool=False) -> array:
+
+def median(a, axis: Optional[Dim], out=None, keepdims: bool = False) -> array:
     if axis is None:
         arr = backend.median(a, axis, out=out, keepdims=keepdims)
-        dims = None        
+        dims = None
     else:
-        if isinstance(axis, int): 
+        if isinstance(axis, int):
             arr = backend.median(a.data, axis, out=out, keepdims=keepdims)
             dims = a.dims.pop(axis)
         elif isinstance(axis[0], int):
@@ -70,10 +76,19 @@ def median(a, axis: Optional[Dim], out=None, keepdims: bool=False) -> array:
                         dims.append(dim)
                 else:
                     dims.append(dim)
-            arr = backend.median(a.data, tuple(axis_indices), out=out, keepdims=keepdims)
+            arr = backend.median(
+                a.data, tuple(axis_indices), out=out, keepdims=keepdims
+            )
     return ops.array(arr, dims=dims)
 
-def pad(x: array, pad_width: tuple, mode: str='constant', reflect_type: Union[str, None]=None, dims: Dims=None) -> array:
+
+def pad(
+    x: array,
+    pad_width: tuple,
+    mode: str = "constant",
+    reflect_type: Union[str, None] = None,
+    dims: Dims = None,
+) -> array:
 
     if dims is None:
         if reflect_type is None:
@@ -81,21 +96,23 @@ def pad(x: array, pad_width: tuple, mode: str='constant', reflect_type: Union[st
         else:
             x_pad = backend.pad(x.data, pad_width, mode, reflect_type=reflect_type)
     else:
-        #check that all dims are in x.dims
+        # check that all dims are in x.dims
         if sum([dim in x.dims for dim in dims]) != len(dims):
-            raise ValueError(f"not all pad dims {dims} are present in arrays dims {x.dims}")
-        
+            raise ValueError(
+                f"not all pad dims {dims} are present in arrays dims {x.dims}"
+            )
+
         # Standardise format to: ((before_1, after_1), (before_2, after_2), ... (before_N, after_N))
         if isinstance(pad_width, int):
             pad_width = [(pad_width, pad_width) for d in dims]
         elif isinstance(pad_width[0], int):
-            if len(pad_width)==1:
+            if len(pad_width) == 1:
                 pad_width = [(pad_width[0], pad_width[0]) for d in dims]
-            elif len(pad_width)==2:
+            elif len(pad_width) == 2:
                 pad_width = [(pad_width[0], pad_width[1]) for d in dims]
-                
+
         # pad_width is individual for each axis
-        pad_width_out = [(0,0) for i in range(len(x.dims))]
+        pad_width_out = [(0, 0) for i in range(len(x.dims))]
         sorted_indices = [x.dims.index(dim) for dim in dims]
         for ii, pad in enumerate(pad_width):
             idx = sorted_indices[ii]
@@ -107,6 +124,7 @@ def pad(x: array, pad_width: tuple, mode: str='constant', reflect_type: Union[st
             x_pad = backend.pad(x.data, pad_width_out, mode, reflect_type=reflect_type)
 
     return array(x_pad, dims=x.dims)
+
 
 def nan_to_num(
     x: array,
@@ -162,7 +180,7 @@ def convolve1d(
     axis_idx = x.dims.index(axis)
 
     data_filtered = backend.convolve1d(x.data, filter.data, mode=mode, axis=axis_idx)
-    
+
     return array(data_filtered, dims=dims)
 
 
