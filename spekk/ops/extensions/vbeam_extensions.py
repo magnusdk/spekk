@@ -361,6 +361,9 @@ def jit(
 
 jit()
 
+def scan(fn, init, xs):
+    return ops.backend.scan(fn, init, xs.data)
+
 
 def reduce_over_dim(
     reduce_f: Callable[[TCarry, TInputData], TCarry],
@@ -438,6 +441,94 @@ def map_reduce_over_dim(
         f, data, init=init, dim=dim, include_index=include_index_in_reduce
     )
 
+def map_over_dim(
+    map_f: Callable,
+    data,
+    *,
+    dim: Dim | Sequence[Dim],
+    include_index: bool = False,
+):    
+    """
+    Iterates over each element of `dim` in `data`, applies `map_f` to it, and returns
+    a new data object of the results along the same dimension.
+    """
+    from spekk.module import flatten
+
+    # Handle case where multiple dims are given. Then we map over each dimension
+    # individually.
+    if not isinstance(dim, Dim):
+        if not isinstance(dim, Sequence):
+            raise ValueError(
+                f"dim must be either a Dim or a sequence of Dim. Got '{type(dim)}'."
+            )
+        dim, *remaining_dims = dim
+        if remaining_dims:
+            return ops.map_over_dim(
+                lambda data_1: map_over_dim(map_f, data_1, dim=remaining_dims),
+                data,
+                dim=dim,
+            )
+
+    # Validate dimension
+    dim_sizes = data.dim_sizes
+    if dim not in dim_sizes:
+        raise ValueError(f"Dimension {dim} not found in the data.")
+
+    # Optionally include index array
+    if include_index:
+        data = (ops.arange(dim_sizes[dim], dim=dim), data)
+
+    # Flatten input data trees for dynamic arrays along `dim`
+    flat_in = flatten(data).filter_dynamic(
+        lambda x: isinstance(x, ops.array) and (dim in x.dims)
+    )
+
+    # Move `dim` to leading axis and extract raw data and dims
+    moved = [ops.moveaxis(arr, dim, 0) for arr in flat_in.dynamic]
+    in_data = tuple(arr.data for arr in moved)
+    in_dims = tuple(arr.dims for arr in moved)
+
+    # Flatten output tree structure by running map_f on a dummy first to capture shape
+    # Prepare scanning
+    flat_out_template = None
+    out_dims = None
+
+    def _scan_f(_, dyn_vals):  # dyn_vals is sequence of numpy arrays for this step
+        nonlocal flat_out_template, out_dims
+        # Reconstruct input arrays for this time-step
+        current = [ops.array(val, dims[1:]) for val, dims in zip(dyn_vals, in_dims)]
+        inp = flat_in.unflatten(current)
+        # Flatten and cache template dims on first call
+        flat = flatten(map_f(inp))
+        flat.dynamic = tuple(
+            ops.array(x) if not isinstance(x, ops.array) else x for x in flat.dynamic
+        )
+        out_dims = [[dim, *x.dims] for x in flat.dynamic]
+        flat.dynamic = tuple(
+            x.data if isinstance(x, ops.array) else None for x in flat.dynamic
+        )
+        flat_out_template = flat
+        # Return unchanged carry and this step's output dynamics
+        return None, flat.dynamic
+
+    # Initialize dummy carry and capture first step
+    first_vals = [arr[0] for arr in in_data]
+    carry0, first_out = _scan_f(None, first_vals)
+
+    # Run scan over the rest
+    rest_vals = [arr[1:] for arr in in_data]
+    _, rest_out = ops.backend.scan(_scan_f, carry0, rest_vals)
+
+    # Combine first and rest outputs for each dynamic output array
+    all_out = []
+    for first_arr, rest_arr in zip(first_out, rest_out):
+        all_out.append(ops.backend.concat([first_arr[None, ...], rest_arr], axis=0))
+
+    # Rewrap into ops.array with leading dimension restored
+    wrapped = [ops.array(arr, dims=dims) for arr, dims in zip(all_out, out_dims)]
+
+    # Reconstruct tree of outputs
+    return flat_out_template.unflatten(wrapped)
 
 def vmap(f, in_axes):
     return backend.vmap(f, in_axes=in_axes)
