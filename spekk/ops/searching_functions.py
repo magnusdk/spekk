@@ -80,7 +80,7 @@ def argmin(x: array, /, *, axis: Optional[int] = None, keepdims: bool = False) -
     return array(backend.argmin(x._data, axis=axis, keepdims=keepdims), dims)
 
 
-def nonzero(x: array, /) -> Tuple[array, ...]:
+def nonzero(x: array, /, *, dim: Optional[Dim] = None) -> Tuple[array, ...]:
     """
     Returns the indices of the array elements which are non-zero.
 
@@ -111,12 +111,14 @@ def nonzero(x: array, /) -> Tuple[array, ...]:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
-    return tuple(array(result, [undefined_dim]) for result in backend.nonzero(x._data))
+    if dim is None:
+        dim = undefined_dim
+    return tuple(array(result, [dim]) for result in backend.nonzero(x._data))
 
 
 def searchsorted(
     x1: array,
-    x2: array,
+    x2: int | float | array,
     /,
     *,
     side: Literal["left", "right"] = "left",
@@ -176,14 +178,12 @@ def searchsorted(
     )
 
 
-if TYPE_CHECKING:
-    from spekk.module import Module
-
-    TModule = TypeVar("TModule", bound=Module)
-
-
-
-def where(condition: array, x1: array, x2: array, /) -> array:
+def where(
+    condition: bool | array,
+    x1: bool | int | float | complex | array,
+    x2: bool | int | float | complex | array,
+    /,
+) -> array:
     """
     Returns elements chosen from ``x1`` or ``x2`` depending on ``condition``.
 

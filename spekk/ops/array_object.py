@@ -2,18 +2,20 @@ from __future__ import annotations
 
 import uuid
 import warnings
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union
 
 import numpy as np
-
 import spekk.ops.data_types as data_types
+from spekk import ops
 from spekk.ops._backend import backend
-from spekk.ops._slicing import ArrayIndexUpdateHelper
 from spekk.ops._types import (
     ArrayLike,
+    DeviceLike,
     Dim,
     Dims,
+    DTypeLike,
     Enum,
+    PossiblyUndefinedDim,
     PyCapsule,
     _UndefinedDim,
     ellipsis,
@@ -21,11 +23,10 @@ from spekk.ops._types import (
 from spekk.ops._types import (
     device as Device,
 )
-from spekk.ops._types import (
-    dtype as Dtype,
-)
-from spekk.ops.data_types import _DType
-from spekk import ops
+from spekk.ops.data_types import DType
+
+if TYPE_CHECKING:
+    from spekk.ops._indexing import ArrayIndexUpdateHelper
 
 __all__ = ["array"]
 
@@ -37,24 +38,23 @@ class array:
         self: array,
         data: ArrayLike,
         /,
-        dims: Optional[Dims] = None,
+        dims: list[PossiblyUndefinedDim] | None = None,
         *,
-        dtype: Optional[dtype] = None,
-        device: Optional[device] = None,
+        dtype: Optional[DTypeLike] = None,
+        device: Optional[Device] = None,
     ):
-        
         if device is None:
             device = ops.backend.device
 
         if dtype is not None:
-            dtype = _DType._to_backend_dtype(dtype)
+            dtype = DType._to_backend_dtype(dtype)
         # else:
         #     if ops.backend.backend_name=="torch":
         #         if isinstance(data, np.ndarray):
         #             if data.dtype == np.float64:
         #                 dtype = _DType._to_backend_dtype(ops.float32)
         #             if data.dtype == np.complex128:
-        #                 dtype = _DType._to_backend_dtype(ops.complex64)                
+        #                 dtype = _DType._to_backend_dtype(ops.complex64)
 
         if isinstance(data, array):
             if dims is None:
@@ -69,7 +69,7 @@ class array:
 
             # if dtype != data.dtype or (hasattr(data, "device") and device!=data.device):
             # if dtype != data.dtype or device!=data.device:
-            if dtype != data.dtype:                
+            if dtype != data.dtype:
                 data = backend.astype(data, dtype, device=device)
 
         if dims is None:
@@ -88,12 +88,12 @@ class array:
         if len(set(dims)) != len(dims):
             raise ValueError(f"The dimensions must be unique, but got {dims=}")
 
-        self._data = data
+        self._data: ArrayLike = data
         self._dims = dims
         self._id = uuid.uuid4()
 
     @property
-    def dtype(self: array) -> Dtype:
+    def dtype(self: array) -> DType:
         """
         Data type of the array elements.
 
@@ -102,10 +102,10 @@ class array:
         out: dtype
             array data type.
         """
-        return _DType(self._data.dtype)
+        return DType(self._data.dtype)
 
     @property
-    def device(self: array) -> Device:
+    def device(self: array) -> DeviceLike:
         """
         Hardware device the array data resides on.
 
@@ -145,7 +145,7 @@ class array:
         return self._data.ndim
 
     @property
-    def shape(self: array) -> Tuple[Optional[int], ...]:
+    def shape(self: array) -> Tuple[int, ...]:
         """
         Array dimensions.
 
@@ -164,7 +164,7 @@ class array:
         return self._data.shape
 
     @property
-    def size(self: array) -> Optional[int]:
+    def size(self: array) -> int:
         """
         Number of elements in an array.
 
@@ -203,7 +203,7 @@ class array:
                 "Transpose is only defined for arrays with two dimensions. See permute_dims instead."
             )
         dims = self._dims[::-1]
-        return array(self._data.T, dims)
+        return array(backend.transpose(self._data), dims)
 
     def __abs__(self: array, /) -> array:
         """
@@ -237,7 +237,7 @@ class array:
 
         return abs(self)
 
-    def __add__(self: array, other: Union[int, float, array], /) -> array:
+    def __add__(self: array, other: array | int | float | complex, /) -> array:
         """
         Calculates the sum for each element of an array instance with the respective element of the array ``other``.
 
@@ -266,7 +266,7 @@ class array:
 
         return add(self, other)
 
-    def __and__(self: array, other: Union[int, bool, array], /) -> array:
+    def __and__(self: array, other: array | int, /) -> array:
         """
         Evaluates ``self_i & other_i`` for each element of an array instance with the respective element of the array ``other``.
 
@@ -602,7 +602,7 @@ class array:
         """
         return self._data.__dlpack_device__()
 
-    def __eq__(self: array, other: Union[int, float, bool, array], /) -> array:
+    def __eq__(self: array, other: array | int | float | complex, /) -> array:  # type: ignore
         r"""
         Computes the truth value of ``self_i == other_i`` for each element of an array instance with the respective element of the array ``other``.
 
@@ -665,7 +665,7 @@ class array:
         """
         return self._data.__float__()
 
-    def __floordiv__(self: array, other: Union[int, float, array], /) -> array:
+    def __floordiv__(self: array, other: array | int | float, /) -> array:
         """
         Evaluates ``self_i // other_i`` for each element of an array instance with the respective element of the array ``other``.
 
@@ -692,7 +692,7 @@ class array:
 
         return floor_divide(self, other)
 
-    def __ge__(self: array, other: Union[int, float, array], /) -> array:
+    def __ge__(self: array, other: array | int | float, /) -> array:
         """
         Computes the truth value of ``self_i >= other_i`` for each element of an array instance with the respective element of the array ``other``.
 
@@ -748,9 +748,11 @@ class array:
         out: array
             an array containing the accessed value(s). The returned array must have the same data type as ``self``.
         """
-        return self.at.__getitem__(key).get()
+        from spekk.ops._indexing import getitem
 
-    def __gt__(self: array, other: Union[int, float, array], /) -> array:
+        return getitem(self, key)
+
+    def __gt__(self: array, other: array | int | float, /) -> array:
         """
         Computes the truth value of ``self_i > other_i`` for each element of an array instance with the respective element of the array ``other``.
 
@@ -879,7 +881,7 @@ class array:
 
         return bitwise_invert(self)
 
-    def __le__(self: array, other: Union[int, float, array], /) -> array:
+    def __le__(self: array, other: array | int | float, /) -> array:
         """
         Computes the truth value of ``self_i <= other_i`` for each element of an array instance with the respective element of the array ``other``.
 
@@ -930,7 +932,7 @@ class array:
 
         return bitwise_left_shift(self, other)
 
-    def __lt__(self: array, other: Union[int, float, array], /) -> array:
+    def __lt__(self: array, other: array | int | float, /) -> array:
         """
         Computes the truth value of ``self_i < other_i`` for each element of an array instance with the respective element of the array ``other``.
 
@@ -1035,7 +1037,7 @@ class array:
 
         return remainder(self, other)
 
-    def __mul__(self: array, other: Union[int, float, array], /) -> array:
+    def __mul__(self: array, other: array | int | float | complex, /) -> array:
         r"""
         Calculates the product for each element of an array instance with the respective element of the array ``other``.
 
@@ -1067,7 +1069,7 @@ class array:
 
         return multiply(self, other)
 
-    def __ne__(self: array, other: Union[int, float, bool, array], /) -> array:
+    def __ne__(self: array, other: array | int | float | complex, /) -> array:  # type: ignore
         """
         Computes the truth value of ``self_i != other_i`` for each element of an array instance with the respective element of the array ``other``.
 
@@ -1130,7 +1132,7 @@ class array:
 
         return negative(self)
 
-    def __or__(self: array, other: Union[int, bool, array], /) -> array:
+    def __or__(self: array, other: array | int, /) -> array:
         """
         Evaluates ``self_i | other_i`` for each element of an array instance with the respective element of the array ``other``.
 
@@ -1181,7 +1183,7 @@ class array:
 
         return positive(self)
 
-    def __pow__(self: array, other: Union[int, float, array], /) -> array:
+    def __pow__(self: array, other: array | int | float | complex, /) -> array:
         r"""
         Calculates an implementation-dependent approximation of exponentiation by raising each element (the base) of an array instance to the power of ``other_i`` (the exponent), where ``other_i`` is the corresponding element of the array ``other``.
 
@@ -1247,12 +1249,14 @@ class array:
         value: Union[int, float, bool, array],
         /,
     ) -> None:
-        new_array = self.at.__getitem__(key).set(value)
+        from spekk.ops._indexing import setitem
+
+        new_array = setitem(self, key, value)
         self._data = new_array.data
         self._dims = new_array.dims
         self._id = new_array._id
 
-    def __sub__(self: array, other: Union[int, float, array], /) -> array:
+    def __sub__(self: array, other: array | int | float | complex, /) -> array:
         """
         Calculates the difference for each element of an array instance with the respective element of the array ``other``.
 
@@ -1283,7 +1287,7 @@ class array:
 
         return subtract(self, other)
 
-    def __truediv__(self: array, other: Union[int, float, array], /) -> array:
+    def __truediv__(self: array, other: array | int | float | complex, /) -> array:
         r"""
         Evaluates ``self_i / other_i`` for each element of an array instance with the respective element of the array ``other``.
 
@@ -1317,7 +1321,7 @@ class array:
 
         return divide(self, other)
 
-    def __xor__(self: array, other: Union[int, bool, array], /) -> array:
+    def __xor__(self: array, other: array | bool | int, /) -> array:
         """
         Evaluates ``self_i ^ other_i`` for each element of an array instance with the respective element of the array ``other``.
 
@@ -1341,63 +1345,73 @@ class array:
 
         return bitwise_xor(self, other)
 
-    def __radd__(self, other):
-        return self.__add__(other)
+    def __radd__(self: array, other: array | int | float | complex) -> array:
+        from spekk.ops import add
 
-    def __rsub__(self, other):
+        return add(other, self)
+
+    def __rsub__(self: array, other: array | int | float | complex) -> array:
         from spekk.ops import subtract
 
         return subtract(other, self)
 
-    def __rmul__(self, other):
-        return self.__mul__(other)
+    def __rmul__(self: array, other: array | int | float | complex) -> array:
+        from spekk.ops import multiply
 
-    def __rtruediv__(self, other):
+        return multiply(other, self)
+
+    def __rtruediv__(self: array, other: array | int | float | complex) -> array:
         from spekk.ops import divide
 
         return divide(other, self)
 
-    def __rfloordiv__(self, other):
+    def __rfloordiv__(self: array, other: array | int | float) -> array:
         from spekk.ops import floor_divide
 
         return floor_divide(other, self)
 
-    def __rmod__(self, other):
+    def __rmod__(self: array, other: array | int | float) -> array:
         from spekk.ops import remainder
 
         return remainder(other, self)
 
-    def __rpow__(self, other):
+    def __rpow__(self: array, other: array | int | float | complex) -> array:
         from spekk.ops import pow
 
         return pow(other, self)
 
-    def __rmatmul__(self, other):
+    def __rmatmul__(self: array, other: array) -> array:
         from spekk.ops import matmul
 
         return matmul(other, self)
 
-    def __rand__(self, other):
-        return self.__and__(other)
+    def __rand__(self: array, other: array | bool) -> array:
+        from spekk.ops import logical_and
 
-    def __ror__(self, other):
-        return self.__or__(other)
+        return logical_and(other, self)
 
-    def __rxor__(self, other):
-        return self.__xor__(other)
+    def __ror__(self: array, other: array | bool) -> array:
+        from spekk.ops import logical_or
 
-    def __rlshift__(self, other):
+        return logical_or(other, self)
+
+    def __rxor__(self: array, other: array | bool) -> array:
+        from spekk.ops import logical_xor
+
+        return logical_xor(other, self)
+
+    def __rlshift__(self: array, other: array | int) -> array:
         from spekk.ops import bitwise_left_shift
 
         return bitwise_left_shift(other, self)
 
-    def __rrshift__(self, other):
+    def __rrshift__(self: array, other: array | int) -> array:
         from spekk.ops import bitwise_right_shift
 
         return bitwise_right_shift(other, self)
 
     def to_device(
-        self: array, device: Device, /, *, stream: Optional[Union[int, Any]] = None
+        self: array, device: DeviceLike, /, *, stream: Optional[Union[int, Any]] = None
     ) -> array:
         """
         Copy the array from the device on which it currently resides to the specified ``device``.
@@ -1449,38 +1463,28 @@ class array:
         return self._data
 
     @property
-    def dims(self):
+    def dims(self) -> list[PossiblyUndefinedDim]:
         return self._dims.copy()
 
     @property
     def dim_sizes(self) -> Dict[Dim, int]:
         return {d: s for d, s in zip(self.dims, self.shape)}
 
-    def dim_index(self, dim: Dim) -> int:
-        return self.dims.index(dim)
-
-    def slice_dim(self, dim: Dim) -> "_DimSlicer":
-        warnings.warn(
-            "arr.slice_dim(dim)[a:b] is deprecated. "
-            "Use arr[dim, a:b] or arr.at[dim, a:b].get() instead.",
-            category=DeprecationWarning,
-            stacklevel=2,
-        )
-        return _DimSlicer(self, dim)
-
-    def rename_dim(self, dim: Dim, new_dim: Dim) -> "array":
-        dims = [new_dim if d == dim else d for d in self.dims]
+    def rename_dim(self, dim: Dim | int, new_dim: Dim) -> "array":
+        axis = self.dims.index(dim) if isinstance(dim, Dim) else dim
+        dims = list(self.dims)
+        dims[axis] = new_dim
         return array(self.data, dims)
-    
+
     def clear_dims(self):
         self._dims = [_UndefinedDim() for din in self.dims]
-        return self # return self for now to prevent updating array ID
+        return self  # return self for now to prevent updating array ID
 
     def max(self):
         return ops.max(self)
 
     def min(self):
-        return ops.min(self)        
+        return ops.min(self)
 
     # Methods for casting dtype
     def int8(self):
@@ -1524,21 +1528,11 @@ class array:
 
     @property
     def at(self) -> "ArrayIndexUpdateHelper":
+        from spekk.ops._indexing import ArrayIndexUpdateHelper
+
         return ArrayIndexUpdateHelper(self)
 
     def __repr__(self):
-        return (
-            f"array(shape={self.shape}, dims={self.dims}, "
-            f"dtype={self.dtype}, data={self.data})"
-        )
-
-
-class _DimSlicer:
-    def __init__(self, data: array, dim: Dim):
-        self.data = data
-        self.dim = dim
-
-    def __getitem__(self, key):
-        axis = self.data.dims.index(self.dim)
-        slices = (slice(None),) * axis + (key, ...)
-        return self.data.__getitem__(slices)
+        if self.ndim == 0:
+            return f"spekk.ops.array({self.data})"
+        return f"spekk.ops.array({self.data}, dims={self.dims})"

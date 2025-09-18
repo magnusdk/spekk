@@ -1,24 +1,40 @@
-[build-system]
-build-backend = "hatchling.build"
-requires = ["hatchling"]
-
 [project]
-authors = [
-  {name = "Magnus Dalen Kvalevåg", email = "magnus.kvalevag@ntnu.no"},
-]
-classifiers = [
-  "Programming Language :: Python :: 3",
-  "License :: OSI Approved :: Apache Software License",
-  "Operating System :: OS Independent",
-]
-dependencies = ["numpy", "array-api-compat", "typing_extensions"]
-description = "Named dimensions of nested arrays, independent of array implementation (Numpy, JAX, etc)"
 name = "spekk"
-readme = "README.md"
-requires-python = ">=3.9"
 version = "2.0.0"
+description = "Python Array API with named dimensions"
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [
+    { name = "Magnus Dalen Kvalevåg", email = "magnus.kvalevag@ntnu.no" },
+]
+dependencies = [
+    "array-api-compat>=1.12.0",
+    "numpy>=2.2.6",
+    "typing-extensions>=4.14.0",
+]
 
-[project.urls]
-"Homepage" = "https://github.com/magnusdk/spekk/"
-"Documentation" = "https://spekk.readthedocs.io/en/latest/"
-"Bug Tracker" = "https://github.com/magnusdk/spekk/issues"
+[dependency-groups]
+dev = [
+    "hypothesis>=6.130.5",
+    "ipykernel>=6.29.5",
+    "jax>=0.6.1",
+    "ndindex>=1.8",
+    "pyright",
+    "pytest",
+    "pytest-cov>=6.2.1",
+    "pytest-json-report>=1.5.0",
+    "pytest-xdist>=3.7.0",
+    "ruff>=0.11.12",
+    "spekk",
+]
+
+[tool.uv.sources]
+spekk = { workspace = true }
+
+
+[build-system]
+requires = ["hatchling>=1.10.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+include = ["spekk", "spekk.*"]

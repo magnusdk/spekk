@@ -119,7 +119,9 @@ def concat(
            This specification leaves type promotion between data type families (i.e., ``intxx`` and ``floatxx``) unspecified.
     """
     # TODO: What to do with 'UndefinedDims's arrays? Then we shouldn't broadcast here.
-    broadcasted_dims, arrays = ensure_broadcastable(*arrays, ensure_same_ndim=True)
+    broadcast_array = get_broadcast_array_fn(*arrays, except_dims=[axis])
+    arrays = [broadcast_array(arr) for arr in arrays]
+    broadcasted_dims = arrays[0].dims
     if isinstance(axis, Dim):
         axis = broadcasted_dims.index(axis)
     data = backend.concat([arr._data for arr in arrays], axis=axis)
@@ -227,16 +229,19 @@ def moveaxis(
         destination = [destination]
 
     # Convert all to integers (axes)
-    source = tuple(x._dims.index(d) if isinstance(d, Dim) else d for d in source)
+    source = tuple(
+        x._dims.index(d) if isinstance(d, Dim) else canonicalize_axis(len(x.dims), d)
+        for d in source
+    )
     destination = tuple(
-        x._dims.index(d) if isinstance(d, Dim) else d for d in destination
+        x._dims.index(d) if isinstance(d, Dim) else canonicalize_axis(len(x.dims), d)
+        for d in destination
     )
 
     data = backend.moveaxis(x._data, source, destination)
     dims = [dim for i, dim in enumerate(x.dims) if i not in source]
     for src, dest in zip(source, destination):
-        dest_idx = canonicalize_axis(len(x.dims), dest)
-        dims.insert(dest_idx, x.dims[src])
+        dims.insert(dest, x.dims[src])
     return array(data, dims)
 
 

@@ -1,6 +1,7 @@
 import abc
 import dataclasses
 import functools
+import warnings
 from collections import defaultdict
 from typing import (
     TYPE_CHECKING,
@@ -8,10 +9,13 @@ from typing import (
     Callable,
     Dict,
     Iterable,
+    Iterator,
+    Mapping,
     Optional,
     Sequence,
-    TypeVar,
-    Union,
+    Type,
+    cast,
+    overload,
 )
 
 from typing_extensions import dataclass_transform
@@ -19,12 +23,6 @@ from typing_extensions import dataclass_transform
 if TYPE_CHECKING:
     from spekk.ops._types import Dim
     from spekk.ops.array_object import array
-
-
-TModule = TypeVar("TModule", bound="Module")
-TContainer = Union[list, tuple, dict, "Module"]
-T = TypeVar("T")
-V = TypeVar("V")
 
 
 @functools.wraps(dataclasses.field)
@@ -40,9 +38,9 @@ def field(*, static: bool = False, **kwargs):
 
 @dataclasses.dataclass
 class _static_value:
-    """Internal class, do not use it (unless you really want to; noone can stop you).
-    Marker for letting spekk know that a value is considered static, and should trigger
-    JIT-recompilation when changed."""
+    """NOTE: this is an internal class; do not use it. Marker for letting spekk know
+    that a value is considered static and should trigger JIT-recompilation when changed.
+    """
 
     value: Any
 
@@ -50,39 +48,11 @@ class _static_value:
         return f"static_value({self.value})"
 
 
-@dataclass_transform(eq_default=False, field_specifiers=(dataclasses.field, field))
-class _ModuleMeta(abc.ABCMeta):
-    """Metaclass for the Module base class.
-
-    Wraps classes with dataclass during class creation and ensures that all backend
-    arrays are converted to spekk arrays during object instantiation.
-    """
-
-    # __new__ is called whenever a class that inherits from Module is defined.
-    def __new__(mcls, name: str, bases, namespace: Dict[str, Any], **kwargs):
-        cls = super().__new__(mcls, name, bases, namespace, **kwargs)
-        # Wrap the new class in dataclass.
-        cls = dataclasses.dataclass(cls, eq=False, init=True)
-        return cls
-
-    # __call__ is called whenever we create a new instance of a class that uses
-    # _ModuleMeta as the metaclass or inherits from Module (defined below).
-    def __call__(cls, *args, **kwargs):
-        import spekk.ops as ops
-
-        # Ensure that the arguments are arrays and not backend arrays.
-        args = [
-            (ops.array(arg) if ops.backend._is_backend_array(arg) else arg)
-            for arg in args
-        ]
-        kwargs = {
-            key: (ops.array(value) if ops.backend._is_backend_array(value) else value)
-            for key, value in kwargs.items()
-        }
-        return super(_ModuleMeta, cls).__call__(*args, **kwargs)
-
-
-class Module(metaclass=_ModuleMeta):
+@dataclass_transform(
+    eq_default=False,
+    field_specifiers=(dataclasses.field, cast(Callable, field)),
+)
+class Module(abc.ABC):
     """Base class for custom classes that are understood by spekk.
 
     Classes that inherit from Module are dataclasses:
@@ -95,40 +65,58 @@ class Module(metaclass=_ModuleMeta):
     compilation, similar to Equinox.
     """
 
+    def __init_subclass__(cls):
+        "Convert all subclasses of Module to dataclass."
+        dataclasses.dataclass(cls)
+
     @property
-    def dim_sizes(self) -> Dict["Dim", int]:
+    def dim_sizes(self) -> Dict["Dim", int | set[int] | dict[int, int]]:
         """Return a dictionary of the dimensions and corresponding sizes of all arrays
-        in self.
+        in self. If two or more arrays contain the same dimension, but the sizes
+        differ, a warning is printed, and a set of the different sizes is returned for
+        that dimension. Undefined dimensions are combined into a single dict from size
+        to number of arrays sharing that size.
         """
         from spekk import ops
         from spekk.ops._types import _UndefinedDim
 
         # Gather the size(s) for each dimension for each array in self. Store the sizes
-        # for each dimension in a set.
+        # for each dimension in a set. For undefined dimension, store in a dict how
+        # many times an array has an axis with a specific size.
         dim_size_sets = defaultdict(set)
+        undefined_dim_sizes = defaultdict(int)
         flattened = flatten(self)
         for x in flattened.dynamic + flattened.static:
             if isinstance(x, ops.array):
                 for dim, size in x.dim_sizes.items():
                     if isinstance(dim, _UndefinedDim):
-                        raise ValueError(
-                            "Can not calculated dimension sizes when some arrays have "
-                            "undefined dimensions."
-                        )
-                    dim_size_sets[dim].add(size)
+                        undefined_dim_sizes[size] += 1
+                    else:
+                        dim_size_sets[dim].add(size)
 
-        # Go through all dimensions and correpsonding set of sizes. Raise a ValueError
-        # if a dimension has more than one corresponding size. If no error was raised,
-        # return a dictionary from dim to the size from the set.
+        # Go through all dimensions and corresponding set of sizes and check which
+        # (if any) dimensions have inconsistent sizes. Get the single size for al other
+        # dimensions.
         dim_sizes = {}
+        inconsistent_dim_sizes = {}
         for dim, sizes in dim_size_sets.items():
             if len(sizes) > 1:
-                raise ValueError(
-                    f"Inconsistent sizes for dimension {dim}. Sizes: {sizes}."
-                )
-            # Get the single size from the set of sizes.
-            size = next(iter(sizes))
-            dim_sizes[dim] = size
+                dim_sizes[dim] = sizes
+                inconsistent_dim_sizes[dim] = sizes
+            else:
+                # Get the single size from the set of sizes.
+                size = next(iter(sizes))
+                dim_sizes[dim] = size
+
+        # Handle undefined dimensions or dimensions with inconsistent sizes.
+        if undefined_dim_sizes:
+            dim_sizes[_UndefinedDim()] = dict(undefined_dim_sizes)
+        if inconsistent_dim_sizes:
+            warnings.warn(
+                f"Got inconsistent sizes for dimensions: {inconsistent_dim_sizes}.",
+                category=UserWarning,
+                stacklevel=1,
+            )
         return dim_sizes
 
     @property
@@ -147,7 +135,8 @@ class Module(metaclass=_ModuleMeta):
                 a = getattr(self, _field.name)
                 b = getattr(other, _field.name)
                 if isinstance(a, ops.array) and isinstance(b, ops.array):
-                    return a._id == b._id
+                    if a._id != b._id:
+                        return False
                 elif a != b:
                     return False
             return True
@@ -158,43 +147,43 @@ class Module(metaclass=_ModuleMeta):
 # Helpers for slicing arrays in Module objects:
 
 
-class _ModuleAtHelper:
-    def __init__(self, module_obj: "array"):
+class _ModuleAtHelper[M: Module]:
+    def __init__(self, module_obj: M):
         self.module_obj = module_obj
 
-    def __getitem__(self, slices):
-        return _ModuleAtUpdateRef(self.module_obj, slices)
+    def __getitem__(self, indexing_object: Any):
+        return _ModuleAtUpdateRef(self.module_obj, indexing_object)
 
 
-class _ModuleAtUpdateRef:
-    def __init__(self, module_obj: "Module", slices: tuple):
+class _ModuleAtUpdateRef[M: Module]:
+    def __init__(self, module_obj: M, indexing_object: Any):
         self.module_obj = module_obj
-        self.slices = slices
+        self.indexing_object = indexing_object
 
     def _get_map_leaf_fn(self, name: str, *args, **kwargs):
         from spekk import ops
+        from spekk.ops._indexing import IndexingBehavior
 
         def map_leaf(leaf):
             if isinstance(leaf, ops.array):
-                indexing_ref = leaf.at[self.slices]._with_indexing_behavior(
-                    raise_if_slice_dim_not_in_x=False
-                )
-                leaf = getattr(indexing_ref, name)(*args, **kwargs)
+                _at = leaf.at[self.indexing_object]
+                _at.indexing_behavior = IndexingBehavior(leaf.dims)
+                leaf = getattr(_at, name)(*args, **kwargs)
             return leaf
 
         return map_leaf
 
-    def get(self) -> "array":
+    def get(self) -> M:
         return traverse(self.module_obj, map_leaf=self._get_map_leaf_fn("get"))
 
-    def set(self, value: "array") -> "array":
+    def set(self, value: "array") -> M:
         return traverse(self.module_obj, map_leaf=self._get_map_leaf_fn("set", value))
 
-    def update(self, f: Callable[["array"], "array"], *args, **kwargs) -> "array":
+    def update(self, f: Callable[["array"], "array"], *args, **kwargs) -> M:
         return traverse(
             self.module_obj,
             map_leaf=self._get_map_leaf_fn("update", f, *args, **kwargs),
-        )
+        )  # type: ignore
 
 
 ####
@@ -203,7 +192,7 @@ class _ModuleAtUpdateRef:
 replace = dataclasses.replace
 
 
-def replace_at(obj: TModule, path: Sequence[str], new_value: T) -> TModule:
+def replace_at[M: Module](obj: M, path: Sequence[str], new_value: Any) -> M:
     if not path:
         return new_value
     current, *rest = path
@@ -212,13 +201,9 @@ def replace_at(obj: TModule, path: Sequence[str], new_value: T) -> TModule:
     )
 
 
-def update_at(
-    obj: TModule,
-    path: Sequence[str],
-    f: Callable[[T], T],
-    *args,
-    **kwargs,
-) -> TModule:
+def update_at[M: Module](
+    obj: M, path: Sequence[str], f: Callable, *args, **kwargs
+) -> M:
     if not path:
         return f(obj, *args, **kwargs)
     current, *rest = path
@@ -231,17 +216,23 @@ def _noop(x):
     return x
 
 
-def _recreate_container(constructor, *args):
+def _recreate_container[M: TContainer](
+    constructor: Callable[[Type[M], *tuple[Any, ...]], M], *args
+) -> M:
     return constructor(*args)
 
 
+type TLeaf = array | bool | int | float | complex
+type TContainer = Module | list | tuple | dict
+
+
 def traverse(
-    obj: T,
+    obj: TLeaf | TContainer,
     *,
-    map_leaf: Callable[[V], V] = _noop,
-    recreate_container: Callable = _recreate_container,
-    map_static_field: Optional[Callable[[V], V]] = None,
-) -> T:
+    map_leaf: Callable[[TLeaf], Any] = _noop,
+    recreate_container: Callable[..., TContainer] = _recreate_container,
+    map_static_field: Optional[Callable[[Any], Any]] = None,
+) -> TContainer:
     recur = functools.partial(
         traverse,
         map_leaf=map_leaf,
@@ -252,7 +243,7 @@ def traverse(
     # Handle basic Python container types
     if isinstance(obj, (list, tuple)):
         traversed_elements = [recur(element) for element in obj]
-        constructor = lambda *args: type(obj)(args)
+        constructor = lambda *args: type(obj)(args)  # noqa: E731
         return recreate_container(constructor, *traversed_elements)
     elif isinstance(obj, dict):
         traversed_values = [recur(value) for value in obj.values()]
@@ -300,30 +291,35 @@ class _Arg:
         return "*" if self.is_dynamic else "_"
 
 
-@dataclasses.dataclass
-class _Flattened:
-    dynamic: tuple
-    static: tuple
-    unflatten_ops: list
+type _TContainerRecreator = Callable[..., TContainer]
 
-    def unflatten(self, dynamic: Iterable) -> Any:
+
+@dataclasses.dataclass
+class _Flattened[M: TContainer]:
+    dynamic: tuple[TLeaf]
+    static: tuple
+    unflatten_ops: list[_TContainerRecreator | _Arg]
+
+    def unflatten(self, dynamic: Iterable[TLeaf]) -> M:
         dynamic = iter(dynamic)
         static = iter(self.static)
 
-        def _eval(op):
+        def _eval(op: _Arg | Sequence[_TContainerRecreator | _Arg]):
             if isinstance(op, _Arg):
                 return next(dynamic) if op.is_dynamic else next(static)
             f, *args = op
-            return f(*(_eval(arg) for arg in args))
+            return f(*(_eval(arg) for arg in args))  # type: ignore
 
-        return _eval(self.unflatten_ops)
+        return _eval(self.unflatten_ops)  # type: ignore
 
-    def filter_dynamic(self, predicate: Callable, *args, **kwargs) -> "_Flattened":
+    def filter_dynamic(self, predicate: Callable, *args, **kwargs) -> "_Flattened[M]":
         """Return a new _Flattened object where all dynamic fields for which predicate
         returns False are made static instead."""
         dynamic = []
         static = []
-        unflatten_ops = [lambda *args: self.unflatten(args)]
+        unflatten_ops: list[_TContainerRecreator | _Arg] = [
+            lambda *args: self.unflatten(args)
+        ]
 
         for obj in self.dynamic:
             if predicate(obj, *args, **kwargs):
@@ -335,7 +331,7 @@ class _Flattened:
 
         # Add the existing static fields to the end of the new tuple of static fields.
         static.extend(self.static)
-        return _Flattened(dynamic, static, unflatten_ops)
+        return _Flattened(tuple(dynamic), tuple(static), unflatten_ops)
 
 
 def _is_array_like(x) -> bool:
@@ -346,7 +342,9 @@ def _is_array_like(x) -> bool:
     ) or ops.backend._is_backend_array(x)
 
 
-def flatten(obj: TModule, *, flatten_spekk_arrays: bool = False) -> _Flattened:
+def flatten[M: TContainer](
+    obj: M, *, flatten_spekk_arrays: bool = False
+) -> _Flattened[M]:
     """Flatten the Module recursively and put dynamic and static attributes into
     separate tuples.
 
@@ -372,7 +370,7 @@ def flatten(obj: TModule, *, flatten_spekk_arrays: bool = False) -> _Flattened:
     dynamic = []
     static = []
 
-    def map_leaf(leaf):
+    def map_leaf(leaf: TLeaf | _static_value):
         if isinstance(leaf, _static_value):
             static.append(leaf.value)  # Unwrap the value
             return _Arg.static()
@@ -401,4 +399,4 @@ def flatten(obj: TModule, *, flatten_spekk_arrays: bool = False) -> _Flattened:
         recreate_container=as_sexpr_ops,
         map_static_field=map_static_field,
     )
-    return _Flattened(tuple(dynamic), tuple(static), unflatten_ops)
+    return _Flattened(tuple(dynamic), tuple(static), unflatten_ops)  # type: ignore

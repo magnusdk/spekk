@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import numpy as np
 import pytest
 
@@ -15,6 +16,20 @@ def test_creating_class():
     obj = A(1.0, 20.0)
     assert obj.a == 1.0
     assert obj.b == 20.0
+
+
+def test_creating_subclass():
+    class A(Module):
+        a: int
+        b: int
+
+    class B(A):
+        c: int
+
+    obj = B(1, 2, 3)
+    assert obj.a == 1
+    assert obj.b == 2
+    assert obj.c == 3
 
 
 def test_creating_class_with_custom_init():
@@ -44,18 +59,6 @@ def test_creating_class_with_post_init():
     assert obj.b == 20.0
 
 
-def test_creating_class_converts_arrays():
-    class A(Module):
-        a: ops.array
-        b: ops.array
-
-    obj = A(np.array(1.0), np.array(20.0))
-    assert obj.a == 1.0
-    assert obj.b == 20.0
-    assert isinstance(obj.a, ops.array)
-    assert isinstance(obj.b, ops.array)
-
-
 def test_module_dim_sizes():
     class A(Module):
         a: ops.array
@@ -74,7 +77,7 @@ def test_module_dim_sizes():
     )
     assert obj.dim_sizes == {"d2": 2, "d3": 3, "d4": 4, "d5": 5, "d6": 6}
 
-    # Inconsistent sizes for the same dimension raises ValueError
+    # Inconsistent sizes for a dimension means a set is returned for that dimension.
     obj = B(
         A(
             ops.ones((2,), dims=["d"]),
@@ -82,10 +85,9 @@ def test_module_dim_sizes():
         ),
         ops.ones((4,), dims=["d"]),
     )
-    with pytest.raises(ValueError):
-        obj.dim_sizes
+    assert obj.dim_sizes == {"d": {2, 5, 4}}
 
-    # Undefined dimensions raises ValueError
+    # Undefined dimensions are put into its own dict.
     obj = B(
         A(
             ops.ones((2,), dims=["d2"]),
@@ -93,8 +95,10 @@ def test_module_dim_sizes():
         ),
         ops.ones((2,), dims=["d2"]),
     )
-    with pytest.raises(ValueError):
-        obj.dim_sizes
+    assert obj.dim_sizes["d2"] == 2
+    # It is a bit difficult to make assertions about undefined dimensions (with the
+    # current implementation).
+    assert len(obj.dim_sizes) == 2
 
 
 def test_module_at():
@@ -203,7 +207,8 @@ def test_update_at_empty_path():
     assert new_obj.a == 20
     assert obj.a == 10
 
-#TODO LOOK THROUGH REMAINING
+
+# TODO LOOK THROUGH REMAINING
 # Tests for traverse
 def test_traverse_map_leaf():
     class A(Module):

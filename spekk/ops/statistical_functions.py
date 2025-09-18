@@ -5,7 +5,7 @@ from spekk.ops._backend import backend
 from spekk.ops._types import Dim, Optional, Tuple, Union, dtype
 from spekk.ops._util import get_reduction_axes_and_resulting_dims
 from spekk.ops.array_object import array
-from spekk.ops.data_types import _DType
+from spekk.ops.data_types import DType
 
 
 def cumulative_sum(
@@ -59,7 +59,7 @@ def cumulative_sum(
     .. versionadded:: 2023.12
     """
     if dtype is not None:
-        dtype = _DType._to_backend_dtype(dtype)
+        dtype = DType._to_backend_dtype(dtype)
     if axis is None:
         if x.ndim != 1:
             raise ValueError("dim must be provided when x has more than one dimension.")
@@ -260,7 +260,7 @@ def prod(
        Required the function to return a floating-point array having the same data type as the input array when provided a floating-point array.
     """
     if dtype is not None:
-        dtype = _DType._to_backend_dtype(dtype)
+        dtype = DType._to_backend_dtype(dtype)
     axis, dims = get_reduction_axes_and_resulting_dims(axis, x._dims, keepdims)
     data = backend.prod(x._data, axis=axis, dtype=dtype, keepdims=keepdims)
     return array(data, dims)
@@ -363,7 +363,7 @@ def sum(
        Required the function to return a floating-point array having the same data type as the input array when provided a floating-point array.
     """
     if dtype is not None:
-        dtype = _DType._to_backend_dtype(dtype)
+        dtype = DType._to_backend_dtype(dtype)
     axis, dims = get_reduction_axes_and_resulting_dims(axis, x._dims, keepdims)
     data = backend.sum(x._data, axis=axis, dtype=dtype, keepdims=keepdims)
     return array(data, dims)

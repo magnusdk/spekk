@@ -359,7 +359,6 @@ def jit(
     )
 
 
-jit()
 
 def scan(fn, init, xs):
     return ops.backend.scan(fn, init, xs.data)

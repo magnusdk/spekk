@@ -46,7 +46,44 @@ from typing import (
     TypedDict,
     TypeVar,
     Union,
+    runtime_checkable,
 )
+
+import numpy as np
+
+if TYPE_CHECKING:
+    from spekk.ops import array
+    from spekk.ops.data_types import DType
+
+
+# DTypes
+class BackendDtype(Protocol): ...
+
+
+type InferableDType = BackendDtype | DType | np.dtype | str
+
+
+type DTypeLike = DType | np.dtype | str
+type DeviceLike = str
+
+
+@runtime_checkable
+class ArrayLike(Protocol):
+    @property
+    def shape(self) -> tuple[int, ...]: ...
+    @property
+    def size(self) -> int: ...
+    @property
+    def ndim(self) -> int: ...
+
+    @property
+    def dtype(self) -> DTypeLike: ...
+
+    @property
+    def device(self) -> DeviceLike: ...
+
+
+type ArrayOrNumber = array | bool | int | float | complex
 
 
 class _UndefinedDim:
@@ -63,8 +100,9 @@ class _UndefinedDim:
 
 undefined_dim = _UndefinedDim()
 
-Dim: TypeAlias = Union[str, _UndefinedDim]
-Dims: TypeAlias = Sequence[Dim]
+type Dim = str
+type PossiblyUndefinedDim = Dim | _UndefinedDim
+type Dims = Sequence[Dim]
 
 
 def is_undefined_dim(x) -> bool:
@@ -74,10 +112,12 @@ def is_undefined_dim(x) -> bool:
 class BackendArray(Protocol): ...
 
 
-device = TypeVar("device")
-dtype = TypeVar("dtype")
+class BackendDevice(Protocol): ...
+
+
+type device = BackendDevice
+type dtype = DType
 SupportsDLPack = TypeVar("SupportsDLPack")
-SupportsBufferProtocol = TypeVar("SupportsBufferProtocol")
 PyCapsule = TypeVar("PyCapsule")
 # ellipsis cannot actually be imported from anywhere, so include a dummy here
 # to keep pyflakes happy. https://github.com/python/typeshed/issues/3556
@@ -106,11 +146,8 @@ class iinfo_object:
     dtype: dtype
 
 
-_T_co = TypeVar("_T_co", covariant=True)
-
-
-class NestedSequence(Protocol[_T_co]):
-    def __getitem__(self, key: int, /) -> Union[_T_co, NestedSequence[_T_co]]: ...
+class NestedSequence[T](Protocol):
+    def __getitem__(self, key: int, /) -> T | NestedSequence[T]: ...
 
     def __len__(self, /) -> int: ...
 
@@ -162,9 +199,3 @@ DataTypes = TypedDict(
 Capabilities = TypedDict(
     "Capabilities", {"boolean indexing": bool, "data-dependent shapes": bool}
 )
-
-if TYPE_CHECKING:
-    from spekk.ops.array_object import array
-ArrayLike = Union[
-    "array", bool, int, float, complex, NestedSequence, SupportsBufferProtocol
-]
