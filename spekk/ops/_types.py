@@ -100,9 +100,9 @@ class _UndefinedDim:
 
 undefined_dim = _UndefinedDim()
 
-type Dim = str
-type PossiblyUndefinedDim = Dim | _UndefinedDim
-type Dims = Sequence[Dim]
+Dim: TypeAlias = str
+PossiblyUndefinedDim: TypeAlias = Dim | _UndefinedDim
+Dims: TypeAlias = Sequence[Dim]
 
 
 def is_undefined_dim(x) -> bool:

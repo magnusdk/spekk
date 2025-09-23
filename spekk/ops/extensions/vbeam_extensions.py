@@ -13,7 +13,7 @@ from typing import (
 from spekk import ops
 from spekk.module.base import Module
 from spekk.ops._backend import backend
-from spekk.ops._types import Dim, undefined_dim, Dims
+from spekk.ops._types import Dim, Dims, undefined_dim
 from spekk.ops.array_object import array
 
 TFunc = TypeVar("TFunc", bound=Callable)
@@ -135,7 +135,7 @@ def nan_to_num(
     from spekk import ops
 
     if nan is not None:
-        x = ops.where(x == ops.nan, nan, x)
+        x = ops.where(ops.isnan(x), nan, x)
     if posinf is not None:
         x = ops.where(x == ops.inf, posinf, x)
     if neginf is not None:
@@ -200,7 +200,7 @@ def dilation1d(
     axis: Dim,
 ):
     # Number of zeros to interleave
-    axis_idx = x.dim_index(axis)
+    axis_idx = x.dims.index(axis)
 
     # Calculate the new shape after interleaving zeros
     new_shape = list(x.shape)
@@ -314,6 +314,46 @@ def expand_slice_to_axis(s: Union[slice, int, array], axis: int):
     return (slice(None),) * axis + (s, ...)
 
 
+def _argf_over_dims(
+    f,
+    x: ops.array,
+    *,
+    axis: tuple[Dim] | list[Dim] | Dim | None = None,
+) -> dict[Dim, int]:
+    """Can be used like argmin or argmax, but allows applying over multiple dimensions
+    at once and integrates better with named dimensions.
+
+    f can be either argmin or argmax (or any other function that similarly returns an
+    index).
+
+    Example:
+    >>> x = ops.array(np.random.randn(2, 3, 4), ["a", "b", "c"])
+    >>> min_i = _argf_over_dims(ops.argmin, x, axis=["a", "b"])
+    >>> assert all(x[min_i] == ops.min(x, axis=["a", "b"]))
+    """
+
+    if axis is None:
+        axis = x.dims
+    elif not isinstance(axis, (tuple, list)):
+        axis = [axis]
+    assert all(isinstance(dim, Dim) for dim in axis)
+
+    dim, *dims = axis
+    i = f(x, axis=dim)
+    x = x[dim, i]
+    result = {dim: i}
+    for dim in dims:
+        i = f(x, axis=dim)
+        x = x[dim, i]
+        result = {result_dim: indices[dim, i] for result_dim, indices in result.items()}
+        result[dim] = i
+    return result
+
+
+argmin_over_dims = functools.partial(_argf_over_dims, ops.argmin)
+argmax_over_dims = functools.partial(_argf_over_dims, ops.argmax)
+
+
 @overload
 def jit(
     f: Optional[TFunc] = None,
@@ -359,7 +399,6 @@ def jit(
     )
 
 
-
 def scan(fn, init, xs):
     return ops.backend.scan(fn, init, xs.data)
 
@@ -372,35 +411,37 @@ def reduce_over_dim(
     dim: Dim,
     include_index: bool = False,
 ) -> TCarry:
-    from spekk.module import flatten as flatten_tree
+    from spekk.module import dim_sizes as get_dim_sizes
+    from spekk.module import flatten
 
-    dim_sizes = data.dim_sizes
+    dim_sizes = get_dim_sizes(data)
     if dim not in dim_sizes:
         raise ValueError(f"Dimension {dim} not found in the data.")
 
-    # Optionally include an index array to the data.
-    if include_index:
-        data = (ops.arange(dim_sizes[dim], dim=dim), data)
-
     # Flatten the initial carry state.
-    flat_carry = flatten_tree(init, flatten_spekk_arrays=True)
+    flat_carry = flatten(init, flatten_spekk_arrays=True)
 
     # Flatten the object that we want to reduce over into a sequence of arrays that has
     # dim in its dimensions.
-    flat_outer = flatten_tree(data).filter_dynamic(
+    flat_outer = flatten(data).filter_dynamic(
         lambda x: isinstance(x, ops.array) and (dim in x.dims)
     )
     # Ensure that the dimension being reduced over is at the first axis.
     dynamic = [ops.moveaxis(x, dim, 0) for x in flat_outer.dynamic]
 
     # Extract underlying data and dims
-    dynamic_data = tuple(x.data for x in dynamic)
-    dynamic_dims = tuple(x.dims for x in dynamic)
+    dynamic_data = [x.data for x in dynamic]
+    dynamic_dims = [x.dims for x in dynamic]
 
     def _scan_f(carry, dyn_data):
         nonlocal flat_carry
         # Reconstruct the carry from its flattened version.
         carry = flat_carry.unflatten(carry)
+
+        # Remove index from dynamic data.
+        if include_index:
+            index = dyn_data[-1]
+            dyn_data = dyn_data[:-1]
 
         # Rebuild the current dynamic arrays for this time step without the leading
         # dimension. It does not have the leading dimension because that is what we are
@@ -408,14 +449,25 @@ def reduce_over_dim(
         current_dynamic = [
             ops.array(data, dims[1:]) for data, dims in zip(dyn_data, dynamic_dims)
         ]
+        reduce_f_args = [carry, flat_outer.unflatten(current_dynamic)]
+        # Add index as last argument to reduce_f.
+        if include_index:
+            reduce_f_args.append(index)
+
         # Unflatten the data, call reduce_f, and flatten the result
-        flat_carry = flatten_tree(
-            reduce_f(carry, flat_outer.unflatten(current_dynamic)),
+        flat_carry = flatten(
+            reduce_f(*reduce_f_args),
             flatten_spekk_arrays=True,
         )
         return flat_carry.dynamic, None
 
     # Run the backend scan implementation on the dynamic backend data.
+    if include_index:
+        # Add indices to the end of dynamic data. NB! We NEED to extract it out again
+        # before calling unflatten on the dynamic data.
+        indices = backend.arange(dim_sizes[dim])
+        dynamic_data.append(indices)
+
     new_dynamic_0, _ = _scan_f(flat_carry.dynamic, [x[0] for x in dynamic_data])
     new_dynamic, _ = ops.backend.scan(
         _scan_f, new_dynamic_0, [x[1:] for x in dynamic_data]
@@ -433,12 +485,13 @@ def map_reduce_over_dim(
     include_index_in_reduce: bool = False,
 ) -> TCarry:
     if include_index_in_reduce:
-        f = lambda carry, x: reduce_f(carry, (x[0], map_f(x[1])))
+        f = lambda carry, part, index: reduce_f(carry, map_f(part), index)
     else:
-        f = lambda carry, x: reduce_f(carry, map_f(x))
+        f = lambda carry, part: reduce_f(carry, map_f(part))
     return reduce_over_dim(
         f, data, init=init, dim=dim, include_index=include_index_in_reduce
     )
+
 
 def map_over_dim(
     map_f: Callable,
@@ -446,7 +499,7 @@ def map_over_dim(
     *,
     dim: Dim | Sequence[Dim],
     include_index: bool = False,
-):    
+):
     """
     Iterates over each element of `dim` in `data`, applies `map_f` to it, and returns
     a new data object of the results along the same dimension.
@@ -528,6 +581,7 @@ def map_over_dim(
 
     # Reconstruct tree of outputs
     return flat_out_template.unflatten(wrapped)
+
 
 def vmap(f, in_axes):
     return backend.vmap(f, in_axes=in_axes)

@@ -7,15 +7,11 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Dict,
     Iterable,
-    Iterator,
-    Mapping,
     Optional,
     Sequence,
     Type,
     cast,
-    overload,
 )
 
 from typing_extensions import dataclass_transform
@@ -56,6 +52,7 @@ class Module(abc.ABC):
     """Base class for custom classes that are understood by spekk.
 
     Classes that inherit from Module are dataclasses:
+    >>> from spekk import ops, Module
     >>> class MyClass(Module):
     ...     foo: float
     ...     bar: ops.array
@@ -70,60 +67,18 @@ class Module(abc.ABC):
         dataclasses.dataclass(cls)
 
     @property
-    def dim_sizes(self) -> Dict["Dim", int | set[int] | dict[int, int]]:
+    def dim_sizes(self) -> dict["Dim", int | set[int]]:
         """Return a dictionary of the dimensions and corresponding sizes of all arrays
-        in self. If two or more arrays contain the same dimension, but the sizes
-        differ, a warning is printed, and a set of the different sizes is returned for
-        that dimension. Undefined dimensions are combined into a single dict from size
-        to number of arrays sharing that size.
+        in self. If a dimension has different sizes for different arrays, a set of
+        sizes is returned for that dimension and a warning is created.
         """
-        from spekk import ops
-        from spekk.ops._types import _UndefinedDim
-
-        # Gather the size(s) for each dimension for each array in self. Store the sizes
-        # for each dimension in a set. For undefined dimension, store in a dict how
-        # many times an array has an axis with a specific size.
-        dim_size_sets = defaultdict(set)
-        undefined_dim_sizes = defaultdict(int)
-        flattened = flatten(self)
-        for x in flattened.dynamic + flattened.static:
-            if isinstance(x, ops.array):
-                for dim, size in x.dim_sizes.items():
-                    if isinstance(dim, _UndefinedDim):
-                        undefined_dim_sizes[size] += 1
-                    else:
-                        dim_size_sets[dim].add(size)
-
-        # Go through all dimensions and corresponding set of sizes and check which
-        # (if any) dimensions have inconsistent sizes. Get the single size for al other
-        # dimensions.
-        dim_sizes = {}
-        inconsistent_dim_sizes = {}
-        for dim, sizes in dim_size_sets.items():
-            if len(sizes) > 1:
-                dim_sizes[dim] = sizes
-                inconsistent_dim_sizes[dim] = sizes
-            else:
-                # Get the single size from the set of sizes.
-                size = next(iter(sizes))
-                dim_sizes[dim] = size
-
-        # Handle undefined dimensions or dimensions with inconsistent sizes.
-        if undefined_dim_sizes:
-            dim_sizes[_UndefinedDim()] = dict(undefined_dim_sizes)
-        if inconsistent_dim_sizes:
-            warnings.warn(
-                f"Got inconsistent sizes for dimensions: {inconsistent_dim_sizes}.",
-                category=UserWarning,
-                stacklevel=1,
-            )
-        return dim_sizes
+        return dim_sizes(self)
 
     @property
     def at(self):
         """Helper for updating slices of _all_ arrays in the object that have the
         sliced dimension(s)."""
-        return _ModuleAtHelper(self)
+        return at(self)
 
     def __eq__(self, other):
         if self is other:
@@ -145,6 +100,41 @@ class Module(abc.ABC):
 
 ####
 # Helpers for slicing arrays in Module objects:
+
+
+def at(obj):
+    return _ModuleAtHelper(obj)
+
+
+def dim_sizes(obj):
+    from spekk import ops
+    from spekk.ops._types import _UndefinedDim
+
+    # Gather the size(s) for each dimension for each array in self. Store the sizes
+    # for each dimension in a set.
+    dim_size_sets: dict[Dim, set[int]] = defaultdict(set)
+    flattened = flatten(obj)
+    for x in flattened.dynamic + flattened.static:
+        if isinstance(x, ops.array):
+            for dim, size in x.dim_sizes.items():
+                if isinstance(dim, _UndefinedDim):
+                    raise ValueError(
+                        "Can not calculated dimension sizes when some arrays have "
+                        "undefined dimensions."
+                    )
+                dim_size_sets[dim].add(size)
+
+    # Check if any dimensions has inconsistent sizes. Warn if they do. If not, get
+    # the single size for that dimension instead of the set of one element.
+    dim_sizes: dict[Dim, int | set[int]] = {}
+    for dim, size in dim_size_sets.items():
+        if len(size) == 1:
+            # Get the single size from the set of sizes.
+            size = next(iter(size))
+        else:
+            warnings.warn(f"Inconsistent sizes for dimension {dim}. Sizes: {size}.")
+        dim_sizes[dim] = size
+    return dim_sizes
 
 
 class _ModuleAtHelper[M: Module]:
@@ -212,6 +202,12 @@ def update_at[M: Module](
     )
 
 
+def get_at(obj: Module, path: Sequence[str]):
+    for step in path:
+        obj = getattr(obj, step)
+    return obj
+
+
 def _noop(x):
     return x
 
@@ -230,9 +226,9 @@ def traverse(
     obj: TLeaf | TContainer,
     *,
     map_leaf: Callable[[TLeaf], Any] = _noop,
+    map_static_field: Optional[Callable[[Any], Any]] = _noop,
     recreate_container: Callable[..., TContainer] = _recreate_container,
-    map_static_field: Optional[Callable[[Any], Any]] = None,
-) -> TContainer:
+) -> TLeaf | TContainer:
     recur = functools.partial(
         traverse,
         map_leaf=map_leaf,
@@ -256,7 +252,7 @@ def traverse(
         traversed_values = []
         for _field in fields:
             value = getattr(obj, _field.name)
-            if map_static_field is not None and _field.metadata.get("static", False):
+            if _field.metadata.get("static", False):
                 traversed_values.append(map_static_field(value))
             else:
                 traversed_values.append(recur(value))
@@ -266,6 +262,81 @@ def traverse(
 
     # The rest are considered leaves
     return map_leaf(obj)
+
+
+def _partial_at(func: Callable, fixed: dict[int, object], n_args: int) -> Callable:
+    """Like functools.partial but for arbitrary positional slots.
+    >>> def func(a, b, c):
+    ...     return [a, b, c]
+    >>> p_func = _partial_at(func, {1: "arg_1"}, 3)
+    >>> p_func(0, 1)
+    [0, 'arg_1', 1]
+    """
+
+    @functools.wraps(func)
+    def wrapper(*args):
+        it = iter(args)
+        return func(*[fixed[i] if i in fixed else next(it) for i in range(n_args)])
+
+    return wrapper
+
+
+def traverse_multiple(
+    *objs: TLeaf | TContainer,
+    f: Callable[..., TLeaf],
+    recreate_container: Callable = _recreate_container,
+) -> TLeaf | TContainer:
+    traversable_objs = []
+    untraversable_objs = {}
+    for i, obj in enumerate(objs):
+        if isinstance(obj, (list, tuple, dict, Module)):
+            traversable_objs.append(obj)
+        else:
+            untraversable_objs[i] = obj
+    if not traversable_objs:
+        return f(*objs)
+    f = _partial_at(f, untraversable_objs, len(objs))
+    objs = traversable_objs
+
+    obj, *rest = objs
+    assert all(type(x) is type(obj) for x in rest)
+
+    recur = functools.partial(
+        traverse_multiple,
+        f=f,
+        recreate_container=recreate_container,
+    )
+
+    # Handle basic Python container types
+    if isinstance(obj, (list, tuple)):
+        assert all(len(x) == len(obj) for x in rest)
+        traversed_elements = [recur(*elements) for elements in zip(*objs)]
+        constructor = lambda *args: type(obj)(args)
+        return recreate_container(constructor, *traversed_elements)
+    elif isinstance(obj, dict):
+        assert all(x.keys() == obj.keys() for x in rest)
+        traversed_values = [
+            recur(*values) for values in zip(*[x.values() for x in objs])
+        ]
+        constructor = lambda *values: dict(zip(obj.keys(), values))
+        return recreate_container(constructor, *traversed_values)
+
+    # Handle custom Module types
+    elif isinstance(obj, Module):
+        fields = dataclasses.fields(obj)
+        traversed_values = []
+        for _field in fields:
+            values = [getattr(x, _field.name) for x in objs]
+            if _field.metadata.get("static", False):
+                traversed_values.append(f(*values))
+            else:
+                traversed_values.append(recur(*values))
+        field_names = [_field.name for _field in fields]
+        constructor = lambda *values: type(obj)(**dict(zip(field_names, values)))
+        return recreate_container(constructor, *traversed_values)
+
+    # The rest are considered leaves
+    return f(*objs)
 
 
 ####
@@ -400,3 +471,9 @@ def flatten[M: TContainer](
         map_static_field=map_static_field,
     )
     return _Flattened(tuple(dynamic), tuple(static), unflatten_ops)  # type: ignore
+
+
+if __name__ == "__main__":
+    import doctest
+
+    doctest.testmod()

@@ -4,10 +4,7 @@ from typing import TYPE_CHECKING, Literal, TypeVar
 
 from spekk.ops._backend import backend
 from spekk.ops._types import Dim, Optional, Tuple, undefined_dim
-from spekk.ops._util import (
-    ensure_backend_compatible_data,
-    ensure_broadcastable,
-)
+from spekk.ops._util import ensure_backend_compatible_data, ensure_broadcastable
 from spekk.ops.array_object import array
 from spekk.ops.exceptions import MismatchedDimensionsError
 

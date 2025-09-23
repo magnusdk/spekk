@@ -6,6 +6,7 @@ import numpy as np
 
 from spekk import ops
 from spekk.module.base import TContainer, TLeaf
+from spekk.ops._backend import backend
 from spekk.ops._types import ArrayLike, Dim, Dims, _UndefinedDim, undefined_dim
 from spekk.ops.array_object import array
 from spekk.ops.data_types import DType
@@ -154,45 +155,42 @@ def get_broadcast_array_fn(
             return ops.broadcast_to(arr, output_shape)
 
         return broadcast_array
-    elif n_arrays_with_undefined_dims > 1:
-        raise ValueError(
-            "Undefined dimensions causes ambiguity when broadcasting. Either make sure "
-            "that all dimension names are defined or fallback to NumPy-style "
-            "broadcasting by removing all named dimensions from the arrays."
-        )
 
-    # Collect all dimension sizes across arrays
-    output_dim_size_sets: dict[Dim, set[int]] = defaultdict(set)
+    # Get the output dimension list of each array after broadcasting. Ordering of
+    # output dimensions are determined by the ordering of input arrays and their
+    # dimensions.
+    combined_output_dims = defaultdict(set)
     for arr in arrays:
         for size, dim in zip(arr.shape, arr._dims):
-            output_dim_size_sets[dim].add(size)
+            if dim not in combined_output_dims:
+                combined_output_dims[dim].add(size)
 
-    output_dim_sizes: dict[Dim, int] = {}
-    for dim, sizes in output_dim_size_sets.items():
-        if len(sizes) > 1 and dim not in except_dims:
-            raise ValueError(f"Inconsistent sizes for dimension '{dim}': {sizes=}")
-        output_dim_sizes[dim] = sizes.pop()
+    combined_output_dims = {
+        dim: sizes.pop() for dim, sizes in combined_output_dims.items()
+    }
 
     def broadcast_array(arr: ops.array) -> ops.array:
         # Ensure that the dimensions have the correct order before broadcasting.
-        arr_dims_in_order = [dim for dim in output_dim_sizes if dim in arr.dims]
+        arr_dims_in_order = [dim for dim in combined_output_dims if dim in arr.dims]
         if arr.dims != arr_dims_in_order:
             arr = ops.permute_dims(arr, arr_dims_in_order)
 
         # Add singleton dimensions that will be broadcasted to the common shape.
         new_shape = []
-        for dim in output_dim_sizes:
+        for dim in combined_output_dims:
             if dim in arr.dims:
                 new_shape.append(arr.dim_sizes[dim])
             else:
                 new_shape.append(1)  # Singleton dimension
         new_shape = tuple(new_shape)
         if arr.shape != new_shape:
-            arr = ops.reshape(arr, shape=new_shape, dims=list(output_dim_sizes.keys()))
+            arr = ops.reshape(
+                arr, shape=new_shape, dims=list(combined_output_dims.keys())
+            )
 
         # Get the final common broadcasted shape.
         broadcasted_shape = []
-        for dim, size in output_dim_sizes.items():
+        for dim, size in combined_output_dims.items():
             # Keep original size for except_dims (e.g., concat axis)
             if dim in except_dims:
                 size = arr.dim_sizes[dim]
@@ -204,7 +202,7 @@ def get_broadcast_array_fn(
             arr = ops.broadcast_to(
                 arr,
                 shape=broadcasted_shape,
-                dims=list(output_dim_sizes.keys()),
+                dims=list(combined_output_dims.keys()),
             )
 
         return arr

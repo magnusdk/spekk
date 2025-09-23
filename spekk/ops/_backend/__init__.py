@@ -4,35 +4,6 @@ from typing import Literal, Optional
 
 import array_api_compat
 
-_env_backend = os.environ.get("SPEKK_BACKEND", None)
-_backend_priority = ["jax", "torch", "cupy", "numpy"]
-
-
-def _set_initial_backend(backend: "Backend"):
-    if _env_backend is not None:
-        try:
-            backend.set_backend(_env_backend)
-            backend.backend_name = _env_backend
-        except ValueError as e:
-            raise ValueError(
-                f"Unknown backend '{_env_backend}' (set in environment "
-                "variable 'SPEKK_BACKEND')."
-            ) from e
-    else:
-        for backend_name in _backend_priority:
-            try:
-                backend.set_backend(backend_name)
-                backend.backend_name = backend_name
-                break
-            except ImportError as e:
-                print(e)
-                continue
-        else:
-            raise ValueError(
-                "No valid backends could be loaded. Please install one of "
-                f"{_backend_priority}."
-            )
-
 
 # TODO: Remove me when next version of array_api_compat comes out and just use their
 # version instead.
@@ -54,17 +25,35 @@ def _is_writeable_array(x) -> bool:
 
 class Backend:
     def __init__(
-        self, backend_name: Optional[Literal["numpy", "mlx", "jax", "torch", "cupy"]] = None
+        self,
+        backend_name: Literal["numpy", "mlx", "jax", "torch", "cupy"] | None,
     ):
         self.backend_name = backend_name
-        if self.backend_name is None:
-            _set_initial_backend(self)
-    
+        if backend_name is None:
+            self._set_initial_backend()
+
+    def _set_initial_backend(self):
+        _backend_priority = ["jax", "torch", "cupy", "numpy"]
+        for backend_name in _backend_priority:
+            try:
+                self.set_backend(backend_name)
+                self.backend_name = backend_name
+                break
+            except ImportError:
+                continue
+        else:
+            raise ValueError(
+                "No valid backends could be loaded. Please install one of "
+                f"{_backend_priority}."
+            )
+
     @property
     def device(self):
         return self.active_device
 
-    def set_backend(self, backend_name: Literal["numpy", "mlx", "jax", "torch", "cupy"]):
+    def set_backend(
+        self, backend_name: Literal["numpy", "mlx", "jax", "torch", "cupy"]
+    ):
         if backend_name not in ["numpy", "mlx", "jax", "torch", "cupy"]:
             raise ValueError(f"Unknown backend '{backend_name}'")
         old_backend_name = self.backend_name
@@ -79,7 +68,9 @@ class Backend:
             raise
 
     @contextlib.contextmanager
-    def temporary_backend(self, backend_name: Literal["numpy", "mlx", "jax", "torch", "cupy"]):
+    def temporary_backend(
+        self, backend_name: Literal["numpy", "mlx", "jax", "torch", "cupy"]
+    ):
         original_backend = self.backend_name
         self.set_backend(backend_name)
         try:
@@ -109,6 +100,8 @@ class Backend:
             import spekk.ops._backend.included_backends.torch as ops
         elif self.backend_name == "cupy":
             import spekk.ops._backend.included_backends.cupy as ops
+        else:
+            raise ValueError(f"Invalid active backend: '{self.backend_name}'.")
         return ops
 
     def __getattr__(self, name: str):
@@ -118,4 +111,5 @@ class Backend:
         return f"Backend('{self.backend_name}')"
 
 
-backend = Backend()
+_env_backend = os.environ.get("SPEKK_BACKEND", None)
+backend = Backend(_env_backend)

@@ -9,13 +9,22 @@ from functools import partial
 
 from spekk.util.profiling import function_profiling
 
+
 def windowed(
-    f,
-    window_sizes: dict[Dim, int],
+    f=None,
+    window_sizes: dict[Dim, int] = None,
     pad_mode: Union[str, None] = None,
     reflect_type: Union[str, None] = None,
 ):
-    def wrapped(data: ops.array):
+    if f is None:
+        return partial(
+            windowed,
+            window_sizes=window_sizes,
+            pad_mode=pad_mode,
+            reflect_type=reflect_type,
+        )
+
+    def wrapped(data: ops.array, *args, **kwargs):
         if pad_mode is not None:
             pad_width = [(size // 2, size // 2) for size in window_sizes.values()]
             dims = list(window_sizes.keys())
@@ -44,15 +53,17 @@ def windowed(
             + offsets
             for dim, offsets in window_index_offsets.items()
         }
-        return f(data[indices], axis=tuple(window_dim_names))
+        return f(data[indices], *args, axis=tuple(window_dim_names), **kwargs)
 
     return wrapped
+
 
 @function_profiling
 def median_filter(
     image: array, window_sizes: dict[Dim, int], pad_mode: Union[str, None] = "edge"
 ) -> array:
     return windowed(ops.median, window_sizes, pad_mode)(image)
+
 
 @function_profiling
 @ops.jit(static_argnames=("spatial_sigmas",))
@@ -75,7 +86,7 @@ def bilateral_filter_kernel(
     spatial_sigmas: dict[Dim, float],
     color_sigma: float,
 ) -> array:
-    
+
     # Pre-compute
     scaleFactor_color = 1 / (2 * color_sigma * color_sigma)
 
@@ -128,7 +139,7 @@ def convNd(image: array, kernel: array, pad_mode="edge") -> array:
 
     return windowed(f, window_sizes, pad_mode=pad_mode)(image)
 
-def convNd_kernel(img_pad: array, axis: tuple, kernel: array) -> array:
+def convNd_kernel(img_pad: array, axis: tuple, kernel: array, kernel_axes) -> array:
     # rename axis in "kernel" to match new axis in "img_pad"
     for dim in kernel.dims:
         if dim in img_pad.dims:
@@ -136,6 +147,7 @@ def convNd_kernel(img_pad: array, axis: tuple, kernel: array) -> array:
             kernel = kernel.rename_dim(dim, img_pad.dims[dim_index])
 
     return ops.sum(img_pad * kernel, axis=axis)
+
 
 def check_odd_items(dictionary):
     for key, value in dictionary.items():
@@ -149,7 +161,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import cv2
     import cfm
-    
+
     # from cfm.utils import profiling
     # profiling.set_level( profiling.Level.Warning)
 
@@ -164,7 +176,9 @@ if __name__ == "__main__":
 
     img_gray_spekk = ops.array(img_gray, dims=["x", "y"])
     img_gray_spekk = ops.expand_dims(img_gray_spekk, axis="dummy")
-    img_gray_spekk = ops.concat((img_gray_spekk,img_gray_spekk,img_gray_spekk), axis="dummy")
+    img_gray_spekk = ops.concat(
+        (img_gray_spekk, img_gray_spekk, img_gray_spekk), axis="dummy"
+    )
 
     # kernel = ops.array([-0.25, 0.5, 0.25])
     r = 3
@@ -185,13 +199,13 @@ if __name__ == "__main__":
     img_ref = convNd(img_gray_spekk, kernel)
     img_ref = convNd(img_gray_spekk, kernel)
     # print(f"bilateralfilter_ref_jitted = {time.time() - tic:0.5f}")
-    
+
     # tic = time.time()
     # r = 4
     # x, y = ops.meshgrid(ops.arange(-r, r + 1, dim="x"), ops.arange(-r, r + 1, dim="y"))
     # kernel = ops.exp(-(x * x + y * y))
     # kernel = kernel / ops.sum(kernel)
-    
+
     # img_ref = convNd(img_gray_spekk+2, kernel)
     # print(f"bilateralfilter_ref_jitted = {time.time() - tic:0.5f}")
 

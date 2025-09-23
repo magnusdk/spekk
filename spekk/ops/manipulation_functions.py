@@ -119,6 +119,8 @@ def concat(
            This specification leaves type promotion between data type families (i.e., ``intxx`` and ``floatxx``) unspecified.
     """
     # TODO: What to do with 'UndefinedDims's arrays? Then we shouldn't broadcast here.
+    # broadcasted_dims, arrays = ensure_broadcastable(*arrays, ensure_same_ndim=True)
+
     broadcast_array = get_broadcast_array_fn(*arrays, except_dims=[axis])
     arrays = [broadcast_array(arr) for arr in arrays]
     broadcasted_dims = arrays[0].dims
@@ -245,7 +247,7 @@ def moveaxis(
     return array(data, dims)
 
 
-def permute_dims(x: array, /, axes: Tuple[Dim, ...]) -> array:
+def permute_dims(x: array, /, axes: tuple[Dim, ...] | list[Dim]) -> array:
     """
     Permutes the axes (dimensions) of an array ``x``.
 
@@ -332,7 +334,7 @@ def repeat(
 def reshape(
     x: array,
     /,
-    shape: Tuple[int, ...],
+    shape: Tuple[int, ...] | list[int],
     dims: Optional[Dims] = None,
     *,
     copy: Optional[bool] = None,
@@ -370,7 +372,7 @@ def reshape(
         )
     if dims is None:
         dims = [undefined_dim] * len(shape)
-    return array(backend.reshape(x._data, shape, copy=copy), dims)
+    return array(backend.reshape(x._data, tuple(shape), copy=copy), dims)
 
 
 def roll(
@@ -455,7 +457,10 @@ def squeeze(
 
 
 def stack(
-    arrays: Union[Tuple[array, ...], List[array]],
+    arrays: Union[
+        Tuple[bool | int | float | complex | array, ...],
+        List[bool | int | float | complex | array],
+    ],
     /,
     *,
     axis: Union[int, Dim] = 0,

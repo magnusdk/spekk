@@ -2144,8 +2144,8 @@ def logical_xor(
 
 
 def maximum(
-    x1: array | int | float,
-    x2: array | int | float,
+    x1: bool | int | float | complex | array,
+    x2: bool | int | float | complex | array,
     /,
 ) -> array:
     r"""
@@ -2612,7 +2612,7 @@ def round(x: array | int | float | complex, /) -> array:
     return array(backend.round(x), dims)
 
 
-def sign(x: array | int | float | complex, /) -> array:
+def sign(x: int | float | complex | array, /) -> array:
     r"""
     Returns an indication of the sign of a number for each element ``x_i`` of the input array ``x``.
 

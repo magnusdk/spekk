@@ -16,10 +16,10 @@ __all__ = [
     "zeros",
     "zeros_like",
 ]
-
 from collections.abc import Buffer
 
 import numpy as np
+
 from spekk import ops
 from spekk.ops._backend import backend
 from spekk.ops._types import (
@@ -29,15 +29,16 @@ from spekk.ops._types import (
     NestedSequence,
     PossiblyUndefinedDim,
 )
+from spekk.ops._util import ensure_backend_compatible_data
 from spekk.ops.array_object import array
 from spekk.ops.data_types import DType
 
 
 def arange(
-    start: int | float,
+    start: int | float | array,
     /,
-    stop: int | float | None = None,
-    step: int | float = 1,
+    stop: int | float | array | None = None,
+    step: int | float | array = 1,
     *,
     dtype: DType | BackendDtype | np.dtype | str | None = None,
     device: BackendDevice | None = None,
@@ -75,6 +76,7 @@ def arange(
         dtype = DType._to_backend_dtype(dtype)
     if device is None:
         device = ops.backend.device
+    start, stop, step = ensure_backend_compatible_data(start, stop, step)
     return array(
         backend.arange(start, stop, step, dtype=dtype, device=device),
         dims,
@@ -83,14 +85,16 @@ def arange(
 
 
 def asarray(
-    obj: array
-    | bool
-    | int
-    | float
-    | complex
-    | NestedSequence[bool | int | float | complex]
-    | Buffer
-    | BackendArray,
+    obj: (
+        array
+        | bool
+        | int
+        | float
+        | complex
+        | NestedSequence[bool | int | float | complex]
+        | Buffer
+        | BackendArray
+    ),
     /,
     *,
     dtype: DType | BackendDtype | np.dtype | str | None = None,
@@ -477,6 +481,8 @@ def linspace(
         dtype = DType._to_backend_dtype(dtype)
     if device is None:
         device = ops.backend.device
+
+    start, stop, num = ensure_backend_compatible_data(start, stop, num)
     return array(
         backend.linspace(
             start, stop, num, dtype=dtype, device=device, endpoint=endpoint

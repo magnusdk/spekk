@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import math
 import uuid
-import warnings
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union
 
 import numpy as np
+
 import spekk.ops.data_types as data_types
 from spekk import ops
 from spekk.ops._backend import backend
@@ -12,17 +13,14 @@ from spekk.ops._types import (
     ArrayLike,
     DeviceLike,
     Dim,
-    Dims,
     DTypeLike,
     Enum,
     PossiblyUndefinedDim,
     PyCapsule,
     _UndefinedDim,
-    ellipsis,
 )
-from spekk.ops._types import (
-    device as Device,
-)
+from spekk.ops._types import device as Device
+from spekk.ops._types import ellipsis
 from spekk.ops.data_types import DType
 
 if TYPE_CHECKING:
@@ -180,7 +178,7 @@ class array:
         .. note::
            For array libraries having graph-based computational models, an array may have unknown dimensions due to data-dependent operations.
         """
-        return self._data.size
+        return math.prod(self._data.shape)
 
     @property
     def T(self: array) -> array:

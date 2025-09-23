@@ -5,5 +5,5 @@ __all__ = [
     "median_filter",
     "bilateral_filter",
     "convNd",
-    "windowed"
+    "windowed",
 ]
