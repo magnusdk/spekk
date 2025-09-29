@@ -1468,6 +1468,9 @@ class array:
     def dim_sizes(self) -> Dict[Dim, int]:
         return {d: s for d, s in zip(self.dims, self.shape)}
 
+    def dim_index(self, dim: Dim) -> int:
+        return self.dims.index(dim)        
+
     def rename_dim(self, dim: Dim | int, new_dim: Dim) -> "array":
         axis = self.dims.index(dim) if isinstance(dim, Dim) else dim
         dims = list(self.dims)
