@@ -8,8 +8,8 @@ from spekk import Dim, ops, util
 from spekk.ops._types import _UndefinedDim
 from spekk.ops._util import (
     ensure_backend_compatible_data,
+    ensure_broadcastable,
     ensure_broadcastable_with,
-    get_broadcast_array_fn,
 )
 
 
@@ -570,14 +570,7 @@ def broadcast_key(
             # inside the broadcasting function further down.
         new_key.append(index)
 
-    broadcast_array_fn = get_broadcast_array_fn(
-        *[index for index in new_key if isinstance(index, ops.array)]
-    )
-    new_key = tuple(
-        broadcast_array_fn(index) if isinstance(index, ops.array) else index
-        for index in new_key
-    )
-
+    _, new_key = ensure_broadcastable(*new_key)
     return replace(indexing_object, key=new_key)
 
 

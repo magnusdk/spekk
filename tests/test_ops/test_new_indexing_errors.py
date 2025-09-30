@@ -129,7 +129,7 @@ def test_advanced_dimension_mismatch():
     indices_a = ops.array([0, 1], ["shared"])
     indices_b = ops.array([0, 1, 2], ["shared"])  # Same dim name, different size
     # This should fail due to dimension size mismatch
-    with pytest.raises(ValueError):
+    with pytest.raises(IndexError):
         x["a", indices_a, "b", indices_b]
 
 
@@ -214,7 +214,6 @@ def test_list_indexing():
 #        setitem(x, {"a": slice(0, 2), "b": slice(0, 2)}, value)
 
 
-# This is a great test!
 # Test 20: Complex mixed indexing with errors
 def test_complex_mixed_indexing_errors():
     """Test complex mixed indexing that should cause errors."""
@@ -222,7 +221,7 @@ def test_complex_mixed_indexing_errors():
     # Mix different types of problematic indices
     indices = ops.array([0, 1, 2, 3], ["b"])  # Size 4, but b has size 4 (this is ok)
     # But then try to index b with slice that creates size mismatch
-    with pytest.raises(ValueError):
+    with pytest.raises(IndexError):
         x["a", indices, "b", slice(0, 2)]  # This creates size mismatch
 
 
