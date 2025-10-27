@@ -48,6 +48,12 @@ def flatten(x: array, dim: Optional[Dim] = None) -> array:
         dim = undefined_dim
     return array(data, dims=[dim])
 
+def diag(v, k=0, dims: Dims=None):
+    if v.ndim==1 or v.ndim==2:
+        data = backend.diag(v.data, k=k)
+        return ops.array(data, dims=dims)
+    else:
+        raise ValueError(f"diag only supported ndim 1 or 2, diag={v.ndim}")
 
 def to_numpy(x: array):
     return backend.to_numpy(x.data)
