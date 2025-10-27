@@ -10,6 +10,7 @@ vmap = common.get_vmap_fn(jax.vmap)
 jit = common.get_jit_fn(jax.jit)
 scan = common.get_scan_fn(jax.lax.scan)
 grad = jax.grad
+value_and_grad = jax.value_and_grad
 checkpoint = jax.checkpoint
 
 

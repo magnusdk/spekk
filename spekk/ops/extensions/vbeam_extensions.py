@@ -588,7 +588,7 @@ def vmap(f, in_axes):
 
 
 def grad(f=None, /, argnums: int | Sequence[int] = 0):
-    """Creates a function that evaluates the gradient of ``f``.
+    """Create a function that evaluates the gradient of ``f``.
 
       f: Function to be differentiated. Its arguments at positions specified by
         ``argnums`` should be arrays, scalars, standard Python containers or spekk
@@ -681,6 +681,106 @@ def grad(f=None, /, argnums: int | Sequence[int] = 0):
             assert len(result) == 1
             result = result[0]
         return result
+
+    return outer
+
+
+def value_and_grad(f=None, /, argnums: int | Sequence[int] = 0):
+    """Create a function that evaluates both `f` and the gradient of ``f``.
+
+      f: Function to be differentiated. Its arguments at positions specified by
+        ``argnums`` should be arrays, scalars, standard Python containers or spekk
+        Modules. Argument arrays in the positions specified by ``argnums`` must be of
+        inexact (i.e., floating-point or complex) type. It should return a scalar (which
+        includes arrays with shape ``()`` but not arrays with shape ``(1,)`` etc.)
+      argnums: Optional, integer or sequence of integers. Specifies which
+        positional argument(s) to differentiate with respect to (default 0).
+
+    Returns:
+      A function with the same arguments as ``f``, that evaluates both ``f``and the 
+      gradient of ``f``. If ``argnums`` is an integer then the gradient has the same 
+      shape and type as the positional argument indicated by that integer. If argnums 
+      is a tuple of integers, the gradient is a tuple of values with the same shapes 
+      and types as the corresponding arguments.
+    """
+    from spekk.module.base import flatten
+
+    # Allow the following syntax:
+    #   @value_and_grad(argnums=1)
+    #   def f(a, b): ...
+    # which is shorthand for:
+    #   @functools.partial(value_and_grad, argnums=1)
+    #   def f(a, b): ...
+    if f is None:
+        return functools.partial(grad, argnums=argnums)
+
+    # Ensure that argnums is a list because it simplifies the code further down. We
+    # still have to keep information about whether the argnums was an integer or a
+    # sequence to know whether we should return a single item or a tuple of items. If
+    # argnums is a sequence of integers, the returned gradient is a tuple of values
+    # with the same shapes and types as the corresponding arguments.
+    is_single_argnum = isinstance(argnums, int)
+    argnums = [argnums] if isinstance(argnums, int) else list(argnums)
+
+    def outer(*args):
+        # Extract only the arguments that are to be differentiated.
+        grad_args = [arg for i, arg in enumerate(args) if i in argnums]
+        # Flatten it down to values that are understood by the backend.
+        flattened_grad_args = flatten(grad_args, flatten_spekk_arrays=True)
+
+        # Define the function that accepts the flattened values and wrap it with grad.
+        # We pass only the values that are to be differentiated to this function, so
+        # argnums is set to be all arguments.
+        @functools.partial(
+            ops.backend.value_and_grad,
+            argnums=range(len(flattened_grad_args.dynamic)),
+        )
+        def inner(*args_inner):
+            # Unflatten the arguments used to calculate the gradient back to their
+            # original types and structure.
+            grad_args_inner = flattened_grad_args.unflatten(args_inner)
+
+            # Get the full list of args by inserting the unflattened args at the right
+            # positions.
+            args_inner = list(args)
+            for i, arg in zip(argnums, grad_args_inner):
+                args_inner[i] = arg
+
+            # Call the function that will be differentiated.
+            result = f(*args_inner)
+
+            # The result must be a scalar float value.
+            if not isinstance(result, (float, array)):
+                raise ValueError(
+                    "Gradient only defined for scalar-output functions. Got output "
+                    f"with type: {type(result)!r}."
+                )
+            if isinstance(result, array) and not result.ndim == 0:
+                raise ValueError(
+                    "Gradient only defined for scalar-output functions. Got output "
+                    f"with shape: {result.shape!r}"
+                )
+
+            # Return the backend data of the result which must be a scalar value.
+            if isinstance(result, array):
+                result = result.data
+            return result
+
+        # Get the resulting gradient and unflatten to the original type and structure.
+        # The call to unflatten is what allows us to take the gradient with regards to
+        # an arbitrary structure of arguments; even Modules.
+        value, grad = inner(*flattened_grad_args.dynamic)
+        assert value.ndim == 0 # We check for this in the inner function as well
+        value = ops.array(value)
+        grad = flattened_grad_args.unflatten(grad)
+
+        # If argnums was a sequence of integers, the returned gradient is a tuple of
+        # values with the same shapes and types as the corresponding arguments.
+        # Otherwise, the result is just a single item and we return it.
+        if is_single_argnum:
+            assert len(grad) == 1
+            grad = grad[0]
+        return value, grad
 
     return outer
 
