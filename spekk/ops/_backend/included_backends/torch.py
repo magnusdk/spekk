@@ -13,7 +13,7 @@ vmap = common.get_vmap_fn(torch.vmap)
 jit = common.get_jit_fn(torch.compile)
 
 
-def scan(fn, init, xs):
+def scan(fn, init, xs, unroll=None):
     from spekk.module import base as module_base
 
     carry = init

@@ -428,6 +428,7 @@ def reduce_over_dim(
     init: TCarry,
     dim: Dim,
     include_index: bool = False,
+    unroll: int | bool = 1
 ) -> TCarry:
     from spekk.module import dim_sizes as get_dim_sizes
     from spekk.module import flatten
@@ -488,7 +489,7 @@ def reduce_over_dim(
 
     new_dynamic_0, _ = _scan_f(flat_carry.dynamic, [x[0] for x in dynamic_data])
     new_dynamic, _ = ops.backend.scan(
-        _scan_f, new_dynamic_0, [x[1:] for x in dynamic_data]
+        _scan_f, new_dynamic_0, [x[1:] for x in dynamic_data], unroll=unroll,
     )
     return flat_carry.unflatten(new_dynamic)
 
@@ -501,13 +502,14 @@ def map_reduce_over_dim(
     init: TCarry,
     dim: Dim,
     include_index_in_reduce: bool = False,
+    unroll: int | bool = 1,
 ) -> TCarry:
     if include_index_in_reduce:
         f = lambda carry, part, index: reduce_f(carry, map_f(part), index)
     else:
         f = lambda carry, part: reduce_f(carry, map_f(part))
     return reduce_over_dim(
-        f, data, init=init, dim=dim, include_index=include_index_in_reduce
+        f, data, init=init, dim=dim, include_index=include_index_in_reduce, unroll=unroll,
     )
 
 
@@ -517,12 +519,14 @@ def map_over_dim(
     *,
     dim: Dim | Sequence[Dim],
     include_index: bool = False,
+    unroll: int | bool = 1,
 ):
     """
     Iterates over each element of `dim` in `data`, applies `map_f` to it, and returns
     a new data object of the results along the same dimension.
     """
     from spekk.module import flatten
+    from spekk.module import dim_sizes as get_dim_sizes
 
     # Handle case where multiple dims are given. Then we map over each dimension
     # individually.
@@ -540,7 +544,8 @@ def map_over_dim(
             )
 
     # Validate dimension
-    dim_sizes = data.dim_sizes
+    # dim_sizes = data.dim_sizes
+    dim_sizes = get_dim_sizes(data)
     if dim not in dim_sizes:
         raise ValueError(f"Dimension {dim} not found in the data.")
 
@@ -587,7 +592,7 @@ def map_over_dim(
 
     # Run scan over the rest
     rest_vals = [arr[1:] for arr in in_data]
-    _, rest_out = ops.backend.scan(_scan_f, carry0, rest_vals)
+    _, rest_out = ops.backend.scan(_scan_f, carry0, rest_vals, unroll=unroll)
 
     # Combine first and rest outputs for each dynamic output array
     all_out = []

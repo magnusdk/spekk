@@ -210,7 +210,7 @@ def get_vmap_fn(vmap_impl):
 
 
 def get_scan_fn(scan_impl):
-    def scan(f, init, xs):
+    def scan(f, init, xs, unroll):
         from spekk.module.base import _Flattened, flatten
 
         flattened_carry = flatten(init, flatten_spekk_arrays=True)
@@ -225,7 +225,7 @@ def get_scan_fn(scan_impl):
             flattened_y = flatten(y, flatten_spekk_arrays=True)
             return flattened_carry.dynamic, flattened_y.dynamic
 
-        carry, ys = scan_impl(wrapped_f, flattened_carry.dynamic, xs)
+        carry, ys = scan_impl(wrapped_f, flattened_carry.dynamic, xs, unroll=unroll)
         return flattened_carry.unflatten(carry), flattened_y.unflatten(ys)
 
     return scan

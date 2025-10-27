@@ -58,7 +58,7 @@ vmap = common.get_vmap_fn(_python_vmap)
 def jit(f, static_argnums: Sequence[int] = (), static_argnames: Sequence[str] = ()):
     return f
 
-def scan(fn, init, xs):
+def scan(fn, init, xs, unroll=None):
     from spekk.module import base as module_base
 
     carry = init
