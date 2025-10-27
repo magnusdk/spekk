@@ -3,7 +3,7 @@ __all__ = ["matmul", "matrix_transpose", "tensordot", "vecdot"]
 
 from spekk.ops._backend import backend
 from spekk.ops._types import Dim, Sequence, Tuple, Union, _UndefinedDim
-from spekk.ops._util import ensure_backend_compatible_data, ensure_broadcastable
+from spekk.ops._util import ensure_backend_compatible_data, ensure_broadcastable, canonicalize_axis
 from spekk.ops.array_object import array
 from spekk.ops.exceptions import MismatchedDimensionsError
 
@@ -196,6 +196,20 @@ def tensordot(
         ]
         dims = [dim for dim in (x1._dims + x2._dims) if dim not in common_dims]
         return array(backend.tensordot(x1, x2, axes=axes), dims)
+
+    if isinstance(axes, tuple):
+        axes = list(axes)
+        if isinstance(axes[0], int) and isinstance(axes[1], int):
+            axes[0] = [axes[0],]
+            axes[1] = [axes[1],]
+
+        x1_axes = [canonicalize_axis(x1.ndim, idx) for idx in axes[0] ]
+        x2_axes = [canonicalize_axis(x2.ndim, idx) for idx in axes[1] ]
+
+        x1_dims = [dim for i, dim in enumerate(x1.dims) if i not in x1_axes]
+        x2_dims = [dim for i, dim in enumerate(x2.dims) if i not in x2_axes]
+
+        return array(backend.tensordot(x1.data, x2.data, axes=axes), x1_dims + x2_dims)
 
 
 def vecdot(x1: array, x2: array, /, *, axis: int = -1) -> array:
