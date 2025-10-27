@@ -15,6 +15,7 @@ from spekk.module.base import Module, _Flattened
 from spekk.ops._backend import backend
 from spekk.ops._types import Dim, Dims, undefined_dim
 from spekk.ops.array_object import array
+from spekk.ops._util import get_reduction_axes_and_resulting_dims
 
 TFunc = TypeVar("TFunc", bound=Callable)
 TCarry = TypeVar("TCarry")
@@ -86,6 +87,17 @@ def median(a, axis: Optional[Dim], out=None, keepdims: bool = False) -> array:
                 a.data, tuple(axis_indices), out=out, keepdims=keepdims
             )
     return ops.array(arr, dims=dims)
+
+def nanmean(
+    x: array,
+    /,
+    *,
+    axis: Optional[Union[Dim, Tuple[Dim, ...], int, Tuple[int, ...]]] = None,
+    keepdims: bool = False,
+) -> array:
+    axis, dims = get_reduction_axes_and_resulting_dims(axis, x.dims, keepdims)
+    data = backend.nanmean(x._data, axis=axis, keepdims=keepdims)
+    return array(data, dims)
 
 
 def pad(
