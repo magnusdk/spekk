@@ -11,7 +11,7 @@ from typing import (
 )
 
 from spekk import ops
-from spekk.module.base import Module, _Flattened, flatten
+from spekk.module.base import Module, _Flattened
 from spekk.ops._backend import backend
 from spekk.ops._types import Dim, Dims, undefined_dim
 from spekk.ops.array_object import array
@@ -605,6 +605,7 @@ def grad(f=None, /, argnums: int | Sequence[int] = 0):
       argnums is a tuple of integers, the gradient is a tuple of values with the
       same shapes and types as the corresponding arguments.
     """
+    from spekk.module.base import flatten
 
     # Allow the following syntax:
     #   @grad(argnums=1)
@@ -686,6 +687,7 @@ def grad(f=None, /, argnums: int | Sequence[int] = 0):
 
 def wrap_backend_decorator(decorator):
     """Wraps a backend decorator so that it accepts spekk arrays and Modules."""
+    from spekk.module.base import flatten
 
     def new_decorator(f=None, /, **decorator_kwargs):
         # Allow the following syntax:
