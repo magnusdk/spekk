@@ -197,11 +197,18 @@ def tensordot(
         dims = [dim for dim in (x1._dims + x2._dims) if dim not in common_dims]
         return array(backend.tensordot(x1, x2, axes=axes), dims)
 
-    if isinstance(axes, tuple):
+    if isinstance(axes, Sequence):
         axes = list(axes)
         if isinstance(axes[0], int) and isinstance(axes[1], int):
             axes[0] = [axes[0],]
             axes[1] = [axes[1],]
+        elif isinstance(axes[0], Dim) and isinstance(axes[1], Dim):
+            dim1 = x1.dim_index(axes[0])
+            dim2 = x2.dim_index(axes[1])
+            axes[0] = [dim1,]
+            axes[1] = [dim2,]
+        else:
+            raise ValueError(f"axes is not implmented for input: {axes}")
 
         x1_axes = [canonicalize_axis(x1.ndim, idx) for idx in axes[0] ]
         x2_axes = [canonicalize_axis(x2.ndim, idx) for idx in axes[1] ]
