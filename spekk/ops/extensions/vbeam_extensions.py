@@ -99,6 +99,16 @@ def nanmean(
     data = backend.nanmean(x._data, axis=axis, keepdims=keepdims)
     return array(data, dims)
 
+def nansum(
+    x: array,
+    /,
+    *,
+    axis: Optional[Union[Dim, Tuple[Dim, ...], int, Tuple[int, ...]]] = None,
+    keepdims: bool = False,
+) -> array:
+    axis, dims = get_reduction_axes_and_resulting_dims(axis, x.dims, keepdims)
+    data = backend.nansum(x._data, axis=axis, keepdims=keepdims)
+    return array(data, dims)
 
 def pad(
     x: array,
