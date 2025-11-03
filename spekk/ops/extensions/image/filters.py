@@ -139,7 +139,7 @@ def convNd(image: array, kernel: array, pad_mode="edge") -> array:
 
     return windowed(f, window_sizes, pad_mode=pad_mode)(image)
 
-def convNd_kernel(img_pad: array, axis: tuple, kernel: array, kernel_axes) -> array:
+def convNd_kernel(img_pad: array, axis: tuple, kernel: array) -> array:
     # rename axis in "kernel" to match new axis in "img_pad"
     for dim in kernel.dims:
         if dim in img_pad.dims:
