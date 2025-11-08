@@ -110,23 +110,22 @@ def dim_sizes(obj):
     from spekk import ops
     from spekk.ops._types import _UndefinedDim
 
+    undefined_dim_key = _UndefinedDim()
+
     # Gather the size(s) for each dimension for each array in self. Store the sizes
     # for each dimension in a set.
-    dim_size_sets: dict[Dim, set[int]] = defaultdict(set)
+    dim_size_sets: dict[str | _UndefinedDim, set[int]] = defaultdict(set)
     flattened = flatten(obj)
     for x in flattened.dynamic + flattened.static:
         if isinstance(x, ops.array):
             for dim, size in x.dim_sizes.items():
                 if isinstance(dim, _UndefinedDim):
-                    raise ValueError(
-                        "Can not calculated dimension sizes when some arrays have "
-                        "undefined dimensions."
-                    )
+                    dim = undefined_dim_key
                 dim_size_sets[dim].add(size)
 
     # Check if any dimensions has inconsistent sizes. Warn if they do. If not, get
     # the single size for that dimension instead of the set of one element.
-    dim_sizes: dict[Dim, int | set[int]] = {}
+    dim_sizes: dict[Dim | _UndefinedDim, int | set[int]] = {}
     for dim, size in dim_size_sets.items():
         if len(size) == 1:
             # Get the single size from the set of sizes.
