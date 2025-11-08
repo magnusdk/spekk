@@ -899,17 +899,19 @@ def clip(
     .. versionadded:: 2023.12
     """
     if isinstance(min, array) and isinstance(max, array):
-        _, (x, min, max) = ensure_broadcastable(x, min, max)
+        dims, (x, min, max) = ensure_broadcastable(x, min, max)
     elif isinstance(min, array):
-        _, (x, min) = ensure_broadcastable(x, min)
+        dims, (x, min) = ensure_broadcastable(x, min)
     elif isinstance(max, array):
-        _, (x, max) = ensure_broadcastable(x, max)
-    dims = get_dims(x)
+        dims, (x, max) = ensure_broadcastable(x, max)
+    else:
+        dims = get_dims(x)
     x, min, max = ensure_backend_compatible_data(x, min, max)
 
-    # block below is needed due to a bug in array compat lib. Need to cast min/max to float when x.dtype is int
     from spekk import ops
 
+    # block below is needed due to a bug in array compat lib. Need to cast min/max to
+    # float when x.dtype is int
     if isinstance(x, array) and not ops.isdtype(x.dtype, "integral"):
         min = float(min) if isinstance(min, int) else min
         max = float(max) if isinstance(max, int) else max
