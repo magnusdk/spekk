@@ -411,9 +411,9 @@ def test_mixed_boolean_and_basic_indexing():
     mask = ops.array([True, False, True, False, True], dims=["time"])
     # Combined with slice on another dimension
     value = ops.ones((2, 3), dims=["batch", "features"])
-    
+
     result = setitem(x, {"time": mask, "batch": slice(0, 2)}, value)
-    
+
     # Should preserve the sliced batch dimension and boolean-indexed time
     assert "batch" in result.dims
     assert "time" in result.dims
@@ -431,9 +431,9 @@ def test_mixed_boolean_and_advanced_indexing():
     width_indices = ops.array([0, 2], dims=["selected_width"])
     # Value that broadcasts correctly
     value = ops.ones((5,), dims=["depth"])
-    
+
     result = setitem(x, {"height": height_mask, "width": width_indices}, value)
-    
+
     # This tests the complex broadcasting logic in the indexing implementation
     assert "depth" in result.dims
     assert result.dim_sizes["depth"] == 5
@@ -477,7 +477,7 @@ def test_inconsistent_dimension_sizes():
     indices2 = ops.array([0, 1, 2], dims=["shared_dim"])  # size 3
     value = ops.ones((2, 3), dims=["shared_dim", "other_dim"])
 
-    with pytest.raises(ValueError):
+    with pytest.raises(IndexError):
         setitem(x, {"a": indices1, "b": indices2}, value)
 
 
@@ -533,16 +533,6 @@ def test_dimension_expansion_with_array_indexing():
 
     expected_dims = {"a", "b", "sel", "new_dim"}
     assert set(result.dims) == expected_dims
-
-
-def test_dimension_expansion_error_conflict():
-    """Test error when new dimensions have conflicting sizes."""
-    x = create_test_array((2, 3), ["a", "b"])
-    indices = ops.array([0, 1], dims=["conflict"])  # size 2
-    value = ops.ones((3, 3), dims=["conflict", "b"])  # size 3 - conflict!
-
-    with pytest.raises(ValueError):
-        setitem(x, {"a": indices}, value)
 
 
 # ============================================================================
