@@ -55,8 +55,10 @@ def _python_vmap(f, in_axes=None):
 
 vmap = common.get_vmap_fn(_python_vmap)
 
+
 def jit(f, static_argnums: Sequence[int] = (), static_argnames: Sequence[str] = ()):
     return f
+
 
 def scan(fn, init, xs, unroll=None):
     from spekk.module import base as module_base
@@ -92,6 +94,18 @@ def scan(fn, init, xs, unroll=None):
     return carry, tree_result
 
 
+def _not_implemented(name: str):
+    def _(*args, **kwargs):
+        raise NotImplementedError(f"{name} is not implemented for Numpy.")
+
+    return _
+
+
+grad = _not_implemented("grad")
+value_and_grad = _not_implemented("value_and_grad")
+checkpoint = _not_implemented("checkpoint")
+
+
 def get_dtype_name(dtype):
     return dtype.name
 
@@ -103,15 +117,20 @@ def _is_backend_array(x):
 def flatten(x: np.ndarray) -> np.ndarray:
     return x.flatten()
 
+
 def to_numpy(x: np.ndarray) -> np.ndarray:
     return x
 
+
 def correlate2d(x1: np.ndarray, x2: np.ndarray) -> np.ndarray:
     import scipy
+
     return scipy.signal.correlate2d(x1, x2)
+
 
 def set_device(device):
     global active_device
     active_device = device
+
 
 active_device = None
