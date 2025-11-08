@@ -28,8 +28,9 @@ from spekk.ops._types import (
     BackendDtype,
     NestedSequence,
     PossiblyUndefinedDim,
+    _UndefinedDim,
 )
-from spekk.ops._util import ensure_backend_compatible_data
+from spekk.ops._util import ensure_backend_compatible_data, ensure_broadcastable
 from spekk.ops.array_object import array
 from spekk.ops.data_types import DType
 
@@ -476,12 +477,14 @@ def linspace(
         a one-dimensional array containing evenly spaced values.
 
     """
-    dims = [dim] if dim is not None else None
     if dtype is not None:
         dtype = DType._to_backend_dtype(dtype)
     if device is None:
         device = ops.backend.device
 
+    dims: list[str | _UndefinedDim]
+    dims, (start, stop) = ensure_broadcastable(start, stop, ensure_same_ndim=True)
+    dims = [dim if dim is not None else _UndefinedDim(), *dims]
     start, stop, num = ensure_backend_compatible_data(start, stop, num)
     return array(
         backend.linspace(
