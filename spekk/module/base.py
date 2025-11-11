@@ -62,9 +62,12 @@ class Module(abc.ABC):
     compilation, similar to Equinox.
     """
 
-    def __init_subclass__(cls):
+    def __init_subclass__(cls, **kwargs):
         "Convert all subclasses of Module to dataclass."
-        dataclasses.dataclass(cls)
+        # NOTE: naively passing kwargs to dataclass can break if user passes additional
+        # kwargs not meant for the dataclass. The fix is to filter the kwargs here
+        # before passing them to the dataclass.
+        dataclasses.dataclass(cls, **kwargs)
 
     @property
     def dim_sizes(self) -> dict["Dim", int | set[int]]:
