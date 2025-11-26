@@ -1535,5 +1535,6 @@ class array:
 
     def __repr__(self):
         if self.ndim == 0:
-            return f"spekk.ops.array({self.data})"
-        return f"spekk.ops.array({self.data}, dims={self.dims})"
+            return f"spekk.ops.array({self.data}, dtype={self.dtype.name})"
+        return f"spekk.ops.array(\n{self.data}, dims={self.dims}, dtype={self.dtype.name})"
+    
