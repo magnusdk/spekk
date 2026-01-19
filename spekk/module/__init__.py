@@ -1,5 +1,7 @@
 from spekk.module.base import (
+    FlattenedTree,
     Module,
+    TreeDef,
     at,
     dim_sizes,
     field,
@@ -13,7 +15,9 @@ from spekk.module.base import (
 )
 
 __all__ = [
+    "FlattenedTree",
     "Module",
+    "TreeDef",
     "at",
     "dim_sizes",
     "field",

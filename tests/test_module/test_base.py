@@ -1,8 +1,9 @@
 from dataclasses import dataclass
+
 import numpy as np
 import pytest
 
-from spekk import Module, field, ops, replace, replace_at, traverse, update_at
+from spekk import Module, field, flatten, ops, replace, replace_at, traverse, update_at
 
 # TODO: Remove me
 ops.backend.set_backend("numpy")
@@ -257,5 +258,29 @@ def test_traverse_map_static_field():
     assert new_obj.b == 101
 
 
-if __name__ == "__main__":
-    test_module_at()
+def test_flatten_and_treedef():
+    class A(Module):
+        foo: float
+        bar: str = field(static=True)
+
+    class B(Module):
+        foo: float
+        bar: str = field(static=True)
+
+    a = A(0.1, "hello")
+    b = B(0.1, "hello")
+    c = B(0.2, "hello")
+
+    flattened_a = flatten(a)
+    flattened_b = flatten(b)
+    flattened_c = flatten(c)
+
+    assert flattened_a.treedef != flattened_b.treedef
+    assert flattened_b.treedef == flattened_c.treedef
+
+    assert hash(flattened_a.treedef) != hash(flattened_b.treedef)
+    assert hash(flattened_b.treedef) == hash(flattened_c.treedef)
+
+    assert flattened_a.dynamic == (0.1,)
+    assert flattened_a.dynamic == flattened_b.dynamic
+    assert flattened_b.dynamic != flattened_c.dynamic

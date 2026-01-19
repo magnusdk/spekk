@@ -1,32 +1,8 @@
-import dataclasses
 import functools
 from typing import List, Sequence
 
+from spekk.module.base import TreeDef
 from spekk.ops._types import undefined_dim
-
-
-def _get_hashable_key(x):
-    from spekk import Module, ops
-
-    if isinstance(x, (list, tuple)):
-        return (type(x), *(_get_hashable_key(element) for element in x))
-    elif isinstance(x, dict):
-        return (
-            dict,
-            *x.keys(),
-            *(_get_hashable_key(element) for element in x.values()),
-        )
-    elif isinstance(x, Module):
-        field_names = [field.name for field in dataclasses.fields(x)]
-        return (
-            type(x),
-            *field_names,
-            *(_get_hashable_key(getattr(x, name)) for name in field_names),
-        )
-    elif isinstance(x, ops.array):
-        return hash(x._id)
-    else:
-        return x
 
 
 def get_vmap_fn(vmap_impl):
@@ -72,13 +48,12 @@ def get_vmap_fn(vmap_impl):
                 positional_args = False
                 original_args = original_kwargs
 
-            flattened_arguments = flatten(original_args)
+            args_dynamic, args_treedef = flatten(original_args)
 
-            # Calculate the cache key. It is used to recompile the vmapped function if
-            # the static parts of the arguments have changed.
-            cache_key = _get_hashable_key(flattened_arguments.static)
-            if cache_key in CACHE:
-                return CACHE[cache_key](*flattened_arguments.dynamic)
+            # Use treedef as the key to the cache. If the structure or types of the
+            # arguments, or any static values change, the function must be recompiled.
+            if args_treedef in CACHE:
+                return CACHE[args_treedef](*args_dynamic)
 
             # Else, we need to compile the function.
             else:
@@ -89,7 +64,7 @@ def get_vmap_fn(vmap_impl):
                 # correspond to the flattened arguments when running the backend vmap
                 # implementation.
                 flattened_in_axes = []
-                for x in flattened_arguments.dynamic:
+                for x in args_dynamic:
                     if isinstance(x, ops.array) and in_axes in x.dims:
                         flattened_in_axes.append(x.dims.index(in_axes))
                     else:
@@ -105,7 +80,7 @@ def get_vmap_fn(vmap_impl):
                 flattened_dynamic_data = []
                 flattened_dynamic_dims_vmap_context = []
                 vmapped_dims = set()
-                for x, axis in zip(flattened_arguments.dynamic, flattened_in_axes):
+                for x, axis in zip(args_dynamic, flattened_in_axes):
                     if isinstance(x, ops.array):
                         flattened_dynamic_data.append(x.data)
                         dims_vmap_context = list(x.dims)
@@ -168,7 +143,7 @@ def get_vmap_fn(vmap_impl):
                     ]
 
                     # Unflatten args, call f, and flatten the result.
-                    args = flattened_arguments.unflatten(flattened_args)
+                    args = args_treedef.unflatten(flattened_args)
                     result_inner = f(*args) if positional_args else f(**args)
                     flattened_result_inner = flatten(result_inner)
 
@@ -194,10 +169,10 @@ def get_vmap_fn(vmap_impl):
                         ops.array(x, [vmapped_dim, *dims]) if dims is not None else x
                         for x, dims in zip(result_inner, flattened_dynamic_dims_inner)
                     ]
-                    return flattened_result_inner.unflatten(result_inner)
+                    return args_treedef.unflatten(result_inner)
 
                 # Cache the compiled function
-                CACHE[cache_key] = lambda *dynamic_args: unflatten_result_inner(
+                CACHE[args_treedef] = lambda *dynamic_args: unflatten_result_inner(
                     wrapped_inner(*dynamic_args)
                 )
 
@@ -211,22 +186,22 @@ def get_vmap_fn(vmap_impl):
 
 def get_scan_fn(scan_impl):
     def scan(f, init, xs, unroll):
-        from spekk.module.base import _Flattened, flatten
+        from spekk.module.base import TreeDef, flatten
 
-        flattened_carry = flatten(init, flatten_spekk_arrays=True)
-        flattened_y: _Flattened = None
+        carry_dynamic, carry_treedef = flatten(init, flatten_spekk_arrays=True)
+        y_treedef: TreeDef = None  # type: ignore
 
         def wrapped_f(carry, x):
-            nonlocal flattened_carry, flattened_y
-            carry = flattened_carry.unflatten(carry)
+            nonlocal carry_dynamic, y_treedef
+            carry = carry_treedef.unflatten(carry)
 
             new_carry, y = f(carry, x)
-            flattened_carry = flatten(new_carry, flatten_spekk_arrays=True)
-            flattened_y = flatten(y, flatten_spekk_arrays=True)
-            return flattened_carry.dynamic, flattened_y.dynamic
+            carry_dynamic, _ = flatten(new_carry, flatten_spekk_arrays=True)
+            y_dynamic, y_treedef = flatten(y, flatten_spekk_arrays=True)
+            return carry_dynamic, y_dynamic
 
-        carry, ys = scan_impl(wrapped_f, flattened_carry.dynamic, xs, unroll=unroll)
-        return flattened_carry.unflatten(carry), flattened_y.unflatten(ys)
+        carry, ys = scan_impl(wrapped_f, carry_dynamic, xs, unroll=unroll)
+        return carry_treedef.unflatten(carry), y_treedef.unflatten(ys)
 
     return scan
 
@@ -239,7 +214,7 @@ def get_jit_fn(jit_impl):
         static_argnames: Sequence[str] = (),
     ):
         "Our custom jit-function which filters out static fields."
-        from spekk.module.base import _Flattened, _static_value, flatten
+        from spekk.module.base import _static_value, flatten
 
         # We cache the jitted function (wrapped_inner) by the static fields. When the
         # static fields changes, the function is re-compiled.
@@ -264,14 +239,14 @@ def get_jit_fn(jit_impl):
             #   This is why it is important to recompile the function when static
             # fields changes, otherwise the function runs with the old values for those
             # fields.
-            flattened_args = flatten(
-                (original_args, original_kwargs), flatten_spekk_arrays=True
+            args_dynamic, args_treedef = flatten(
+                (original_args, original_kwargs),
+                flatten_spekk_arrays=True,
             )
 
             # Try to find an already-compiled version for the given static fields.
-            cache_key = _get_hashable_key(flattened_args.static)
-            if cache_key in CACHE:
-                return CACHE[cache_key](*flattened_args.dynamic)
+            if args_treedef in CACHE:
+                return CACHE[args_treedef](*args_dynamic)
             else:
                 # Cache miss! Now we have to compile it. This is simply done by
                 # wrapping the function with the jit_impl.
@@ -280,26 +255,28 @@ def get_jit_fn(jit_impl):
                 # flatten the result of calling f as well, such that backends only sees
                 # arrays as outputs as well. We need to unflatten the result after, and
                 # for that we use flatten_result_inner.
-                flatten_result_inner: _Flattened = None
+                result_inner_treedef: TreeDef = None  # type: ignore
 
                 @jit_impl
                 def wrapped_inner(*args):
-                    nonlocal flatten_result_inner
-                    args, kwargs = flattened_args.unflatten(args)
+                    nonlocal result_inner_treedef
+                    args, kwargs = args_treedef.unflatten(args)
                     result_inner = f(*args, **kwargs)
-                    flatten_result_inner = flatten(
+                    result_inner_dynamic, result_inner_treedef = flatten(
                         result_inner, flatten_spekk_arrays=True
                     )
-                    return flatten_result_inner.dynamic
+                    return result_inner_dynamic
 
-                result_outer = wrapped_inner(*flattened_args.dynamic)
+                result_outer = wrapped_inner(*args_dynamic)
                 # Make sure to cache the function until next time. It is important to
                 # cache flatten_result_inner AFTER calling wrapped_inner; otherwise it
                 # will be stored as None.
-                CACHE[cache_key] = lambda *dynamic_args: flatten_result_inner.unflatten(
-                    wrapped_inner(*dynamic_args)
+                CACHE[args_treedef] = (
+                    lambda *dynamic_args: result_inner_treedef.unflatten(
+                        wrapped_inner(*dynamic_args)
+                    )
                 )
-                return flatten_result_inner.unflatten(result_outer)
+                return result_inner_treedef.unflatten(result_outer)
 
         return wrapped_outer
 

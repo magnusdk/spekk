@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-import uuid
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union
 
 import numpy as np
@@ -88,7 +87,6 @@ class array:
 
         self._data: ArrayLike = data
         self._dims = dims
-        self._id = uuid.uuid4()
 
     @property
     def dtype(self: array) -> DType:
@@ -1252,7 +1250,6 @@ class array:
         new_array = setitem(self, key, value)
         self._data = new_array.data
         self._dims = new_array.dims
-        self._id = new_array._id
 
     def __sub__(self: array, other: array | int | float | complex, /) -> array:
         """
@@ -1469,7 +1466,7 @@ class array:
         return {d: s for d, s in zip(self.dims, self.shape)}
 
     def dim_index(self, dim: Dim) -> int:
-        return self.dims.index(dim)        
+        return self.dims.index(dim)
 
     def rename_dim(self, dim: Dim | int, new_dim: Dim) -> "array":
         axis = self.dims.index(dim) if isinstance(dim, Dim) else dim
@@ -1536,5 +1533,6 @@ class array:
     def __repr__(self):
         if self.ndim == 0:
             return f"spekk.ops.array({self.data}, dtype={self.dtype.name})"
-        return f"spekk.ops.array(\n{self.data}, dims={self.dims}, dtype={self.dtype.name})"
-    
+        return (
+            f"spekk.ops.array(\n{self.data}, dims={self.dims}, dtype={self.dtype.name})"
+        )

@@ -11,11 +11,11 @@ from typing import (
 )
 
 from spekk import ops
-from spekk.module.base import Module, _Flattened
+from spekk.module.base import Module
 from spekk.ops._backend import backend
 from spekk.ops._types import Dim, Dims, undefined_dim
-from spekk.ops.array_object import array
 from spekk.ops._util import get_reduction_axes_and_resulting_dims
+from spekk.ops.array_object import array
 
 TFunc = TypeVar("TFunc", bound=Callable)
 TCarry = TypeVar("TCarry")
@@ -49,12 +49,14 @@ def flatten(x: array, dim: Optional[Dim] = None) -> array:
         dim = undefined_dim
     return array(data, dims=[dim])
 
-def diag(v, k=0, dims: Dims=None):
-    if v.ndim==1 or v.ndim==2:
+
+def diag(v, k=0, dims: Dims = None):
+    if v.ndim == 1 or v.ndim == 2:
         data = backend.diag(v.data, k=k)
         return ops.array(data, dims=dims)
     else:
         raise ValueError(f"diag only supported ndim 1 or 2, diag={v.ndim}")
+
 
 def to_numpy(x: array):
     return backend.to_numpy(x.data)
@@ -88,6 +90,7 @@ def median(a, axis: Optional[Dim], out=None, keepdims: bool = False) -> array:
             )
     return ops.array(arr, dims=dims)
 
+
 def nanmean(
     x: array,
     /,
@@ -99,6 +102,7 @@ def nanmean(
     data = backend.nanmean(x._data, axis=axis, keepdims=keepdims)
     return array(data, dims)
 
+
 def nansum(
     x: array,
     /,
@@ -109,6 +113,7 @@ def nansum(
     axis, dims = get_reduction_axes_and_resulting_dims(axis, x.dims, keepdims)
     data = backend.nansum(x._data, axis=axis, keepdims=keepdims)
     return array(data, dims)
+
 
 def pad(
     x: array,
@@ -438,7 +443,7 @@ def reduce_over_dim(
     init: TCarry,
     dim: Dim,
     include_index: bool = False,
-    unroll: int | bool = 1
+    unroll: int | bool = 1,
 ) -> TCarry:
     from spekk.module import dim_sizes as get_dim_sizes
     from spekk.module import flatten
@@ -465,7 +470,7 @@ def reduce_over_dim(
     def _scan_f(carry, dyn_data):
         nonlocal flat_carry
         # Reconstruct the carry from its flattened version.
-        carry = flat_carry.unflatten(carry)
+        carry = flat_carry.treedef.unflatten(carry)
 
         # Remove index from dynamic data.
         if include_index:
@@ -478,7 +483,7 @@ def reduce_over_dim(
         current_dynamic = [
             ops.array(data, dims[1:]) for data, dims in zip(dyn_data, dynamic_dims)
         ]
-        reduce_f_args = [carry, flat_outer.unflatten(current_dynamic)]
+        reduce_f_args = [carry, flat_outer.treedef.unflatten(current_dynamic)]
         # Add index as last argument to reduce_f.
         if include_index:
             reduce_f_args.append(index)
@@ -499,9 +504,12 @@ def reduce_over_dim(
 
     new_dynamic_0, _ = _scan_f(flat_carry.dynamic, [x[0] for x in dynamic_data])
     new_dynamic, _ = ops.backend.scan(
-        _scan_f, new_dynamic_0, [x[1:] for x in dynamic_data], unroll=unroll,
+        _scan_f,
+        new_dynamic_0,
+        [x[1:] for x in dynamic_data],
+        unroll=unroll,
     )
-    return flat_carry.unflatten(new_dynamic)
+    return flat_carry.treedef.unflatten(new_dynamic)
 
 
 def map_reduce_over_dim(
@@ -519,7 +527,12 @@ def map_reduce_over_dim(
     else:
         f = lambda carry, part: reduce_f(carry, map_f(part))
     return reduce_over_dim(
-        f, data, init=init, dim=dim, include_index=include_index_in_reduce, unroll=unroll,
+        f,
+        data,
+        init=init,
+        dim=dim,
+        include_index=include_index_in_reduce,
+        unroll=unroll,
     )
 
 
@@ -535,8 +548,9 @@ def map_over_dim(
     Iterates over each element of `dim` in `data`, applies `map_f` to it, and returns
     a new data object of the results along the same dimension.
     """
-    from spekk.module import flatten
+    from spekk.module import TreeDef
     from spekk.module import dim_sizes as get_dim_sizes
+    from spekk.module import flatten
 
     # Handle case where multiple dims are given. Then we map over each dimension
     # individually.
@@ -575,26 +589,25 @@ def map_over_dim(
 
     # Flatten output tree structure by running map_f on a dummy first to capture shape
     # Prepare scanning
-    flat_out_template = None
+    flat_out_template: TreeDef = None
     out_dims = None
 
     def _scan_f(_, dyn_vals):  # dyn_vals is sequence of numpy arrays for this step
         nonlocal flat_out_template, out_dims
         # Reconstruct input arrays for this time-step
         current = [ops.array(val, dims[1:]) for val, dims in zip(dyn_vals, in_dims)]
-        inp = flat_in.unflatten(current)
+        inp = flat_in.treedef.unflatten(current)
         # Flatten and cache template dims on first call
-        flat = flatten(map_f(inp))
-        flat.dynamic = tuple(
-            ops.array(x) if not isinstance(x, ops.array) else x for x in flat.dynamic
+        flat_dynamic, flat_out_template = flatten(map_f(inp))
+        flat_dynamic = tuple(
+            ops.array(x) if not isinstance(x, ops.array) else x for x in flat_dynamic
         )
-        out_dims = [[dim, *x.dims] for x in flat.dynamic]
-        flat.dynamic = tuple(
-            x.data if isinstance(x, ops.array) else None for x in flat.dynamic
+        out_dims = [[dim, *x.dims] for x in flat_dynamic]
+        flat_dynamic = tuple(
+            x.data if isinstance(x, ops.array) else None for x in flat_dynamic
         )
-        flat_out_template = flat
         # Return unchanged carry and this step's output dynamics
-        return None, flat.dynamic
+        return None, flat_dynamic
 
     # Initialize dummy carry and capture first step
     first_vals = [arr[0] for arr in in_data]
@@ -673,7 +686,7 @@ def grad(f=None, /, argnums: int | Sequence[int] = 0):
         def inner(*args_inner):
             # Unflatten the arguments used to calculate the gradient back to their
             # original types and structure.
-            grad_args_inner = flattened_grad_args.unflatten(args_inner)
+            grad_args_inner = flattened_grad_args.treedef.unflatten(args_inner)
 
             # Get the full list of args by inserting the unflattened args at the right
             # positions.
@@ -705,7 +718,7 @@ def grad(f=None, /, argnums: int | Sequence[int] = 0):
         # The call to unflatten is what allows us to take the gradient with regards to
         # an arbitrary structure of arguments; even Modules.
         result = inner(*flattened_grad_args.dynamic)
-        result = flattened_grad_args.unflatten(result)
+        result = flattened_grad_args.treedef.unflatten(result)
 
         # If argnums was a sequence of integers, the returned gradient is a tuple of
         # values with the same shapes and types as the corresponding arguments.
@@ -730,10 +743,10 @@ def value_and_grad(f=None, /, argnums: int | Sequence[int] = 0):
         positional argument(s) to differentiate with respect to (default 0).
 
     Returns:
-      A function with the same arguments as ``f``, that evaluates both ``f``and the 
-      gradient of ``f``. If ``argnums`` is an integer then the gradient has the same 
-      shape and type as the positional argument indicated by that integer. If argnums 
-      is a tuple of integers, the gradient is a tuple of values with the same shapes 
+      A function with the same arguments as ``f``, that evaluates both ``f``and the
+      gradient of ``f``. If ``argnums`` is an integer then the gradient has the same
+      shape and type as the positional argument indicated by that integer. If argnums
+      is a tuple of integers, the gradient is a tuple of values with the same shapes
       and types as the corresponding arguments.
     """
     from spekk.module.base import flatten
@@ -771,7 +784,7 @@ def value_and_grad(f=None, /, argnums: int | Sequence[int] = 0):
         def inner(*args_inner):
             # Unflatten the arguments used to calculate the gradient back to their
             # original types and structure.
-            grad_args_inner = flattened_grad_args.unflatten(args_inner)
+            grad_args_inner = flattened_grad_args.treedef.unflatten(args_inner)
 
             # Get the full list of args by inserting the unflattened args at the right
             # positions.
@@ -803,9 +816,9 @@ def value_and_grad(f=None, /, argnums: int | Sequence[int] = 0):
         # The call to unflatten is what allows us to take the gradient with regards to
         # an arbitrary structure of arguments; even Modules.
         value, grad = inner(*flattened_grad_args.dynamic)
-        assert value.ndim == 0 # We check for this in the inner function as well
+        assert value.ndim == 0  # We check for this in the inner function as well
         value = ops.array(value)
-        grad = flattened_grad_args.unflatten(grad)
+        grad = flattened_grad_args.treedef.unflatten(grad)
 
         # If argnums was a sequence of integers, the returned gradient is a tuple of
         # values with the same shapes and types as the corresponding arguments.
@@ -820,7 +833,7 @@ def value_and_grad(f=None, /, argnums: int | Sequence[int] = 0):
 
 def wrap_backend_decorator(decorator):
     """Wraps a backend decorator so that it accepts spekk arrays and Modules."""
-    from spekk.module.base import flatten
+    from spekk.module.base import FlattenedTree, TreeDef, flatten
 
     def new_decorator(f=None, /, **decorator_kwargs):
         # Allow the following syntax:
@@ -837,18 +850,20 @@ def wrap_backend_decorator(decorator):
             # Flatten the arguments down to values that are understood by the backend.
             flattened_input = flatten((args, kwargs), flatten_spekk_arrays=True)
             # flattened_output gets defined inside inner function.
-            flattened_output: _Flattened = None  # type: ignore
+            output_treedef: TreeDef = None  # type: ignore
 
             @functools.partial(decorator, **decorator_kwargs)
             def inner(inner_args):
-                nonlocal flattened_output
-                inner_args, inner_kwargs = flattened_input.unflatten(inner_args)
+                nonlocal output_treedef
+                inner_args, inner_kwargs = flattened_input.treedef.unflatten(inner_args)
                 result = f(*inner_args, **inner_kwargs)
-                flattened_output = flatten(result, flatten_spekk_arrays=True)
-                return flattened_output.dynamic
+                output_dynamic, output_treedef = flatten(
+                    result, flatten_spekk_arrays=True
+                )
+                return output_dynamic
 
             inner_result = inner(flattened_input.dynamic)
-            return flattened_output.unflatten(inner_result)
+            return output_treedef.unflatten(inner_result)
 
         return outer
 

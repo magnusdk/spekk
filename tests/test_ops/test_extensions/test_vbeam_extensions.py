@@ -48,6 +48,3 @@ def test_fftconvolve(
     )
     expected = fftconvolve(x, filter, mode)
     np.testing.assert_allclose(result, expected, rtol=1e-6, atol=1e-4)
-
-
-# if __name__ == "__main__": foo()
