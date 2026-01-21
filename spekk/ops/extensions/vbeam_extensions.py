@@ -42,6 +42,11 @@ def angle(x: array) -> array:
     data = backend.angle(x.data)
     return array(data, dims=x.dims)
 
+def sinc(x: ops.array) -> ops.array:
+    """Compute normalized sinc function: sin(pi*x) / (pi*x). """
+    # sinc(x) = sin(pi*x) / (pi*x), with sinc(0) = 1
+    pi_x = ops.pi * x
+    return ops.where(x == 0, ops.ones_like(x), ops.sin(pi_x) / pi_x)
 
 def flatten(x: array, dim: Optional[Dim] = None) -> array:
     data = backend.flatten(x.data)
@@ -432,8 +437,8 @@ def jit(
     )
 
 
-def scan(fn, init, xs):
-    return ops.backend.scan(fn, init, xs.data)
+def scan(fn, init, xs, unroll: int | bool = 1):
+    return ops.backend.scan(fn, init, xs.data, unroll=unroll)
 
 
 def reduce_over_dim(
