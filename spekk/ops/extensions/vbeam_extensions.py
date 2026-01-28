@@ -19,6 +19,7 @@ from spekk.ops.array_object import array
 
 TFunc = TypeVar("TFunc", bound=Callable)
 TCarry = TypeVar("TCarry")
+TOutput = TypeVar("TOutput")
 TInputData = TypeVar("TInputData", bound=Module)
 TMappedInputData = TypeVar("TMappedInputData")
 TOutputData = TypeVar("TOutputData")
@@ -437,10 +438,6 @@ def jit(
     )
 
 
-def scan(fn, init, xs, unroll: int | bool = 1):
-    return ops.backend.scan(fn, init, xs.data, unroll=unroll)
-
-
 def reduce_over_dim(
     reduce_f: Callable[[TCarry, TInputData], TCarry],
     data: TInputData,
@@ -633,6 +630,105 @@ def map_over_dim(
     # Reconstruct tree of outputs
     return flat_out_template.unflatten(wrapped)
 
+def scan(
+    scan_f: Callable[[TCarry, ops.array], tuple[TCarry, TOutput]],
+    init: TCarry,
+    xs: ops.array,
+    *,
+    unroll: int | bool = 1,
+) -> tuple[TCarry, TOutput]:
+    """Scan over a dimension of xs, accumulating carry and stacking outputs.
+
+    This is a spekk-compatible scan that properly handles the extra dimension
+    in outputs. Based on the pattern from reduce_over_dim and map_over_dim.
+
+    Parameters
+    ----------
+    scan_f : Callable[[TCarry, ops.array], tuple[TCarry, TOutput]]
+        Function that takes (carry, x) and returns (new_carry, output).
+    init : TCarry
+        Initial carry state (can be a Module or ops.array).
+    xs : ops.array
+        Input array to scan over. Must have exactly one dimension.
+    unroll : int | bool
+        Unroll factor for scan loop.
+
+    Returns
+    -------
+    tuple[TCarry, TOutput]
+        Final carry state and stacked outputs with xs.dims[0] as leading dimension.
+    """
+    from spekk.module.base import flatten
+
+    if xs.ndim != 1:
+        raise ValueError(f"xs must be 1D, got ndim={xs.ndim}")
+
+    dim = xs.dims[0]
+
+    # Flatten the initial carry state (with spekk arrays split into data/dims)
+    flat_carry = flatten(init, flatten_spekk_arrays=True)
+
+    # We'll capture the output structure on first call (without splitting arrays
+    # so that unflatten just returns the wrapped arrays directly)
+    flat_out_template = None
+    out_dims: list[tuple] = []
+
+    def _scan_f(carry, x_val):
+        nonlocal flat_carry, flat_out_template, out_dims
+
+        # Reconstruct the carry from its flattened version
+        carry = flat_carry.unflatten(carry)
+
+        # Call the user's scan function
+        new_carry, output = scan_f(carry, ops.array(x_val))
+
+        # Flatten the new carry (with spekk arrays split)
+        flat_carry = flatten(new_carry, flatten_spekk_arrays=True)
+
+        # Flatten the output WITHOUT splitting arrays - this means unflatten
+        # will just return whatever we pass in directly
+        flat_out = flatten(output)  # arrays are leaves
+
+        # Ensure all dynamic values are ops.arrays
+        flat_out.dynamic = tuple(
+            ops.array(x) if not isinstance(x, ops.array) else x
+            for x in flat_out.dynamic
+        )
+
+        # Capture output dims with leading scan dimension on first call
+        if flat_out_template is None:
+            out_dims = [(dim, *x.dims) for x in flat_out.dynamic]
+            flat_out_template = flat_out
+
+        # Extract raw data for JAX scan
+        out_data = tuple(x.data for x in flat_out.dynamic)
+
+        return flat_carry.dynamic, out_data
+
+    # Run the first step to initialize structures (using raw data)
+    first_carry, first_out = _scan_f(flat_carry.dynamic, xs.data[0])
+
+    # Run scan over the rest (using raw data)
+    final_carry, rest_out = backend.scan(
+        _scan_f, first_carry, xs.data[1:], unroll=unroll
+    )
+
+    # Combine first and rest outputs for each dynamic output array
+    all_out = []
+    for first_arr, rest_arr in zip(first_out, rest_out, strict=True):
+        combined = backend.concat([first_arr[None, ...], rest_arr], axis=0)
+        all_out.append(combined)
+
+    # Rewrap into ops.array with leading dimension restored
+    wrapped = [ops.array(arr, dims=dims) for arr, dims in zip(all_out, out_dims, strict=True)]
+
+    # Reconstruct output tree using the wrapped arrays directly as leaves
+    output = flat_out_template.unflatten(wrapped)
+
+    # Reconstruct final carry
+    final_carry_obj = flat_carry.unflatten(final_carry)
+
+    return final_carry_obj, output
 
 def vmap(f, in_axes):
     return backend.vmap(f, in_axes=in_axes)
