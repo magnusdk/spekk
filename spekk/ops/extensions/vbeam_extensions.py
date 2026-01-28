@@ -677,7 +677,7 @@ def scan(
         nonlocal flat_carry, flat_out_template, out_dims
 
         # Reconstruct the carry from its flattened version
-        carry = flat_carry.unflatten(carry)
+        carry = flat_carry.treedef.unflatten(carry)
 
         # Call the user's scan function
         new_carry, output = scan_f(carry, ops.array(x_val))
@@ -687,21 +687,21 @@ def scan(
 
         # Flatten the output WITHOUT splitting arrays - this means unflatten
         # will just return whatever we pass in directly
-        flat_out = flatten(output)  # arrays are leaves
+        flat_out_dynamic, flat_out_treedef = flatten(output)  # arrays are leaves
 
         # Ensure all dynamic values are ops.arrays
-        flat_out.dynamic = tuple(
+        flat_out_dynamic = tuple(
             ops.array(x) if not isinstance(x, ops.array) else x
-            for x in flat_out.dynamic
+            for x in flat_out_dynamic
         )
 
         # Capture output dims with leading scan dimension on first call
         if flat_out_template is None:
-            out_dims = [(dim, *x.dims) for x in flat_out.dynamic]
-            flat_out_template = flat_out
+            out_dims = [(dim, *x.dims) for x in flat_out_dynamic]
+            flat_out_template = flat_out_treedef
 
         # Extract raw data for JAX scan
-        out_data = tuple(x.data for x in flat_out.dynamic)
+        out_data = tuple(x.data for x in flat_out_dynamic)
 
         return flat_carry.dynamic, out_data
 
@@ -726,7 +726,7 @@ def scan(
     output = flat_out_template.unflatten(wrapped)
 
     # Reconstruct final carry
-    final_carry_obj = flat_carry.unflatten(final_carry)
+    final_carry_obj = flat_carry.treedef.unflatten(final_carry)
 
     return final_carry_obj, output
 
