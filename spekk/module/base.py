@@ -348,8 +348,20 @@ type _TContainerRecreator = Callable[..., TContainer]
 
 
 class _DynamicArg:
+    """Placeholder for dynamic arguments in TreeDef.
+    
+    All _DynamicArg instances are considered equal for caching purposes,
+    since they represent "any dynamic value goes here".
+    """
     def __repr__(self):
         return "*"
+    
+    def __eq__(self, other):
+        return isinstance(other, _DynamicArg)
+    
+    def __hash__(self):
+        # All _DynamicArg instances hash to the same value
+        return hash("_DynamicArg")
 
 
 class TreeDef[M: TContainer]:
