@@ -364,6 +364,11 @@ class _DynamicArg:
         return hash("_DynamicArg")
 
 
+# Unique sentinel for _DynamicArg in TreeDef equality/hash comparisons.
+# Using a dedicated object avoids collision with actual None values in the tree.
+_DYNAMIC_PLACEHOLDER = object()
+
+
 class TreeDef[M: TContainer]:
     "A tree-like structure representing a tree-like object that was flattened."
 
@@ -398,16 +403,17 @@ class TreeDef[M: TContainer]:
         return self.constructor(*leaves)
 
     def __hash__(self) -> int:
-        # Don't create unique hash-values for placeholder args.
-        args = [None if isinstance(leaf, _DynamicArg) else leaf for leaf in self.leaves]
+        # Use sentinel instead of None to avoid collision with actual None values.
+        args = [_DYNAMIC_PLACEHOLDER if isinstance(leaf, _DynamicArg) else leaf for leaf in self.leaves]
         return hash((self.constructor, *args))
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, TreeDef):
             return False
-        args = [None if isinstance(leaf, _DynamicArg) else leaf for leaf in self.leaves]
+        # Use sentinel instead of None to avoid collision with actual None values.
+        args = [_DYNAMIC_PLACEHOLDER if isinstance(leaf, _DynamicArg) else leaf for leaf in self.leaves]
         args_other = [
-            None if isinstance(leaf, _DynamicArg) else leaf for leaf in other.leaves
+            _DYNAMIC_PLACEHOLDER if isinstance(leaf, _DynamicArg) else leaf for leaf in other.leaves
         ]
         return (args == args_other) and (self.constructor == other.constructor)
 
