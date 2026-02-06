@@ -10,6 +10,7 @@ from spekk.ops.extensions.function_transformations import (
     map_over_dim,
     map_reduce_over_dim,
     reduce_over_dim,
+    scan,
     value_and_grad,
 )
 
@@ -206,6 +207,62 @@ def test_map_over_dim_module():
     result = map_over_dim(map_f, data, dim="a")
     assert isinstance(result, Carry)
     assert ops.all(result.total == a + b)
+
+
+# -- Tests: scan --------------------------------------------------------------
+
+
+def test_scan_basic():
+    """Scan should accumulate carry and stack outputs."""
+    xs = ops.arange(5, dtype=float, dim="t")
+
+    def scan_f(carry, x):
+        new_carry = carry + x
+        output = new_carry * 2
+        return new_carry, output
+
+    final_carry, outputs = scan(scan_f, ops.array(0.0), xs)
+
+    # Final carry should be sum of all xs: 0+1+2+3+4 = 10
+    assert float(final_carry) == 10.0
+
+    # Outputs should be cumsum * 2: [0, 2, 6, 12, 20]
+    expected_outputs = ops.array([0.0, 2.0, 6.0, 12.0, 20.0], dims=["t"])
+    assert ops.all(outputs == expected_outputs)
+
+
+def test_scan_module_carry():
+    """Scan should work with Module as carry state."""
+    xs = ops.arange(4, dtype=float, dim="t")
+
+    def scan_f(carry: Carry, x: ops.array) -> tuple[Carry, ops.array]:
+        new_total = carry.total + x
+        return Carry(new_total), new_total
+
+    init = Carry(ops.array(0.0))
+    final_carry, outputs = scan(scan_f, init, xs)
+
+    assert isinstance(final_carry, Carry)
+    assert float(final_carry.total) == 6.0  # 0+1+2+3
+
+    expected = ops.array([0.0, 1.0, 3.0, 6.0], dims=["t"])
+    assert ops.all(outputs == expected)
+
+
+def test_scan_module_output():
+    """Scan should work with Module as output."""
+    xs = ops.arange(3, dtype=float, dim="t")
+
+    def scan_f(carry: float, x: ops.array) -> tuple[float, Carry]:
+        new_carry = carry + float(x)
+        return new_carry, Carry(x * 2)
+
+    final_carry, outputs = scan(scan_f, 0.0, xs)
+
+    assert final_carry == 3.0  # 0+1+2
+    assert isinstance(outputs, Carry)
+    expected = ops.array([0.0, 2.0, 4.0], dims=["t"])
+    assert ops.all(outputs.total == expected)
 
 
 # -- Tests: grad --------------------------------------------------------------

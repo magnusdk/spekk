@@ -96,10 +96,6 @@ def jit[TFunc: Callable](
     )
 
 
-def scan(fn, init, xs, *, dim: str | None = None, unroll: int = 1):
-    return ops.backend.scan(fn, init, xs, dim=dim, unroll=unroll)
-
-
 def reduce_over_dim[TInitialValue, TCarry, TInputData](
     reduce_f: Callable[[TCarry | TInitialValue, TInputData], TCarry],
     data: TInputData,
@@ -295,6 +291,94 @@ def map_over_dim(
 
     # Reconstruct tree of outputs
     return flat_out_template.unflatten(wrapped)
+
+
+def scan[TInitialValue, TCarry, TOutput](
+    scan_f: Callable[[TCarry | TInitialValue, ops.array], tuple[TCarry, TOutput]],
+    init: TInitialValue,
+    xs: ops.array,
+    *,
+    unroll: int | bool = 1,
+) -> tuple[TCarry, TOutput]:
+    """Scan over a dimension of xs, accumulating carry and stacking outputs.
+
+    Parameters
+    ----------
+    scan_f : Callable[[TCarry | TInitialValue, ops.array], tuple[TCarry, TOutput]]
+        Function that takes (carry, x) and returns (new_carry, output).
+    init : TInitialValue
+        Initial carry state (can be a Module or ops.array).
+    xs : ops.array
+        Input array to scan over. Must have exactly one dimension.
+    unroll : int | bool
+        Unroll factor for scan loop.
+
+    Returns
+    -------
+    tuple[TCarry, TOutput]
+        Final carry state and stacked outputs with xs.dims[0] as leading dimension.
+    """
+    if xs.ndim != 1:
+        raise ValueError(f"xs must be 1D, got ndim={xs.ndim}")
+
+    dim = xs.dims[0]
+
+    # Flatten the initial carry state
+    flat_carry_leaves, flat_carry_treedef = as_backend_arrays(tree.flatten(init))
+
+    # We'll capture the output structure on first call
+    flat_out_treedef: tree.TreeDef | tree.Leaf | tree.StaticLeaf = None  # type: ignore
+    out_dims: list[tuple] = []
+
+    def _scan_f(carry, x_val):
+        nonlocal flat_carry_treedef, flat_out_treedef, out_dims
+
+        # Reconstruct the carry from its flattened version and call scan_f
+        carry = flat_carry_treedef.unflatten(carry)
+        new_carry, output = scan_f(carry, ops.array(x_val))
+
+        # Flatten the new carry and output
+        flat_carry_leaves, flat_carry_treedef = as_backend_arrays(
+            tree.flatten(new_carry)
+        )
+        flat_out_leaves, treedef = tree.flatten(output)
+        flat_out_leaves = tuple(
+            ops.array(x) if not isinstance(x, ops.array) else x for x in flat_out_leaves
+        )
+
+        # Capture output dims with leading scan dimension on first call
+        if flat_out_treedef is None:
+            out_dims = [(dim, *x.dims) for x in flat_out_leaves]
+            flat_out_treedef = treedef
+
+        # Extract raw data for backend scan
+        out_data = tuple(x.data for x in flat_out_leaves)
+        return flat_carry_leaves, out_data
+
+    # Run the first step to initialize structures
+    first_carry, first_out = _scan_f(flat_carry_leaves, xs.data[0])
+
+    # Run scan over the rest
+    final_carry, rest_out = backend.scan(
+        _scan_f, first_carry, xs.data[1:], unroll=unroll
+    )
+
+    # Combine first and rest outputs for each dynamic output array
+    all_out = []
+    for first_arr, rest_arr in zip(first_out, rest_out, strict=True):
+        combined = backend.concat([first_arr[None, ...], rest_arr], axis=0)
+        all_out.append(combined)
+
+    # Rewrap into ops.array with leading dimension restored
+    wrapped = [
+        ops.array(arr, dims=dims) for arr, dims in zip(all_out, out_dims, strict=True)
+    ]
+
+    # Reconstruct final carry and output
+    final_carry_obj = flat_carry_treedef.unflatten(final_carry)
+    output = flat_out_treedef.unflatten(wrapped)
+
+    return final_carry_obj, output
 
 
 def vmap(f, in_axes):
