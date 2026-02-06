@@ -3,19 +3,11 @@ import dataclasses
 import functools
 import warnings
 from collections import defaultdict
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Iterable,
-    NamedTuple,
-    Optional,
-    Sequence,
-    Type,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Hashable, Sequence, cast
 
 from typing_extensions import dataclass_transform
+
+import spekk.tree as tree
 
 if TYPE_CHECKING:
     from spekk.ops._types import Dim
@@ -31,18 +23,6 @@ def field(*, static: bool = False, **kwargs):
     if static:
         metadata["static"] = True
     return dataclasses.field(metadata=metadata, **kwargs)
-
-
-@dataclasses.dataclass
-class _static_value:
-    """NOTE: this is an internal class; do not use it. Marker for letting spekk know
-    that a value is considered static and should trigger JIT-recompilation when changed.
-    """
-
-    value: Any
-
-    def __repr__(self):
-        return f"static_value({self.value})"
 
 
 @dataclass_transform(
@@ -62,6 +42,9 @@ class Module(abc.ABC):
     Fields that are marked as static are filtered out during backend function
     compilation, similar to Equinox.
     """
+
+    # Declare __dataclass_fields__ to satisfy DataclassInstance protocol for type checkers
+    __dataclass_fields__: ClassVar[dict[str, dataclasses.Field[Any]]]
 
     def __init_subclass__(cls, **kwargs):
         "Convert all subclasses of Module to dataclass."
@@ -88,26 +71,11 @@ class Module(abc.ABC):
         if self is other:
             return True
         if self.__class__ is other.__class__:
-            from spekk import ops
-
-            for _field in dataclasses.fields(self):
-                a = getattr(self, _field.name)
-                b = getattr(other, _field.name)
-                if isinstance(a, ops.array) and isinstance(b, ops.array):
-                    if a._id != b._id:
-                        return False
-                elif a != b:
-                    return False
-            return True
+            # By flattening we compare both the structure (treedefs) and values. If any
+            # values (be they dynamic or static) are non-scalar arrays, this may raise
+            # an exception.
+            return tree.flatten(self) == tree.flatten(other)
         return NotImplemented
-
-
-####
-# Helpers for slicing arrays in Module objects:
-
-
-def at(obj):
-    return _ModuleAtHelper(obj)
 
 
 def dim_sizes(obj):
@@ -119,16 +87,14 @@ def dim_sizes(obj):
     # Gather the size(s) for each dimension for each array in self. Store the sizes
     # for each dimension in a set.
     dim_size_sets: dict[str | _UndefinedDim, set[int]] = defaultdict(set)
-
-    def add_size(x):
-        if isinstance(x, ops.array):
-            for dim, size in x.dim_sizes.items():
+    dynamic, treedef = tree.flatten(obj)
+    # Loop over both dynamic and static values
+    for leaf in [*dynamic, *treedef.static_values]:
+        if isinstance(leaf, ops.array):
+            for dim, size in leaf.dim_sizes.items():
                 if isinstance(dim, _UndefinedDim):
                     dim = undefined_dim_key
                 dim_size_sets[dim].add(size)
-        return x
-
-    traverse(obj, map_leaf=add_size, map_static_field=add_size)
 
     # Check if any dimensions has inconsistent sizes. Warn if they do. If not, get
     # the single size for that dimension instead of the set of one element.
@@ -143,7 +109,11 @@ def dim_sizes(obj):
     return dim_sizes
 
 
-class _ModuleAtHelper[M: Module]:
+def at(obj):
+    return _ModuleAtHelper(obj)
+
+
+class _ModuleAtHelper[M]:
     def __init__(self, module_obj: M):
         self.module_obj = module_obj
 
@@ -151,7 +121,7 @@ class _ModuleAtHelper[M: Module]:
         return _ModuleAtUpdateRef(self.module_obj, indexing_object)
 
 
-class _ModuleAtUpdateRef[M: Module]:
+class _ModuleAtUpdateRef[M]:
     def __init__(self, module_obj: M, indexing_object: Any):
         self.module_obj = module_obj
         self.indexing_object = indexing_object
@@ -170,16 +140,16 @@ class _ModuleAtUpdateRef[M: Module]:
         return map_leaf
 
     def get(self) -> M:
-        return traverse(self.module_obj, map_leaf=self._get_map_leaf_fn("get"))
+        return tree.map(self._get_map_leaf_fn("get"), self.module_obj)
 
     def set(self, value: "array") -> M:
-        return traverse(self.module_obj, map_leaf=self._get_map_leaf_fn("set", value))
+        return tree.map(self._get_map_leaf_fn("set", value), self.module_obj)
 
     def update(self, f: Callable[["array"], "array"], *args, **kwargs) -> M:
-        return traverse(
+        return tree.map(
+            self._get_map_leaf_fn("update", f, *args, **kwargs),
             self.module_obj,
-            map_leaf=self._get_map_leaf_fn("update", f, *args, **kwargs),
-        )  # type: ignore
+        )
 
 
 ####
@@ -214,291 +184,67 @@ def get_at(obj: Module, path: Sequence[str]):
     return obj
 
 
-def _noop(x):
-    return x
+# Register Module as a treedef
 
 
-def _recreate_container[M: TContainer](
-    constructor: Callable[[Type[M], *tuple[Any, ...]], M], *args
-) -> M:
-    return constructor(*args)
+@dataclasses.dataclass(frozen=True, repr=False)
+class ModuleTreeDef(tree.registry.TreeDef):
+    cls: type
+    dynamic_fields: tuple[str, ...]
+    static_fields: tuple[tuple[str, tree.TreeDef | tree.StaticLeaf], ...]
+
+    def _construct(self, children: list) -> Any:
+        kwargs = {
+            field_name: frozen_static_value.unflatten()
+            for field_name, frozen_static_value in self.static_fields
+        }
+        kwargs.update(zip(self.dynamic_fields, children))
+        return self.cls(**kwargs)
+
+    @property
+    def static_values(self) -> tuple:
+        return super().static_values + tuple(value for _, value in self.static_fields)
+
+    def _inner_repr(self, child_repr_fn: Callable[[Any], str]) -> str:
+        parts = []
+        child_iter = iter(self.children)
+        for name in self.dynamic_fields:
+            parts.append(f"{name}={child_repr_fn(next(child_iter))}")
+        for name, value in self.static_fields:
+            parts.append(f"{name}={value!r}")
+        return f"{self.cls.__name__}({', '.join(parts)})"
 
 
-type TLeaf = array | bool | int | float | complex
-type TContainer = Module | list | tuple | dict
+def _destructure_module(obj: Module):
+    dynamic_fields = []
+    static_fields = []
+    children_values = []
 
+    for field in dataclasses.fields(type(obj)):  # type: ignore[arg-type]
+        value = getattr(obj, field.name)
+        is_static = field.metadata.get("static", False)
 
-def traverse(
-    obj: TLeaf | TContainer,
-    *,
-    map_leaf: Callable[[TLeaf], Any] = _noop,
-    map_static_field: Optional[Callable[[Any], Any]] = _noop,
-    recreate_container: Callable[..., TContainer] = _recreate_container,
-) -> TLeaf | TContainer:
-    recur = functools.partial(
-        traverse,
-        map_leaf=map_leaf,
-        recreate_container=recreate_container,
-        map_static_field=map_static_field,
-    )
-
-    # Handle basic Python container types
-    if isinstance(obj, (list, tuple)):
-        traversed_elements = tuple(recur(element) for element in obj)
-        return recreate_container(type(obj), traversed_elements)
-    elif isinstance(obj, dict):
-        traversed_values = tuple(recur(value) for value in obj.values())
-        return recreate_container(dict, tuple(zip(obj.keys(), traversed_values)))
-
-    # Handle custom Module types
-    elif isinstance(obj, Module):
-        fields = dataclasses.fields(obj)
-        traversed_values = []
-        for _field in fields:
-            value = getattr(obj, _field.name)
-            if _field.metadata.get("static", False):
-                traversed_values.append(map_static_field(value))
-            else:
-                traversed_values.append(recur(value))
-        return recreate_container(type(obj), *traversed_values)
-
-    # The rest are considered leaves
-    return map_leaf(obj)
-
-
-def _partial_at(func: Callable, fixed: dict[int, object], n_args: int) -> Callable:
-    """Like functools.partial but for arbitrary positional slots.
-    >>> def func(a, b, c):
-    ...     return [a, b, c]
-    >>> p_func = _partial_at(func, {1: "arg_1"}, 3)
-    >>> p_func(0, 1)
-    [0, 'arg_1', 1]
-    """
-
-    @functools.wraps(func)
-    def wrapper(*args):
-        it = iter(args)
-        return func(*[fixed[i] if i in fixed else next(it) for i in range(n_args)])
-
-    return wrapper
-
-
-def traverse_multiple(
-    *objs: TLeaf | TContainer,
-    f: Callable[..., TLeaf],
-    recreate_container: Callable = _recreate_container,
-) -> TLeaf | TContainer:
-    traversable_objs = []
-    untraversable_objs = {}
-    for i, obj in enumerate(objs):
-        if isinstance(obj, (list, tuple, dict, Module)):
-            traversable_objs.append(obj)
+        if is_static:
+            # Freeze static values to make them immutible and make the most common
+            # container objects hashable.
+            frozen_static_value = tree.freeze_as_treedef(value)
+            static_fields.append((field.name, frozen_static_value))
         else:
-            untraversable_objs[i] = obj
-    if not traversable_objs:
-        return f(*objs)
-    f = _partial_at(f, untraversable_objs, len(objs))
-    objs = traversable_objs
+            dynamic_fields.append(field.name)
+            children_values.append(value)
 
-    obj, *rest = objs
-    assert all(type(x) is type(obj) for x in rest)
+    def make_treedef(children: tuple[tree.registry.TreeDef, ...]) -> ModuleTreeDef:
+        return ModuleTreeDef(
+            children,
+            type(obj),
+            tuple(dynamic_fields),
+            tuple(static_fields),
+        )
 
-    recur = functools.partial(
-        traverse_multiple,
-        f=f,
-        recreate_container=recreate_container,
-    )
-
-    # Handle basic Python container types
-    if isinstance(obj, (list, tuple)):
-        assert all(len(x) == len(obj) for x in rest)
-        traversed_elements = [recur(*elements) for elements in zip(*objs)]
-        constructor = lambda *args: type(obj)(args)
-        return recreate_container(constructor, *traversed_elements)
-    elif isinstance(obj, dict):
-        assert all(x.keys() == obj.keys() for x in rest)
-        traversed_values = [
-            recur(*values) for values in zip(*[x.values() for x in objs])
-        ]
-        constructor = lambda *values: dict(zip(obj.keys(), values))
-        return recreate_container(constructor, *traversed_values)
-
-    # Handle custom Module types
-    elif isinstance(obj, Module):
-        fields = dataclasses.fields(obj)
-        traversed_values = []
-        for _field in fields:
-            values = [getattr(x, _field.name) for x in objs]
-            if _field.metadata.get("static", False):
-                traversed_values.append(f(*values))
-            else:
-                traversed_values.append(recur(*values))
-        field_names = [_field.name for _field in fields]
-        constructor = lambda *values: type(obj)(**dict(zip(field_names, values)))
-        return recreate_container(constructor, *traversed_values)
-
-    # The rest are considered leaves
-    return f(*objs)
+    return children_values, make_treedef
 
 
-####
-# Functions and helpers for flattening a Module into dynamic and static components:
-
-type _TContainerRecreator = Callable[..., TContainer]
-
-
-class _DynamicArg:
-    """Placeholder for dynamic arguments in TreeDef.
-    
-    All _DynamicArg instances are considered equal for caching purposes,
-    since they represent "any dynamic value goes here".
-    """
-    def __repr__(self):
-        return "*"
-    
-    def __eq__(self, other):
-        return isinstance(other, _DynamicArg)
-    
-    def __hash__(self):
-        # All _DynamicArg instances hash to the same value
-        return hash("_DynamicArg")
-
-
-# Unique sentinel for _DynamicArg in TreeDef equality/hash comparisons.
-# Using a dedicated object avoids collision with actual None values in the tree.
-_DYNAMIC_PLACEHOLDER = object()
-
-
-class TreeDef[M: TContainer]:
-    "A tree-like structure representing a tree-like object that was flattened."
-
-    def __init__(
-        self,
-        constructor: Callable[..., M] | None,
-        leaves: tuple[_DynamicArg | Any, ...],
-    ):
-        self.constructor = constructor
-        self.leaves = leaves
-
-    def unflatten(self, dynamic_args: Iterable):
-        "Undo the flattening using the dynamic_args."
-        # Ensure dynamic_args is an iterator.
-        dynamic_args = iter(dynamic_args)
-
-        leaves = []
-        for leaf in self.leaves:
-
-            def map_leaf(leaf):
-                if isinstance(leaf, _DynamicArg):
-                    return next(dynamic_args)
-                elif isinstance(leaf, TreeDef):
-                    return leaf.unflatten(dynamic_args)
-                else:
-                    return leaf
-
-            leaf = traverse(leaf, map_leaf=map_leaf)
-            leaves.append(leaf)
-
-        # Return the original object.
-        return self.constructor(*leaves)
-
-    def __hash__(self) -> int:
-        # Use sentinel instead of None to avoid collision with actual None values.
-        args = [_DYNAMIC_PLACEHOLDER if isinstance(leaf, _DynamicArg) else leaf for leaf in self.leaves]
-        return hash((self.constructor, *args))
-
-    def __eq__(self, other) -> bool:
-        if not isinstance(other, TreeDef):
-            return False
-        # Use sentinel instead of None to avoid collision with actual None values.
-        args = [_DYNAMIC_PLACEHOLDER if isinstance(leaf, _DynamicArg) else leaf for leaf in self.leaves]
-        args_other = [
-            _DYNAMIC_PLACEHOLDER if isinstance(leaf, _DynamicArg) else leaf for leaf in other.leaves
-        ]
-        return (args == args_other) and (self.constructor == other.constructor)
-
-    def _get_repr(self):
-        constructor_name = getattr(self.constructor, "__name__", repr(self.constructor))
-        leaf_reprs = []
-        for leaf in self.leaves:
-            leaf_reprs.append(
-                leaf._get_repr() if isinstance(leaf, TreeDef) else repr(leaf)
-            )
-        return f"{constructor_name}({", ".join(leaf_reprs)})"
-
-    def __repr__(self):
-        return f"<TreeDef {self._get_repr()}>"
-
-
-class FlattenedTree(NamedTuple):
-    dynamic: tuple[TLeaf, ...]
-    treedef: TreeDef
-
-    def filter_dynamic(self, predicate: Callable, *args, **kwargs) -> "FlattenedTree":
-        """Return a new FlattenedTree object where all dynamic fields for which
-        predicate returns False are made static instead."""
-        dynamic = []
-        leaves = []
-        for arg in self.dynamic:
-            if predicate(arg, *args, **kwargs):
-                dynamic.append(arg)
-                leaves.append(_DynamicArg())
-            else:
-                leaves.append(arg)
-
-        treedef = TreeDef(lambda *leaves: self.treedef.unflatten(leaves), tuple(leaves))
-        return FlattenedTree(tuple(dynamic), treedef)
-
-
-def _is_array_like(x) -> bool:
-    import spekk.ops as ops
-
-    return isinstance(
-        x, (int, float, complex, ops.array)
-    ) or ops.backend._is_backend_array(x)
-
-
-def flatten(obj, *, flatten_spekk_arrays: bool = False) -> FlattenedTree:
-    """Flatten a tree-like structure recursively.
-
-    This is useful when we want to pass custom Module objects into traced functions,
-    e.g.: functions that have been wrapped with jax.jit. Flattening the object first
-    lets us input only the tuple of dynamic fields and the backend doesn't have to know
-    about our classes. Static fields are meant to be baked into the computation and if
-    they change then it is assumed that the computation also meaningfully changes.
-
-    Args:
-        obj (TModule): A tree-like object, i.e. one of Module, list, tuple or dict.
-        flatten_spekk_arrays (bool): Whether to also flatten arrays into "data"
-            (dynamic) and "dims" (static). If False (default), then arrays are
-            considered as leaves and as dynamic attributes.
-    """
-    from spekk import ops
-
-    dynamic = []
-
-    def map_leaf(leaf: TLeaf | _static_value):
-        if isinstance(leaf, _static_value):
-            return leaf.value
-        elif not _is_array_like(leaf):
-            return leaf
-
-        # Else, leaf is an array or number:
-
-        if flatten_spekk_arrays and isinstance(leaf, ops.array):
-            dynamic.append(leaf.data)
-            return TreeDef(ops.array, (_DynamicArg(), tuple(leaf.dims)))
-        else:
-            dynamic.append(leaf)
-            return _DynamicArg()
-
-    def as_treedef(type, *args):
-        return TreeDef(type, args)
-
-    treedef = traverse(obj, map_leaf=map_leaf, recreate_container=as_treedef)
-    if not isinstance(treedef, TreeDef):
-        treedef = TreeDef(lambda value: value, (treedef,))
-    return FlattenedTree(tuple(dynamic), treedef)
+tree.registry.register(lambda x: isinstance(x, Module), _destructure_module)
 
 
 if __name__ == "__main__":

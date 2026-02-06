@@ -1,6 +1,6 @@
 import functools
 
-from spekk.module import flatten
+from spekk import tree
 
 
 def make_jaxpr(f):
@@ -8,16 +8,17 @@ def make_jaxpr(f):
 
     @functools.wraps(f)
     def wrapped_outer(*original_args, **original_kwargs):
-        outer_dynamic, outer_treedef = flatten(
-            (original_args, original_kwargs),
-            flatten_spekk_arrays=True,
+        from spekk.ops._util import as_backend_arrays
+
+        outer_dynamic, outer_treedef = as_backend_arrays(
+            *tree.flatten((original_args, original_kwargs))
         )
 
         @jax.make_jaxpr
         def wrapped_inner(*flattened_args):
             args, kwargs = outer_treedef.unflatten(flattened_args)
             result = f(*args, **kwargs)
-            inner_dynamic, _ = flatten(result, flatten_spekk_arrays=True)
+            inner_dynamic, _ = as_backend_arrays(*tree.flatten(result))
             return inner_dynamic
 
         return wrapped_inner(*outer_dynamic)

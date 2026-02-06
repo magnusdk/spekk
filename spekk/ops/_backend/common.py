@@ -1,7 +1,7 @@
 import functools
-from typing import List, Sequence
+from typing import Sequence
 
-from spekk.module.base import TreeDef
+from spekk import tree, util
 from spekk.ops._types import undefined_dim
 
 
@@ -9,7 +9,6 @@ def get_vmap_fn(vmap_impl):
     @functools.wraps(vmap_impl)
     def vmap(f, in_axes):
         from spekk import Dim, ops
-        from spekk.module import flatten
 
         if not isinstance(in_axes, Dim):
             raise NotImplementedError()
@@ -48,7 +47,9 @@ def get_vmap_fn(vmap_impl):
                 positional_args = False
                 original_args = original_kwargs
 
-            args_dynamic, args_treedef = flatten(original_args)
+            args_dynamic, args_treedef = tree.flatten(
+                original_args, is_static=lambda x: not util.is_array_like(x)
+            )
 
             # Use treedef as the key to the cache. If the structure or types of the
             # arguments, or any static values change, the function must be recompiled.
@@ -117,8 +118,8 @@ def get_vmap_fn(vmap_impl):
                 # flatten_result_inner handles. Since the result of f is unknown until
                 # it has actually been called, flatten_result_inner is set dynamically
                 # inside wrapped_inner.
-                flattened_result_inner = None
-                flattened_dynamic_dims_inner: List[ops.Dim]
+                result_inner_treedef = None
+                dynamic_dims_inner: list[list[ops.Dim]]
 
                 # wrapped_inner is a function that takes flattened arguments of arrays
                 # or numbers and returns the arrays and numbers of the flattened result
@@ -127,7 +128,7 @@ def get_vmap_fn(vmap_impl):
                 # of wrapped_inner. This is so that we can unflatten the result
                 # afterwards.
                 def wrapped_inner(*flattened_args):
-                    nonlocal flattened_result_inner, flattened_dynamic_dims_inner
+                    nonlocal result_inner_treedef, dynamic_dims_inner
 
                     # Re-add the original dimensions to the arguments, minus the one
                     # being vmapped over.
@@ -145,31 +146,34 @@ def get_vmap_fn(vmap_impl):
                     # Unflatten args, call f, and flatten the result.
                     args = args_treedef.unflatten(flattened_args)
                     result_inner = f(*args) if positional_args else f(**args)
-                    flattened_result_inner = flatten(result_inner)
+                    result_inner_dynamic, result_inner_treedef = tree.flatten(
+                        result_inner,
+                        is_static=lambda x: not util.is_array_like(x),
+                    )
 
                     # Return the flattened result. It will be unflattened outside of
                     # this function using flattened_result_inner.
-                    flattened_dynamic_data_inner = [
+                    dynamic_data_inner = [
                         x.data if isinstance(x, ops.array) else x
-                        for x in flattened_result_inner.dynamic
+                        for x in result_inner_dynamic
                     ]
-                    flattened_dynamic_dims_inner = [
+                    dynamic_dims_inner = [
                         x.dims if isinstance(x, ops.array) else None
-                        for x in flattened_result_inner.dynamic
+                        for x in result_inner_dynamic
                     ]
-                    return flattened_dynamic_data_inner
+                    return dynamic_data_inner
 
                 # Wrap wrapped_inner with the backend vmap implementation and call it.
                 wrapped_inner = vmap_impl(wrapped_inner, in_axes=flattened_in_axes)
                 result_inner = wrapped_inner(*flattened_dynamic_data)
 
                 def unflatten_result_inner(result_inner):
-                    nonlocal flattened_dynamic_dims_inner
+                    nonlocal dynamic_dims_inner
                     result_inner = [
                         ops.array(x, [vmapped_dim, *dims]) if dims is not None else x
-                        for x, dims in zip(result_inner, flattened_dynamic_dims_inner)
+                        for x, dims in zip(result_inner, dynamic_dims_inner)
                     ]
-                    return args_treedef.unflatten(result_inner)
+                    return result_inner_treedef.unflatten(result_inner)
 
                 # Cache the compiled function
                 CACHE[args_treedef] = lambda *dynamic_args: unflatten_result_inner(
@@ -185,22 +189,45 @@ def get_vmap_fn(vmap_impl):
 
 
 def get_scan_fn(scan_impl):
-    def scan(f, init, xs, unroll):
-        from spekk.module.base import TreeDef, flatten
+    def scan(f, init, xs, *, dim: str | None = None, unroll: int = 1):
+        from spekk import ops
+        from spekk.ops._util import as_backend_arrays
 
-        carry_dynamic, carry_treedef = flatten(init, flatten_spekk_arrays=True)
-        y_treedef: TreeDef = None  # type: ignore
+        carry_dynamic, carry_treedef = as_backend_arrays(tree.flatten(init))
+        if dim is not None:
+            # Move the scan dim to the first axis.
+            xs = tree.map(
+                lambda x: ops.moveaxis(x, dim, 0)
+                if isinstance(x, ops.array) and dim in x.dims
+                else x,
+                xs,
+            )
+        # Arrays without the scan dim are treated as static (not sliced per iteration).
+        # remove_dims: scan dim is sliced away, so don't store it.
+        xs_dynamic, xs_treedef = as_backend_arrays(
+            tree.flatten(
+                xs,
+                is_static=lambda x: isinstance(x, ops.array) and dim not in x.dims,
+            ),
+            remove_dims={dim} if dim is not None else (),
+        )
+        # Captured from wrapped_f; assumes xs is non-empty so wrapped_f runs at least once.
+        y_treedef: tree.registry.TreeDef = None  # type: ignore
 
         def wrapped_f(carry, x):
-            nonlocal carry_dynamic, y_treedef
+            nonlocal y_treedef
             carry = carry_treedef.unflatten(carry)
+            x = xs_treedef.unflatten(x)
 
             new_carry, y = f(carry, x)
-            carry_dynamic, _ = flatten(new_carry, flatten_spekk_arrays=True)
-            y_dynamic, y_treedef = flatten(y, flatten_spekk_arrays=True)
+            carry_dynamic, _ = as_backend_arrays(tree.flatten(new_carry))
+            # Prepend scan dim so stacked outputs get the dimension name back.
+            y_dynamic, y_treedef = as_backend_arrays(
+                tree.flatten(y), prepend_dims=(dim,) if dim is not None else ()
+            )
             return carry_dynamic, y_dynamic
 
-        carry, ys = scan_impl(wrapped_f, carry_dynamic, xs, unroll=unroll)
+        carry, ys = scan_impl(wrapped_f, carry_dynamic, xs_dynamic, unroll=unroll)
         return carry_treedef.unflatten(carry), y_treedef.unflatten(ys)
 
     return scan
@@ -214,7 +241,7 @@ def get_jit_fn(jit_impl):
         static_argnames: Sequence[str] = (),
     ):
         "Our custom jit-function which filters out static fields."
-        from spekk.module.base import _static_value, flatten
+        from spekk.ops._util import as_backend_arrays
 
         # We cache the jitted function (wrapped_inner) by the static fields. When the
         # static fields changes, the function is re-compiled.
@@ -225,11 +252,11 @@ def get_jit_fn(jit_impl):
             # Handle arguments explicitly marked as static
             original_args = list(original_args)
             for static_argnum in static_argnums:
-                original_args[static_argnum] = _static_value(
+                original_args[static_argnum] = tree.static_value(
                     original_args[static_argnum]
                 )
             for static_argname in static_argnames:
-                original_kwargs[static_argname] = _static_value(
+                original_kwargs[static_argname] = tree.static_value(
                     original_kwargs[static_argname]
                 )
 
@@ -239,9 +266,8 @@ def get_jit_fn(jit_impl):
             #   This is why it is important to recompile the function when static
             # fields changes, otherwise the function runs with the old values for those
             # fields.
-            args_dynamic, args_treedef = flatten(
-                (original_args, original_kwargs),
-                flatten_spekk_arrays=True,
+            args_dynamic, args_treedef = as_backend_arrays(
+                tree.flatten((original_args, original_kwargs))
             )
 
             # Try to find an already-compiled version for the given static fields.
@@ -255,15 +281,15 @@ def get_jit_fn(jit_impl):
                 # flatten the result of calling f as well, such that backends only sees
                 # arrays as outputs as well. We need to unflatten the result after, and
                 # for that we use flatten_result_inner.
-                result_inner_treedef: TreeDef = None  # type: ignore
+                result_inner_treedef: tree.TreeDef = None  # type: ignore
 
                 @jit_impl
                 def wrapped_inner(*args):
                     nonlocal result_inner_treedef
                     args, kwargs = args_treedef.unflatten(args)
                     result_inner = f(*args, **kwargs)
-                    result_inner_dynamic, result_inner_treedef = flatten(
-                        result_inner, flatten_spekk_arrays=True
+                    result_inner_dynamic, result_inner_treedef = as_backend_arrays(
+                        tree.flatten(result_inner)
                     )
                     return result_inner_dynamic
 

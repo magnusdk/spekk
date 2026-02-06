@@ -60,38 +60,30 @@ def jit(f, static_argnums: Sequence[int] = (), static_argnames: Sequence[str] = 
     return f
 
 
-def scan(fn, init, xs, unroll=None):
-    from spekk.module import base as module_base
+def _scan(fn, init, xs: tuple[np.ndarray, ...], unroll=None):
+    from spekk import tree
 
     carry = init
-    flat_xs = module_base.flatten(xs)
     # Assume all dynamic arrays have the same size along axis 0.
-    T = flat_xs.dynamic[0].shape[0]
+    size = xs[0].shape[0]
 
-    # Will hold the flattened outputs (list of lists of arrays) for each time step.
-    results_flat = []
-
-    for t in range(T):
+    ys_dynamic = []
+    ys_treedef = []
+    for t in range(size):
         # For each dynamic array in xs, extract the t-th element along axis 0.
-        xs_t_dynamic = [arr[t] for arr in flat_xs.dynamic]
+        xs_t = [arr[t] for arr in xs]
         # Reconstruct the tree corresponding to the t-th slice.
-        xs_t = flat_xs.unflatten(xs_t_dynamic)
         carry, y = fn(carry, xs_t)
-        flat_y = module_base.flatten(y)
-        results_flat.append(flat_y.dynamic)
+        y_dynamic, y_treedef = tree.flatten(y)
+        ys_dynamic.append(y_dynamic)
+        ys_treedef.append(y_treedef)
 
-    # Now, results_flat is a list of lists of arrays. The inner list corresponds to the tree's leaves.
-    # For each leaf, stack all T outputs along a new first axis.
-    num_leaves = len(results_flat[0])
-    dynamic_result = []
-    for leaf_idx in range(num_leaves):
-        # Gather the same leaf from each time step.
-        leaf_values = [results_flat[t][leaf_idx] for t in range(T)]
-        dynamic_result.append(np.stack(leaf_values, axis=0))
+    ys_dynamic = [np.stack(a) for a in zip(*ys_dynamic)]
+    ys = y_treedef.unflatten(ys_dynamic)
+    return carry, ys
 
-    # Use the flattening scheme from the output tree to unflatten back to a tree structure.
-    tree_result = flat_y.unflatten(dynamic_result)
-    return carry, tree_result
+
+scan = common.get_scan_fn(_scan)
 
 
 def _not_implemented(name: str):

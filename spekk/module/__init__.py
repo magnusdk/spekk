@@ -1,31 +1,21 @@
 from spekk.module.base import (
-    FlattenedTree,
     Module,
-    TreeDef,
     at,
     dim_sizes,
     field,
-    flatten,
     get_at,
     replace,
     replace_at,
-    traverse,
-    traverse_multiple,
     update_at,
 )
 
 __all__ = [
-    "FlattenedTree",
     "Module",
-    "TreeDef",
     "at",
     "dim_sizes",
     "field",
-    "flatten",
     "get_at",
     "replace",
     "replace_at",
-    "traverse",
-    "traverse_multiple",
     "update_at",
 ]

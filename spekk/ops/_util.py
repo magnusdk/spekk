@@ -1,15 +1,16 @@
+import dataclasses
 import numbers
 from collections import defaultdict
-from typing import Callable, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Container, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
 from spekk import ops
-from spekk.module.base import TContainer, TLeaf
-from spekk.ops._backend import backend
 from spekk.ops._types import ArrayLike, Dim, Dims, _UndefinedDim, undefined_dim
 from spekk.ops.array_object import array
 from spekk.ops.data_types import DType
+from spekk.tree import Flattened
+from spekk.tree.registry import Leaf, TreeDef
 
 
 def get_reduction_axes_and_resulting_dims(
@@ -93,7 +94,7 @@ def canonicalize_axis(n: int, i: int) -> int:
     return i
 
 
-def temporarily_make_undefined_dims_defined[T: TLeaf | TContainer](
+def temporarily_make_undefined_dims_defined[T](
     x: T,
 ) -> tuple[T, set[Dim]]:
     from spekk import traverse, util
@@ -117,7 +118,7 @@ def temporarily_make_undefined_dims_defined[T: TLeaf | TContainer](
     return x, temporary_dims
 
 
-def make_temporary_dims_undefined[T: TLeaf | TContainer](
+def make_temporary_dims_undefined[T](
     x: T,
     temporary_dims: set[Dim],
 ) -> T:
@@ -211,7 +212,7 @@ def get_broadcast_array_fn(
 
 
 def ensure_broadcastable(
-    *arrays: array, ensure_same_ndim: bool = False
+    *arrays: bool | int | float | complex | array, ensure_same_ndim: bool = False
 ) -> Tuple[List[Dim], List[array]]:
     from spekk import ops
 
@@ -305,6 +306,74 @@ def get_dims(obj) -> Dims:
     elif isinstance(obj, (list, tuple)):
         raise NotImplementedError()
     return []
+
+
+@dataclasses.dataclass(frozen=True, repr=False)
+class BackendArrayTreeDef(TreeDef):
+    """Wraps a TreeDef to restore spekk array dims during unflatten."""
+
+    dims_by_index: tuple[tuple[int, tuple[str, ...]], ...]
+
+    def __post_init__(self):
+        if len(self.children) != 1:
+            raise ValueError(
+                f"BackendArrayTreeDef expects exactly 1 child, got {len(self.children)}"
+            )
+
+    def _construct(self, children: list) -> Any:
+        # children[0] is the unflattened result from the inner treedef
+        return children[0]
+
+    def _unflatten(self, leaves_iter) -> Any:
+        # Collect all leaves, wrap spekk arrays, then delegate to inner
+        leaves_list = list(leaves_iter)
+        for i, dims in self.dims_by_index:
+            leaves_list[i] = array(leaves_list[i], dims=list(dims))
+        inner = self.children[0]
+        if isinstance(inner, (TreeDef, Leaf)):
+            return inner.unflatten(leaves_list)
+        return inner  # Static value
+
+    def _inner_repr(self, child_repr_fn: Callable[[Any], str]) -> str:
+        return f"BackendArrayTreeDef({child_repr_fn(self.children[0])})"
+
+
+def as_backend_arrays(
+    flattened: Flattened,
+    *,
+    remove_dims: Container[str] = (),
+    prepend_dims: tuple[str, ...] = (),
+) -> Flattened:
+    """Convert spekk arrays to backend arrays, storing dims for reconstruction.
+
+    Args:
+        leaves: List of leaves from flatten()
+        treedef: TreeDef from flatten()
+        remove_dims: Dimension names to exclude from the stored dims. These dims
+            will not be restored when unflattening.
+        prepend_dims: Dimension names to prepend to the stored dims. These will
+            appear before the original dims when unflattening.
+
+    Returns:
+        A tuple of (backend_leaves, wrapped_treedef) where backend_leaves contains
+        raw backend arrays instead of spekk arrays, and wrapped_treedef will restore
+        the spekk arrays with their dims during unflatten.
+    """
+    backend_leaves = []
+    dims_by_index = []
+    for i, leaf in enumerate(flattened.leaves):
+        if isinstance(leaf, array):
+            backend_leaves.append(leaf.data)
+            dims = prepend_dims + tuple(
+                dim for dim in leaf.dims if dim not in remove_dims
+            )
+            dims_by_index.append((i, dims))
+        else:
+            backend_leaves.append(leaf)
+    return Flattened(
+        tuple(backend_leaves),
+        BackendArrayTreeDef((flattened.treedef,), tuple(dims_by_index)),
+    )
 
 
 if __name__ == "__main__":

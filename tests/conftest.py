@@ -1,7 +1,9 @@
 """
 Test configuration for spekk test suite.
 """
+
 import os
+
 import pytest
 
 

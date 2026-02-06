@@ -1,12 +1,9 @@
-from spekk import ops, util
-from spekk.ops.array_object import array
-from spekk.ops._types import (
-    Dim,
-    Dims,
-)
-from typing import Union
 from functools import partial
+from typing import Union
 
+from spekk import ops, util
+from spekk.ops._types import Dim
+from spekk.ops.array_object import array
 from spekk.util.profiling import function_profiling
 
 
@@ -66,7 +63,7 @@ def median_filter(
 
 
 @function_profiling
-@ops.jit(static_argnames=("spatial_sigmas",))
+# @ops.jit(static_argnames=("spatial_sigmas",))
 def bilateral_filter(
     image: array, *, spatial_sigmas: dict[Dim, float], color_sigma: float
 ) -> array:
@@ -86,7 +83,6 @@ def bilateral_filter_kernel(
     spatial_sigmas: dict[Dim, float],
     color_sigma: float,
 ) -> array:
-
     # Pre-compute
     scaleFactor_color = 1 / (2 * color_sigma * color_sigma)
 
@@ -118,26 +114,28 @@ def bilateral_filter_kernel(
 
     return out
 
+
 # @function_profiling
 def convNd(image: array, kernel: array, pad_mode="edge") -> array:
     """
     Args:
         image: Input array
-        kernel: The kernel used, note that if the kernel includes an axis not present in image, 
+        kernel: The kernel used, note that if the kernel includes an axis not present in image,
                 that axis will be seen as different set of convolution filters.
-    
-    """    
+
+    """
     window_sizes = {}
     for dim in kernel.dims:
         if dim in image.dims:
             window_sizes[dim] = kernel.dim_sizes[dim]
 
     # window_sizes should be odd
-    check_odd_items(window_sizes)    
+    check_odd_items(window_sizes)
 
     f = partial(convNd_kernel, kernel=kernel)
 
     return windowed(f, window_sizes, pad_mode=pad_mode)(image)
+
 
 def convNd_kernel(img_pad: array, axis: tuple, kernel: array) -> array:
     # rename axis in "kernel" to match new axis in "img_pad"
@@ -156,11 +154,12 @@ def check_odd_items(dictionary):
 
 
 if __name__ == "__main__":
-    import numpy as np
     import time
-    import matplotlib.pyplot as plt
-    import cv2
+
     import cfm
+    import cv2
+    import matplotlib.pyplot as plt
+    import numpy as np
 
     # from cfm.utils import profiling
     # profiling.set_level( profiling.Level.Warning)
