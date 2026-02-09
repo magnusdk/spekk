@@ -12,7 +12,8 @@ of the tree's structure and are restored as-is during unflatten.
 There are three ways to make values static:
 
 1. **is_static predicate**: Pass `is_static=lambda x: ...` to `flatten()`.
-   Values where the predicate returns True are stored in the TreeDef.
+   Applied only to leaves; leaves where the predicate returns True are stored
+   in the TreeDef.
 
 2. **Module static fields**: Mark fields with `field(static=True)` on Module
    subclasses. These fields are always static regardless of predicates.
@@ -79,26 +80,29 @@ def flatten(
     Args:
         tree: Any Python object (supports tuple, list, dict, set, Module, or leaves)
         is_leaf: Optional predicate to treat certain objects as leaves.
-        is_static: Optional predicate to treat certain objects as static.
-            Static objects are stored in the treedef and not included in leaves.
+            Checked before destructuring, so can stop recursion into containers.
+        is_static: Optional predicate applied only to leaves (not containers).
+            Leaves where this returns True are stored in the treedef and not
+            included in the leaves tuple.
 
     Returns:
-        A tuple of (leaves, treedef) where leaves is a list and treedef captures structure
+        A (named-) tuple of (leaves, treedef) where leaves is a tuple and treedef
+            captures structure.
     """
     # Check for static_value wrapper first (unwrap and store inner value in treedef)
     if isinstance(tree, static_value):
         return Flattened((), freeze_as_treedef(tree.value))
-    if is_static is not None and is_static(tree):
-        return Flattened((), freeze_as_treedef(tree))
 
-    if is_leaf is not None and is_leaf(tree):
-        return Flattened((tree,), Leaf())
-
+    # An object is considered a leaf if it can't be further destructured or if it is
+    # explicitly marked as a leaf through the is_leaf predicate.
     destructure = get_destructure(tree)
-    if destructure is None:
-        # No destructuring function has been registered; return the object as a leaf.
-        return Flattened((tree,), Leaf())
+    if destructure is None or (is_leaf is not None and is_leaf(tree)):
+        if is_static is not None and is_static(tree):
+            return Flattened((), freeze_as_treedef(tree))
+        else:
+            return Flattened((tree,), Leaf())
 
+    # If the object was not a leaf then we recursively flatten it.
     children_iter, make_treedef = destructure(tree)
     leaves = []
     child_defs = []
@@ -106,6 +110,7 @@ def flatten(
         child_leaves, child_def = flatten(child, is_leaf=is_leaf, is_static=is_static)
         leaves.extend(child_leaves)
         child_defs.append(child_def)
+
     return Flattened(
         tuple(leaves),
         make_treedef(tuple(child_defs)),

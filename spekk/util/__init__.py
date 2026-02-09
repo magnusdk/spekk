@@ -6,11 +6,14 @@ from spekk.util.dims import random_dim_name
 def is_array_like(x):
     from spekk import ops
 
-    return isinstance(x, (ops.array, bool, int, float, complex))
+    return isinstance(
+        x, (ops.array, bool, int, float, complex)
+    ) or ops.backend._is_backend_array(x)
 
 
 __all__ = [
     "dims",
     "jax_util",
     "random_dim_name",
+    "is_array_like",
 ]

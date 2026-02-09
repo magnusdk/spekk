@@ -193,13 +193,17 @@ def get_scan_fn(scan_impl):
         from spekk import ops
         from spekk.ops._util import as_backend_arrays
 
-        carry_dynamic, carry_treedef = as_backend_arrays(tree.flatten(init))
+        carry_dynamic, carry_treedef = as_backend_arrays(
+            tree.flatten(init, is_static=lambda x: not util.is_array_like(x))
+        )
         if dim is not None:
             # Move the scan dim to the first axis.
             xs = tree.map(
-                lambda x: ops.moveaxis(x, dim, 0)
-                if isinstance(x, ops.array) and dim in x.dims
-                else x,
+                lambda x: (
+                    ops.moveaxis(x, dim, 0)
+                    if isinstance(x, ops.array) and dim in x.dims
+                    else x
+                ),
                 xs,
             )
         # Arrays without the scan dim are treated as static (not sliced per iteration).
@@ -207,7 +211,8 @@ def get_scan_fn(scan_impl):
         xs_dynamic, xs_treedef = as_backend_arrays(
             tree.flatten(
                 xs,
-                is_static=lambda x: isinstance(x, ops.array) and dim not in x.dims,
+                is_static=lambda x: not util.is_array_like(x)
+                or (isinstance(x, ops.array) and dim not in x.dims),
             ),
             remove_dims={dim} if dim is not None else (),
         )
@@ -220,10 +225,13 @@ def get_scan_fn(scan_impl):
             x = xs_treedef.unflatten(x)
 
             new_carry, y = f(carry, x)
-            carry_dynamic, _ = as_backend_arrays(tree.flatten(new_carry))
+            carry_dynamic, _ = as_backend_arrays(
+                tree.flatten(new_carry, is_static=lambda x: not util.is_array_like(x))
+            )
             # Prepend scan dim so stacked outputs get the dimension name back.
             y_dynamic, y_treedef = as_backend_arrays(
-                tree.flatten(y), prepend_dims=(dim,) if dim is not None else ()
+                tree.flatten(y, is_static=lambda x: not util.is_array_like(x)),
+                prepend_dims=(dim,) if dim is not None else (),
             )
             return carry_dynamic, y_dynamic
 
@@ -263,11 +271,13 @@ def get_jit_fn(jit_impl):
             # Flatten all args. flatten_result_outer knows which parts of the arguments
             # are static. The underlying jit_impl only ever sees non-static inputs; the
             # rest are baked into the function itself.
-            #   This is why it is important to recompile the function when static
-            # fields changes, otherwise the function runs with the old values for those
-            # fields.
+            # This is why it is important to recompile the function when static fields
+            # changes, otherwise the function runs with the old values for those fields.
             args_dynamic, args_treedef = as_backend_arrays(
-                tree.flatten((original_args, original_kwargs))
+                tree.flatten(
+                    (original_args, original_kwargs),
+                    is_static=lambda x: not util.is_array_like(x),
+                )
             )
 
             # Try to find an already-compiled version for the given static fields.
@@ -289,7 +299,10 @@ def get_jit_fn(jit_impl):
                     args, kwargs = args_treedef.unflatten(args)
                     result_inner = f(*args, **kwargs)
                     result_inner_dynamic, result_inner_treedef = as_backend_arrays(
-                        tree.flatten(result_inner)
+                        tree.flatten(
+                            result_inner,
+                            is_static=lambda x: not util.is_array_like(x),
+                        )
                     )
                     return result_inner_dynamic
 

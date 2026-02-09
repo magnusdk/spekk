@@ -119,7 +119,7 @@ def reduce_over_dim[TInitialValue, TCarry, TInputData](
     # dim in its dimensions.
     flat_outer = tree.flatten(
         data,
-        is_static=lambda x: isinstance(x, ops.array) and (dim not in x.dims),
+        is_static=lambda x: not isinstance(x, ops.array) or dim not in x.dims,
     )
     # Ensure that the dimension being reduced over is at the first axis.
     dynamic = [ops.moveaxis(x, dim, 0) for x in flat_outer.leaves]
@@ -186,6 +186,7 @@ def map_reduce_over_dim[TInitialValue, TCarry, TInputData, TMappedInputData](
 
         def f(carry, part, index):
             return reduce_f(carry, map_f(part), index)
+
     else:
 
         def f(carry, part):
@@ -243,7 +244,7 @@ def map_over_dim(
     # Flatten input data trees for dynamic arrays along `dim`
     flat_in_leaves, flat_in_treedef = tree.flatten(
         data,
-        is_static=lambda x: isinstance(x, ops.array) and (dim not in x.dims),
+        is_static=lambda x: not isinstance(x, ops.array) or dim not in x.dims,
     )
 
     # Move `dim` to leading axis and extract raw data and dims

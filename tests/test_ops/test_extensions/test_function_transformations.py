@@ -385,3 +385,114 @@ def test_jit_with_unhashable_static_field():
 
         f(C(1.0, {"offset": 5.0}))  # static field changed — must recompile
         assert n == 2
+
+
+def test_jit_string_arg_auto_static():
+    """Strings are not arrays, so jit should automatically treat them as static."""
+    with ops.backend.temporary_backend("jax"):
+        n = 0
+
+        @jit
+        def f(mode: str, x):
+            nonlocal n
+            n += 1
+            if mode == "double":
+                return x * 2
+            return x + 1
+
+        x = ops.arange(4, dtype=float, dim="a")
+        assert ops.all(f("double", x) == x * 2)
+        f("double", x)
+        assert n == 1
+
+        assert ops.all(f("add", x) == x + 1)
+        assert n == 2  # recompiled because string changed
+
+
+# -- Tests: non-array leaves in function transformations ----------------------
+
+
+class DataWithLabel(Module):
+    values: ops.array
+    label: str = field(static=True)
+
+
+def test_reduce_over_dim_with_string_field():
+    """reduce_over_dim should handle Modules with static string fields."""
+    data = DataWithLabel(
+        ops.reshape(ops.arange(12, dtype=float), (3, 4), dims=["a", "b"]),
+        "test",
+    )
+    init = ops.zeros((4,), dims=["b"])
+    result = reduce_over_dim(
+        lambda carry, d: carry + d.values,
+        data,
+        init=init,
+        dim="a",
+    )
+    assert ops.all(result == ops.sum(data.values, axis="a"))
+
+
+def test_map_over_dim_with_string_field():
+    """map_over_dim should handle Modules with static string fields."""
+    data = DataWithLabel(
+        ops.reshape(ops.arange(12, dtype=float), (3, 4), dims=["a", "b"]),
+        "test",
+    )
+    result = map_over_dim(lambda d: d.values * 2, data, dim="a")
+    assert ops.all(result == data.values * 2)
+
+
+def test_map_reduce_over_dim_with_string_field():
+    """map_reduce_over_dim should handle Modules with static string fields."""
+    data = DataWithLabel(
+        ops.reshape(ops.arange(12, dtype=float), (3, 4), dims=["a", "b"]),
+        "test",
+    )
+    init = ops.zeros((4,), dims=["b"])
+    result = map_reduce_over_dim(
+        lambda d: d.values**2,
+        lambda carry, mapped: carry + mapped,
+        data,
+        init=init,
+        dim="a",
+    )
+    assert ops.all(result == ops.sum(data.values**2, axis="a"))
+
+
+def test_scan_with_string_field():
+    """scan should handle Modules with static string fields as carry."""
+    xs = ops.arange(3, dtype=float, dim="a")
+    init = DataWithLabel(ops.array(0.0), "test")
+
+    def scan_f(carry, x):
+        return DataWithLabel(carry.values + x, carry.label), carry.values + x
+
+    final, outputs = scan(scan_f, init, xs)
+    assert isinstance(final, DataWithLabel)
+    assert float(final.values) == float(ops.sum(xs))
+
+
+def test_grad_with_string_field():
+    """grad should handle Modules with static string fields."""
+    with ops.backend.temporary_backend("jax"):
+        data = DataWithLabel(
+            ops.arange(4, dtype=float, dim="a"),
+            "test",
+        )
+        g = grad(lambda d: ops.sum(d.values**2))(data)
+        assert isinstance(g, DataWithLabel)
+        assert ops.all(g.values == 2 * data.values)
+
+
+def test_value_and_grad_with_string_field():
+    """value_and_grad should handle Modules with static string fields."""
+    with ops.backend.temporary_backend("jax"):
+        data = DataWithLabel(
+            ops.arange(4, dtype=float, dim="a"),
+            "test",
+        )
+        val, g = value_and_grad(lambda d: ops.sum(d.values**2))(data)
+        assert float(val) == float(ops.sum(data.values**2))
+        assert isinstance(g, DataWithLabel)
+        assert ops.all(g.values == 2 * data.values)
