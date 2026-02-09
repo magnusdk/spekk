@@ -2,7 +2,7 @@ import numpy as np
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from spekk import Module, field, ops
+from spekk import Module, field, ops, replace
 from spekk.ops.extensions.function_transformations import (
     _argf_over_dims,
     grad,
@@ -496,3 +496,57 @@ def test_value_and_grad_with_string_field():
         assert float(val) == float(ops.sum(data.values**2))
         assert isinstance(g, DataWithLabel)
         assert ops.all(g.values == 2 * data.values)
+
+
+def test_jit_complex_module_with_mixed_fields():
+    """jit should handle a Module with arrays, floats, strings, dicts, and static fields."""
+    with ops.backend.temporary_backend("jax"):
+
+        class Complex(Module):
+            x: ops.array
+            scale: float
+            arrays: dict
+            method: str = field(static=True)
+            n_iters: int = field(static=True)
+            config: dict = field(static=True)
+
+        n = 0
+
+        @jit
+        def f(obj: Complex):
+            nonlocal n
+            n += 1
+            result = obj.x * obj.scale + obj.arrays["bias"]
+            if obj.method == "repeat":
+                for _ in range(obj.n_iters):
+                    result = result + obj.config["offset"]
+            return result
+
+        x = ops.arange(4, dtype=float, dim="a")
+        bias = ops.ones(4, dtype=float, dims=["a"])
+        obj = Complex(x, 2.0, {"bias": bias}, "repeat", 3, {"offset": 1.0})
+
+        expected = x * 2.0 + bias + 3.0
+        assert ops.all(f(obj) == expected)
+        f(obj)
+        assert n == 1  # no recompilation
+
+        # Changing a dynamic field (scale) should NOT recompile
+        f(replace(obj, scale=3.0))
+        assert n == 1
+
+        # Changing a dynamic dict array should NOT recompile
+        f(replace(obj, arrays={"bias": bias * 2}))
+        assert n == 1
+
+        # Changing a static string field should recompile
+        f(replace(obj, method="other"))
+        assert n == 2
+
+        # Changing a static int field should recompile
+        f(replace(obj, n_iters=5))
+        assert n == 3
+
+        # Changing a static dict field should recompile
+        f(replace(obj, config={"offset": 2.0}))
+        assert n == 4
