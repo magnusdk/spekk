@@ -619,3 +619,50 @@ def wrap_backend_decorator(decorator):
 
 
 checkpoint = wrap_backend_decorator(backend.checkpoint)
+
+
+def wrap_with_tree_support(
+    f: Callable | None = None,
+    /,
+    *,
+    only_arrays: bool = False,
+):
+    """Decorator that lets a function written for a single leaf accept a
+    tree-like structure as its first positional argument.
+
+    Parameters
+    ----------
+    f : Callable | None
+        Function that operates on a single leaf. If None, returns a configured decorator.
+    only_arrays : bool, default False
+        If True, apply the function only to array leaves. Other leaves are returned unchanged.
+
+    Examples
+    --------
+    >>> @wrap_with_tree_support
+    ... def negate(x):
+    ...     return -x
+    ...
+    >>> negate([1, 2, (3, 4)])
+    [-1, -2, (-3, -4)]
+    """
+    # Allow decorating like this: @wrap_tree_map(only_arrays=True)
+    if f is None:
+        return functools.partial(wrap_with_tree_support, only_arrays=only_arrays)
+
+    # predicates is a list of checks for whether we should apply f to a leaf. All
+    # checks must evaluate to True if the leaf should be processed.
+    predicates = []
+    if only_arrays:
+        predicates.append(lambda x: isinstance(x, ops.array))
+
+    @functools.wraps(f)
+    def wrapped(obj, *args, **kwargs):
+        return tree.map(
+            lambda x: f(x, *args, **kwargs)
+            if all(predicate(x) for predicate in predicates)
+            else x,
+            obj,
+        )
+
+    return wrapped
