@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union
 
+import array_api_compat
 import numpy as np
 
 import spekk.ops.data_types as data_types
@@ -17,9 +18,9 @@ from spekk.ops._types import (
     PossiblyUndefinedDim,
     PyCapsule,
     _UndefinedDim,
+    ellipsis,
 )
 from spekk.ops._types import device as Device
-from spekk.ops._types import ellipsis
 from spekk.ops.data_types import DType
 
 if TYPE_CHECKING:
@@ -1435,7 +1436,7 @@ class array:
         .. versionchanged:: 2023.12
            Clarified behavior when a provided ``device`` object corresponds to the device on which an array instance resides.
         """
-        return array(self._data.to_device(device, stream=stream), self._dims)
+        return array(array_api_compat.to_device(self.data, stream=stream), self._dims)
 
     # We use the _sentinel as default values instead of None, because None has a
     # semantic meaning in Numpy's __array__ implementation.
