@@ -6,7 +6,7 @@ from typing import (
     Union,
 )
 
-from spekk import ops
+from spekk import ops, tree
 from spekk.ops._backend import backend
 from spekk.ops._types import Dim, Dims, undefined_dim
 from spekk.ops._util import get_reduction_axes_and_resulting_dims
@@ -68,6 +68,10 @@ def to_numpy(x: array):
     return backend.to_numpy(x.data)
 
 
+def to_device(data, device):
+    return tree.map(lambda x: x.to_device(device) if isinstance(x, ops.array) else x, data)    
+
+    
 def median(a, axis: Optional[Dim], out=None, keepdims: bool = False) -> array:
     if axis is None:
         arr = backend.median(a, axis, out=out, keepdims=keepdims)
