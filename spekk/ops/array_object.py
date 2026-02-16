@@ -1436,7 +1436,7 @@ class array:
         .. versionchanged:: 2023.12
            Clarified behavior when a provided ``device`` object corresponds to the device on which an array instance resides.
         """
-        return array(array_api_compat.to_device(self.data, stream=stream), self._dims)
+        return array(array_api_compat.to_device(self.data, device, stream=stream), self._dims)
 
     # We use the _sentinel as default values instead of None, because None has a
     # semantic meaning in Numpy's __array__ implementation.
