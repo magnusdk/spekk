@@ -51,7 +51,7 @@ class Module(abc.ABC):
         # NOTE: naively passing kwargs to dataclass can break if user passes additional
         # kwargs not meant for the dataclass. The fix is to filter the kwargs here
         # before passing them to the dataclass.
-        dataclasses.dataclass(cls, **kwargs)
+        dataclasses.dataclass(cls, eq=False, **kwargs)
 
     @property
     def dim_sizes(self) -> dict["Dim", int | set[int]]:
