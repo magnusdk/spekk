@@ -335,16 +335,27 @@ def merge_dims(
 ) -> array:
     from spekk import ops
 
-    # Get the dim names and sizes of the dimensions that are not being merged.
-    other_dim_names = [d for d in x.dims if d not in merged_dims]
-    other_dim_sizes = [x.dim_sizes[d] for d in x.dims if d not in merged_dims]
+    merged_set = set(merged_dims)
 
-    # Move the dimensions to the start and in the right order.
-    x = ops.permute_dims(x, [*merged_dims, *other_dim_names])
+    # Find the position of the first dim to be merged.
+    first_merged_idx = min(x.dims.index(d) for d in merged_dims)
 
-    # Perform the actual reshape operation and return.
-    new_dims = [new_dim_name, *other_dim_names]
-    new_shape = [-1, *other_dim_sizes]
+    # Split dims into: before the merge point, the merged dims (in original
+    # order), and after.
+    before = list(x.dims[:first_merged_idx])
+    merged_in_order = [d for d in x.dims if d in merged_set]
+    after = [d for d in x.dims[first_merged_idx:] if d not in merged_set]
+
+    # Permute to make merged dims contiguous at the merge point.
+    # If the merged dims are already contiguous neighbors, this is a no-op.
+    perm = [*before, *merged_in_order, *after]
+    x = ops.permute_dims(x, perm)
+
+    # Reshape to merge the contiguous dims into one.
+    before_sizes = [x.dim_sizes[d] for d in before]
+    after_sizes = [x.dim_sizes[d] for d in after]
+    new_dims = [*before, new_dim_name, *after]
+    new_shape = [*before_sizes, -1, *after_sizes]
     return ops.reshape(x, new_shape, new_dims)
 
 
