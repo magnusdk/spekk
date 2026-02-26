@@ -55,6 +55,20 @@ def flatten(x: array, dim: Optional[Dim] = None) -> array:
         dim = undefined_dim
     return array(data, dims=[dim])
 
+def allclose(a, b, atol=None, rtol=None):
+    """Check if two arrays are element-wise equal within a tolerance.
+    
+    Default tolerances are dtype-dependent:
+        float32: atol=1e-5, rtol=1e-4
+        float64: atol=1e-8, rtol=1e-5
+    """
+    dtype = getattr(a, 'dtype', getattr(b, 'dtype', None))
+    is_float32 = dtype is not None and 'float32' in str(dtype)
+    if atol is None:
+        atol = 1e-5 if is_float32 else 1e-8
+    if rtol is None:
+        rtol = 1e-4 if is_float32 else 1e-5
+    return bool(ops.all(ops.abs(a - b) <= atol + rtol * ops.abs(b)))
 
 def diag(v, k=0, dims: Dims = None):
     if v.ndim == 1 or v.ndim == 2:
