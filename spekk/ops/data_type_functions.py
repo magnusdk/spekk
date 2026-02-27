@@ -4,9 +4,6 @@ from dataclasses import dataclass
 
 from spekk.ops._backend import backend
 from spekk.ops._types import (
-    Optional,
-    Tuple,
-    Union,
     device,
     dtype,
     finfo_object,
@@ -17,28 +14,13 @@ from spekk.ops.data_types import DType
 from spekk import ops
 
 def astype(
-    x: array, dtype: dtype, /, *, copy: bool = True, device: Optional[device] = None
+    x: array, dtype: dtype, /, *, copy: bool = True, device: device | None = None
 ) -> array:
     """
-    Copies an array to a specified data type irrespective of :ref:`type-promotion` rules.
+    Copies an array to a specified data type irrespective of type promotion rules.
 
     .. note::
-       Casting floating-point ``NaN`` and ``infinity`` values to integral data types is not specified and is implementation-dependent.
-
-    .. note::
-       Casting a complex floating-point array to a real-valued data type should not be permitted.
-
-       Historically, when casting a complex floating-point array to a real-valued data type, libraries such as NumPy have discarded imaginary components such that, for a complex floating-point array ``x``, ``astype(x)`` equals ``astype(real(x))``). This behavior is considered problematic as the choice to discard the imaginary component is arbitrary and introduces more than one way to achieve the same outcome (i.e., for a complex floating-point array ``x``, ``astype(x)`` and ``astype(real(x))`` versus only ``astype(imag(x))``). Instead, in order to avoid ambiguity and to promote clarity, this specification requires that array API consumers explicitly express which component should be cast to a specified real-valued data type.
-
-    .. note::
-       When casting a boolean input array to a real-valued data type, a value of ``True`` must cast to a real-valued number equal to ``1``, and a value of ``False`` must cast to a real-valued number equal to ``0``.
-
-       When casting a boolean input array to a complex floating-point data type, a value of ``True`` must cast to a complex number equal to ``1 + 0j``, and a value of ``False`` must cast to a complex number equal to ``0 + 0j``.
-
-    .. note::
-       When casting a real-valued input array to ``bool``, a value of ``0`` must cast to ``False``, and a non-zero value must cast to ``True``.
-
-       When casting a complex floating-point array to ``bool``, a value of ``0 + 0j`` must cast to ``False``, and all other values must cast to ``True``.
+       Casting floating-point ``NaN`` and ``infinity`` values to integral data types is backend-dependent.
 
     Parameters
     ----------
@@ -47,23 +29,14 @@ def astype(
     dtype: dtype
         desired data type.
     copy: bool
-        specifies whether to copy an array when the specified ``dtype`` matches the data type of the input array ``x``. If ``True``, a newly allocated array must always be returned. If ``False`` and the specified ``dtype`` matches the data type of the input array, the input array must be returned; otherwise, a newly allocated array must be returned. Default: ``True``.
-    device: Optional[device]
-        device on which to place the returned array. If ``device`` is ``None``, the output array device must be inferred from ``x``. Default: ``None``.
+        if ``True``, always returns a new array. If ``False`` and ``dtype`` matches the input array's data type, the input array is returned; otherwise a new array is returned. Default: ``True``.
+    device: device | None
+        device on which to place the returned array. If ``device`` is ``None``, the output array device is inferred from ``x``. Default: ``None``.
 
     Returns
     -------
     out: array
-        an array having the specified data type. The returned array must have the same shape as ``x``.
-
-    Notes
-    -----
-
-    .. versionchanged:: 2022.12
-       Added complex data type support.
-
-    .. versionchanged:: 2023.12
-       Added device keyword argument support.
+        an array having the specified data type. The returned array has the same shape as ``x``.
     """
     # NOTE: Hack to make it work with Numpy. Remove this (and just pass copy and device
     # directly to backend.astype) when it has been fixed.
@@ -77,13 +50,13 @@ def astype(
     return array(data, x._dims, device=device)
 
 
-def can_cast(from_: Union[dtype, array], to: dtype, /) -> bool:
+def can_cast(from_: dtype | array, to: dtype, /) -> bool:
     """
-    Determines if one data type can be cast to another data type according :ref:`type-promotion` rules.
+    Determines if one data type can be cast to another data type according to type promotion rules.
 
     Parameters
     ----------
-    from_: Union[dtype, array]
+    from_: dtype | array
         input data type or array from which to cast.
     to: dtype
         desired data type.
@@ -91,7 +64,7 @@ def can_cast(from_: Union[dtype, array], to: dtype, /) -> bool:
     Returns
     -------
     out: bool
-        ``True`` if the cast can occur according to :ref:`type-promotion` rules; otherwise, ``False``.
+        ``True`` if the cast can occur according to type promotion rules; otherwise, ``False``.
     """
     from_ = from_._data if isinstance(from_, array) else from_
     from_ = DType._to_backend_dtype(from_)
@@ -119,54 +92,26 @@ class iinfo_object:
     dtype: DType
 
 
-def finfo(type: Union[dtype, array], /) -> finfo_object:
+def finfo(type: dtype | array, /) -> finfo_object:
     """
     Machine limits for floating-point data types.
 
     Parameters
     ----------
-    type: Union[dtype, array]
+    type: dtype | array
         the kind of floating-point data-type about which to get information. If complex, the information is about its component data type.
-
-        .. note::
-           Complex floating-point data types are specified to always use the same precision for both its real and imaginary components, so the information should be true for either component.
 
     Returns
     -------
     out: finfo object
-        an object having the following attributes:
+        an object with the following attributes:
 
-        - **bits**: *int*
-
-          number of bits occupied by the real-valued floating-point data type.
-
-        - **eps**: *float*
-
-          difference between 1.0 and the next smallest representable real-valued floating-point number larger than 1.0 according to the IEEE-754 standard.
-
-        - **max**: *float*
-
-          largest representable real-valued number.
-
-        - **min**: *float*
-
-          smallest representable real-valued number.
-
-        - **smallest_normal**: *float*
-
-          smallest positive real-valued floating-point number with full precision.
-
-        - **dtype**: dtype
-
-          real-valued floating-point data type.
-
-          .. versionadded:: 2022.12
-
-    Notes
-    -----
-
-    .. versionchanged:: 2022.12
-       Added complex data type support.
+        - **bits** (*int*): number of bits occupied by the floating-point data type.
+        - **eps** (*float*): difference between 1.0 and the next representable floating-point number larger than 1.0.
+        - **max** (*float*): largest representable finite number.
+        - **min** (*float*): smallest representable finite number.
+        - **smallest_normal** (*float*): smallest positive floating-point number with full precision.
+        - **dtype** (*dtype*): the floating-point data type.
     """
     if isinstance(type, array):
         type = type._data
@@ -183,37 +128,24 @@ def finfo(type: Union[dtype, array], /) -> finfo_object:
     )
 
 
-def iinfo(type: Union[dtype, array], /) -> iinfo_object:
+def iinfo(type: dtype | array, /) -> iinfo_object:
     """
     Machine limits for integer data types.
 
     Parameters
     ----------
-    type: Union[dtype, array]
+    type: dtype | array
         the kind of integer data-type about which to get information.
 
     Returns
     -------
     out: iinfo object
-        an object having the following attributes:
+        an object with the following attributes:
 
-        - **bits**: *int*
-
-          number of bits occupied by the type.
-
-        - **max**: *int*
-
-          largest representable number.
-
-        - **min**: *int*
-
-          smallest representable number.
-
-        - **dtype**: dtype
-
-          integer data type.
-
-          .. versionadded:: 2022.12
+        - **bits** (*int*): number of bits occupied by the integer data type.
+        - **max** (*int*): largest representable integer.
+        - **min** (*int*): smallest representable integer.
+        - **dtype** (*dtype*): the integer data type.
     """
     if isinstance(type, array):
         type = type._data
@@ -223,20 +155,20 @@ def iinfo(type: Union[dtype, array], /) -> iinfo_object:
 
 
 def isdtype(
-    dtype: dtype, kind: Union[dtype, str, Tuple[Union[dtype, str], ...]]
+    dtype: dtype, kind: dtype | str | tuple[dtype | str, ...]
 ) -> bool:
     """
-    Returns a boolean indicating whether a provided dtype is of a specified data type "kind".
+    Returns a boolean indicating whether a provided dtype is of a specified data type ``kind``.
 
     Parameters
     ----------
     dtype: dtype
         the input dtype.
-    kind: Union[str, dtype, Tuple[Union[str, dtype], ...]]
+    kind: dtype | str | tuple[dtype | str, ...]
         data type kind.
 
-        -   If ``kind`` is a dtype, the function must return a boolean indicating whether the input ``dtype`` is equal to the dtype specified by ``kind``.
-        -   If ``kind`` is a string, the function must return a boolean indicating whether the input ``dtype`` is of a specified data type kind. The following dtype kinds must be supported:
+        -   If ``kind`` is a dtype, returns whether the input ``dtype`` is equal to the dtype specified by ``kind``.
+        -   If ``kind`` is a string, returns whether the input ``dtype`` is of a specified data type kind. The following dtype kinds are supported:
 
             -   ``'bool'``: boolean data types (e.g., ``bool``).
             -   ``'signed integer'``: signed integer data types (e.g., ``int8``, ``int16``, ``int32``, ``int64``).
@@ -246,22 +178,12 @@ def isdtype(
             -   ``'complex floating'``: complex floating-point data types (e.g., ``complex64``, ``complex128``).
             -   ``'numeric'``: numeric data types. Shorthand for ``('integral', 'real floating', 'complex floating')``.
 
-        -   If ``kind`` is a tuple, the tuple specifies a union of dtypes and/or kinds, and the function must return a boolean indicating whether the input ``dtype`` is either equal to a specified dtype or belongs to at least one specified data type kind.
-
-        .. note::
-           A conforming implementation of the array API standard is **not** limited to only including the dtypes described in this specification in the required data type kinds. For example, implementations supporting ``float16`` and ``bfloat16`` can include ``float16`` and ``bfloat16`` in the ``real floating`` data type kind. Similarly, implementations supporting ``int128`` can include ``int128`` in the ``signed integer`` data type kind.
-
-           In short, conforming implementations may extend data type kinds; however, data type kinds must remain consistent (e.g., only integer dtypes may belong to integer data type kinds and only floating-point dtypes may belong to floating-point data type kinds), and extensions must be clearly documented as such in library documentation.
+        -   If ``kind`` is a tuple, the tuple specifies a union of dtypes and/or kinds, and returns whether the input ``dtype`` is either equal to a specified dtype or belongs to at least one specified data type kind.
 
     Returns
     -------
     out: bool
         boolean indicating whether a provided dtype is of a specified data type kind.
-
-    Notes
-    -----
-
-    .. versionadded:: 2022.12
     """
     dtype = DType._to_backend_dtype(dtype)
     if isinstance(kind, tuple):
@@ -271,16 +193,16 @@ def isdtype(
     return backend.isdtype(dtype, kind)
 
 
-def result_type(*arrays_and_dtypes: Union[array, dtype]) -> dtype:
+def result_type(*arrays_and_dtypes: dtype | array) -> dtype:
     """
-    Returns the dtype that results from applying the type promotion rules (see :ref:`type-promotion`) to the arguments.
+    Returns the dtype that results from applying type promotion rules to the arguments.
 
     .. note::
-       If provided mixed dtypes (e.g., integer and floating-point), the returned dtype will be implementation-specific.
+       If provided mixed dtypes (e.g., integer and floating-point), the returned dtype is backend-dependent.
 
     Parameters
     ----------
-    arrays_and_dtypes: Union[array, dtype]
+    arrays_and_dtypes: dtype | array
         an arbitrary number of input arrays and/or dtypes.
 
     Returns

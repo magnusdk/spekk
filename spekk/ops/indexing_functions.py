@@ -1,9 +1,7 @@
 __all__ = ["take"]
 
-from typing import Union
-
 from spekk.ops._backend import backend
-from spekk.ops._types import Dim, Optional
+from spekk.ops._types import Dim
 from spekk.ops.array_object import array
 
 
@@ -12,41 +10,37 @@ def take(
     indices: array,
     /,
     *,
-    axis: Optional[Union[int, Dim]] = None,
+    axis: int | str | None = None,
 ) -> array:
     """
     Returns elements of an array along an axis.
 
-    .. note::
-       Conceptually, ``take(x, indices, axis=3)`` is equivalent to ``x[:,:,:,indices,...]``; however, explicit indexing via arrays of indices is not currently supported in this specification due to concerns regarding ``__setitem__`` and array mutation semantics.
+    Conceptually, ``take(x, indices, axis=3)`` is equivalent to
+    ``x[:,:,:,indices,...]``.
 
     Parameters
     ----------
     x: array
-        input array.
+        Input array.
     indices: array
-        array indices. The array must be one-dimensional and have an integer data type.
+        Array indices. Must be zero- or one-dimensional with an integer data
+        type. Out-of-bounds behavior is backend-dependent.
+    axis: int | str | None
+        Axis over which to select values. Can be a dimension name or an integer
+        position. If ``axis`` is negative, the axis is counted from the last
+        dimension.
 
-        .. note::
-           This specification does not require bounds checking. The behavior for out-of-bounds indices is left unspecified.
-
-    axis: Optional[int]
-        axis over which to select values. If ``axis`` is negative, the function must determine the axis along which to select values by counting from the last dimension.
-
-        If ``x`` is a one-dimensional array, providing an ``axis`` is optional; however, if ``x`` has more than one dimension, providing an ``axis`` is required.
+        If ``x`` is a one-dimensional array, providing an ``axis`` is optional;
+        however, if ``x`` has more than one dimension, providing an ``axis`` is
+        required.
 
     Returns
     -------
     out: array
-        an array having the same data type as ``x``. The output array must have the same rank (i.e., number of dimensions) as ``x`` and must have the same shape as ``x``, except for the axis specified by ``axis`` whose size must equal the number of elements in ``indices``.
-
-    Notes
-    -----
-
-    .. versionadded:: 2022.12
-
-    .. versionchanged:: 2023.12
-       Out-of-bounds behavior is explicitly left unspecified.
+        An array with the same data type and rank as ``x``. The shape is the
+        same as ``x`` except along ``axis``, whose size equals the number of
+        elements in ``indices``. If ``indices`` is zero-dimensional, the
+        specified axis is removed.
     """
 
 

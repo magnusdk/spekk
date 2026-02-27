@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Union
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, Literal
 
 import array_api_compat
 import numpy as np
@@ -12,7 +13,6 @@ from spekk.ops._backend import backend
 from spekk.ops._types import (
     ArrayLike,
     DeviceLike,
-    Dim,
     DTypeLike,
     Enum,
     PossiblyUndefinedDim,
@@ -36,11 +36,36 @@ class array:
         self: array,
         data: ArrayLike,
         /,
-        dims: list[PossiblyUndefinedDim] | None = None,
+        dims: list[str] | None = None,
         *,
-        dtype: Optional[DTypeLike] = None,
-        device: Optional[Device] = None,
+        dtype: DTypeLike | None = None,
+        device: Device | None = None,
     ):
+        """
+        Create a spekk array wrapping array-like data with optional named dimensions.
+
+        Parameters
+        ----------
+        data: ArrayLike
+            The array data. May be a Python scalar, nested list, NumPy array,
+            backend array, or another spekk array. If a spekk array is given,
+            its underlying data and dims are reused unless overridden.
+        dims: list[str] | None
+            Named dimensions for each axis. If ``None``, all axes receive
+            anonymous (undefined) dimensions. The number of entries must equal
+            the number of axes in ``data``. Dimension names must be unique.
+        dtype: DTypeLike | None
+            Target data type. If ``None``, the dtype is inferred from ``data``.
+        device: Device | None
+            Target device. If ``None``, the current backend's default device is
+            used.
+
+        Raises
+        ------
+        ValueError
+            If the length of ``dims`` does not match the number of axes in
+            ``data``, or if ``dims`` contains duplicate names.
+        """
         if device is None:
             device = ops.backend.device
 
@@ -96,8 +121,8 @@ class array:
 
         Returns
         -------
-        out: dtype
-            array data type.
+        out: DType
+            The data type of the array elements.
         """
         return DType(self._data.dtype)
 
@@ -108,8 +133,8 @@ class array:
 
         Returns
         -------
-        out: device
-            a ``device`` object (see :ref:`device-support`).
+        out: DeviceLike
+            The device on which the underlying backend array lives.
         """
         return self._data.device
 
@@ -118,16 +143,17 @@ class array:
         """
         Transpose of a matrix (or a stack of matrices).
 
-        If an array instance has fewer than two dimensions, an error should be raised.
+        Delegates to ``spekk.ops.matrix_transpose``. Raises an error if
+        the array has fewer than two dimensions.
 
         Returns
         -------
         out: array
-            array whose last two dimensions (axes) are permuted in reverse order relative to original array (i.e., for an array instance having shape ``(..., M, N)``, the returned array must have shape ``(..., N, M)``). The returned array must have the same data type as the original array.
+            An array whose last two dimensions are permuted in reverse order.
+            For shape ``(..., M, N)`` the result has shape ``(..., N, M)`` and
+            the same data type as ``self``.
         """
-        from spekk.ops import matrix_transpose
-
-        return matrix_transpose(self)
+        return ops.matrix_transpose(self)
 
     @property
     def ndim(self: array) -> int:
@@ -137,45 +163,31 @@ class array:
         Returns
         -------
         out: int
-            number of array dimensions (axes).
+            The number of dimensions (axes) in the array.
         """
         return self._data.ndim
 
     @property
-    def shape(self: array) -> Tuple[int, ...]:
+    def shape(self: array) -> tuple[int, ...]:
         """
         Array dimensions.
 
         Returns
         -------
-        out: Tuple[Optional[int], ...]
-            array dimensions. An array dimension must be ``None`` if and only if a dimension is unknown.
-
-
-        .. note::
-           For array libraries having graph-based computational models, array dimensions may be unknown due to data-dependent operations (e.g., boolean indexing; ``A[:, B > 0]``) and thus cannot be statically resolved without knowing array contents.
-
-        .. note::
-           The returned value should be a tuple; however, where warranted, an array library may choose to return a custom shape object. If an array library returns a custom shape object, the object must be immutable, must support indexing for dimension retrieval, and must behave similarly to a tuple.
+        out: tuple[int, ...]
+            A tuple of integers representing the size of each axis.
         """
         return self._data.shape
 
     @property
     def size(self: array) -> int:
         """
-        Number of elements in an array.
-
-        .. note::
-           This must equal the product of the array's dimensions.
+        Total number of elements in the array.
 
         Returns
         -------
-        out: Optional[int]
-            number of elements in an array. The returned value must be ``None`` if and only if one or more array dimensions are unknown.
-
-
-        .. note::
-           For array libraries having graph-based computational models, an array may have unknown dimensions due to data-dependent operations.
+        out: int
+            The product of all axis sizes (``math.prod(self.shape)``).
         """
         return math.prod(self._data.shape)
 
@@ -184,16 +196,16 @@ class array:
         """
         Transpose of the array.
 
-        The array instance must be two-dimensional. If the array instance is not two-dimensional, an error should be raised.
+        The array must be two-dimensional; raises ``ValueError`` otherwise.
+        To reverse all axes of a higher-dimensional array, use
+        ``spekk.ops.permute_dims``.
 
         Returns
         -------
         out: array
-            two-dimensional array whose first and last dimensions (axes) are permuted in reverse order relative to original array. The returned array must have the same data type as the original array.
-
-
-        .. note::
-           Limiting the transpose to two-dimensional arrays (matrices) deviates from the NumPy et al practice of reversing all axes for arrays having more than two-dimensions. This is intentional, as reversing all axes was found to be problematic (e.g., conflicting with the mathematical definition of a transpose which is limited to matrices; not operating on batches of matrices; et cetera). In order to reverse all axes, one is recommended to use the functional ``permute_dims`` interface found in this specification.
+            A two-dimensional array with its axes permuted in reverse order.
+            Has the same data type as ``self``, with dimension names swapped
+            accordingly.
         """
         if self.ndim != 2:
             raise ValueError(
@@ -204,151 +216,121 @@ class array:
 
     def __abs__(self: array, /) -> array:
         """
-        Calculates the absolute value for each element of an array instance.
+        Computes the element-wise absolute value. Delegates to
+        ``spekk.ops.abs``.
 
-        For real-valued input arrays, the element-wise result has the same magnitude as the respective element in ``x`` but has positive sign.
-
-        .. note::
-           For signed integer data types, the absolute value of the minimum representable integer is implementation-dependent.
+        For real-valued arrays the result has the same data type as ``self``.
+        For complex floating-point arrays the result is real-valued with
+        matching precision (e.g. ``complex64`` → ``float32``). For signed
+        integer types, the absolute value of the minimum representable integer
+        is backend-dependent.
 
         Parameters
         ----------
         self: array
-            array instance. Should have a numeric data type.
+            Array with a numeric data type.
 
         Returns
         -------
         out: array
-            an array containing the element-wise absolute value. If ``self`` has a real-valued data type, the returned array must have the same data type as ``self``. If ``self`` has a complex floating-point data type, the returned arrayed must have a real-valued floating-point data type whose precision matches the precision of ``self`` (e.g., if ``self`` is ``complex128``, then the returned array must have a ``float64`` data type).
-
-        Notes
-        -----
-
-        .. note::
-           Element-wise results, including special cases, must equal the results returned by the equivalent element-wise function :func:`~array_api.abs`.
-
-        .. versionchanged:: 2022.12
-            Added complex data type support.
+            An array containing the element-wise absolute values, preserving
+            named dimensions.
         """
-        from spekk.ops import abs
-
-        return abs(self)
+        return ops.abs(self)
 
     def __add__(self: array, other: array | int | float | complex, /) -> array:
         """
-        Calculates the sum for each element of an array instance with the respective element of the array ``other``.
+        Computes the element-wise sum. Delegates to ``spekk.ops.add``.
 
         Parameters
         ----------
         self: array
-            array instance (augend array). Should have a numeric data type.
-        other: Union[int, float, array]
-            addend array. Must be compatible with ``self`` (see :ref:`broadcasting`). Should have a numeric data type.
+            Augend array with a numeric data type.
+        other: int | float | complex | array
+            Addend. Must be broadcast-compatible with ``self`` and have a
+            numeric data type.
 
         Returns
         -------
         out: array
-            an array containing the element-wise sums. The returned array must have a data type determined by :ref:`type-promotion`.
-
-        Notes
-        -----
-
-        .. note::
-           Element-wise results, including special cases, must equal the results returned by the equivalent element-wise function :func:`~array_api.add`.
-
-        .. versionchanged:: 2022.12
-            Added complex data type support.
+            An array containing the element-wise sums. The data type is
+            determined by type-promotion rules.
         """
-        from spekk.ops import add
-
-        return add(self, other)
+        return ops.add(self, other)
 
     def __and__(self: array, other: array | int, /) -> array:
         """
-        Evaluates ``self_i & other_i`` for each element of an array instance with the respective element of the array ``other``.
+        Computes the element-wise bitwise AND (``self_i & other_i``). Delegates
+        to ``spekk.ops.bitwise_and``.
 
         Parameters
         ----------
         self: array
-            array instance. Should have an integer or boolean data type.
-        other: Union[int, bool, array]
-            other array. Must be compatible with ``self`` (see :ref:`broadcasting`). Should have an integer or boolean data type.
+            Array with an integer or boolean data type.
+        other: int | array
+            Operand. Must be broadcast-compatible with ``self`` and have an
+            integer or boolean data type.
 
         Returns
         -------
         out: array
-            an array containing the element-wise results. The returned array must have a data type determined by :ref:`type-promotion`.
-
-
-        .. note::
-           Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.bitwise_and`.
+            An array containing the element-wise bitwise AND results. The data
+            type is determined by type-promotion rules.
         """
-        from spekk.ops import bitwise_and
+        return ops.bitwise_and(self, other)
 
-        return bitwise_and(self, other)
-
-    def __array_namespace__(
-        self: array, /, *, api_version: Optional[str] = None
-    ) -> Any:
+    def __array_namespace__(self: array, /, *, api_version: str | None = None) -> Any:
         """
-        Returns an object that has all the array API functions on it.
+        Returns the ``spekk.ops`` namespace, which implements the Python Array
+        API standard.
 
         Parameters
         ----------
-        self: array
-            array instance.
-        api_version: Optional[str]
-            string representing the version of the array API specification to be returned, in ``'YYYY.MM'`` form, for example, ``'2020.10'``. If it is ``None``, it should return the namespace corresponding to latest version of the array API specification.  If the given version is invalid or not implemented for the given module, an error should be raised. Default: ``None``.
+        api_version: str | None
+            Array API version string in ``'YYYY.MM'`` form. Currently only
+            ``'2023.12'`` is supported. Pass ``None`` to get the latest
+            supported version. Raises ``NotImplementedError`` for unsupported
+            versions. Default: ``None``.
 
         Returns
         -------
         out: Any
-            an object representing the array API namespace. It should have every top-level function defined in the specification as an attribute. It may contain other public names as well, but it is recommended to only include those names that are part of the specification.
+            The ``spekk.ops`` module, providing all Array API top-level
+            functions.
         """
         if api_version != "2023.12" and api_version is not None:
             raise NotImplementedError(
                 f"API version '{api_version}' not supported. Only array API version '2023.12' is supported."
             )
-        import spekk.ops
-
-        return spekk.ops
+        return ops
 
     def __bool__(self: array, /) -> bool:
         """
-        Converts a zero-dimensional array to a Python ``bool`` object.
+        Converts a zero-dimensional array to a Python ``bool``.
 
         Parameters
         ----------
         self: array
-            zero-dimensional array instance.
+            A zero-dimensional array.
 
         Returns
         -------
         out: bool
-            a Python ``bool`` object representing the single element of the array.
+            The single element of the array as a Python ``bool``.
 
         Notes
         -----
+        **Special cases** (real-valued floating-point)
 
-        **Special cases**
+        - ``NaN`` → ``True``
+        - ``+infinity`` or ``-infinity`` → ``True``
+        - ``+0`` or ``-0`` → ``False``
 
-        For real-valued floating-point operands,
+        For complex operands, the result is
+        ``bool(real(self)) or bool(imag(self))``.
 
-        - If ``self`` is ``NaN``, the result is ``True``.
-        - If ``self`` is either ``+infinity`` or ``-infinity``, the result is ``True``.
-        - If ``self`` is either ``+0`` or ``-0``, the result is ``False``.
-
-        For complex floating-point operands, special cases must be handled as if the operation is implemented as the logical OR of ``bool(real(self))`` and ``bool(imag(self))``.
-
-        **Lazy implementations**
-
-        The Python language requires the return value to be of type ``bool``. Lazy implementations are therefore not able to return any kind of lazy/delayed object here and should raise a ``ValueError`` instead.
-
-        .. versionchanged:: 2022.12
-            Added boolean and complex data type support.
-
-        .. versionchanged:: 2023.12
-            Allowed lazy implementations to error.
+        Backends that use lazy/graph-based evaluation may raise
+        ``ValueError`` if the value cannot be materialized.
         """
         return self._data.__bool__()
 
@@ -364,7 +346,7 @@ class array:
         Returns
         -------
         out: complex
-            a Python ``complex`` object representing the single element of the array instance.
+            a Python ``complex`` object representing the single element of the array.
 
         Notes
         -----
@@ -382,15 +364,6 @@ class array:
         - If ``self`` is ``+infinity``, the result is ``+infinity + 0j``.
         - If ``self`` is ``-infinity``, the result is ``-infinity + 0j``.
         - If ``self`` is a finite number, the result is ``self + 0j``.
-
-        **Lazy implementations**
-
-        The Python language requires the return value to be of type ``complex``. Lazy implementations are therefore not able to return any kind of lazy/delayed object here and should raise a ``ValueError`` instead.
-
-        .. versionadded:: 2022.12
-
-        .. versionchanged:: 2023.12
-            Allowed lazy implementations to error.
         """
         return self._data.__complex__()
 
@@ -398,181 +371,77 @@ class array:
         self: array,
         /,
         *,
-        stream: Optional[Union[int, Any]] = None,
-        max_version: Optional[tuple[int, int]] = None,
-        dl_device: Optional[tuple[Enum, int]] = None,
-        copy: Optional[bool] = None,
+        stream: int | Any | None = None,
+        max_version: tuple[int, int] | None = None,
+        dl_device: tuple[Enum, int] | None = None,
+        copy: bool | None = None,
     ) -> PyCapsule:
         """
-        Exports the array for consumption by :func:`~array_api.from_dlpack` as a DLPack capsule.
+        Exports the array as a DLPack capsule for use with ``from_dlpack``.
 
         Parameters
         ----------
         self: array
             array instance.
-        stream: Optional[Union[int, Any]]
-            for CUDA and ROCm, a Python integer representing a pointer to a stream, on devices that support streams. ``stream`` is provided by the consumer to the producer to instruct the producer to ensure that operations can safely be performed on the array (e.g., by inserting a dependency between streams via "wait for event"). The pointer must be an integer larger than or equal to ``-1`` (see below for allowed values on each platform). If ``stream`` is ``-1``, the value may be used by the consumer to signal "producer must not perform any synchronization". The ownership of the stream stays with the consumer. On CPU and other device types without streams, only ``None`` is accepted.
-
-            For other device types which do have a stream, queue, or similar synchronization/ordering mechanism, the most appropriate type to use for ``stream`` is not yet determined. E.g., for SYCL one may want to use an object containing an in-order ``cl::sycl::queue``. This is allowed when libraries agree on such a convention, and may be standardized in a future version of this API standard.
-
-            .. note::
-                Support for a ``stream`` value other than ``None`` is optional and implementation-dependent.
+        stream: int | Any | None
+            for CUDA and ROCm, a Python integer representing a pointer to a stream.
+            ``stream`` instructs the producer to ensure operations can safely be
+            performed on the array. The pointer must be an integer >= ``-1``.
+            If ``stream`` is ``-1``, no synchronization is performed by the producer.
+            On CPU and other devices without streams, only ``None`` is accepted.
+            Support for non-``None`` values is backend-dependent.
 
             Device-specific values of ``stream`` for CUDA:
 
-            - ``None``: producer must assume the legacy default stream (default).
+            - ``None``: legacy default stream (default).
             - ``1``: the legacy default stream.
             - ``2``: the per-thread default stream.
-            - ``> 2``: stream number represented as a Python integer.
-            - ``0`` is disallowed due to its ambiguity: ``0`` could mean either ``None``, ``1``, or ``2``.
+            - ``> 2``: stream number as a Python integer.
+            - ``0`` is disallowed (ambiguous).
 
             Device-specific values of ``stream`` for ROCm:
 
-            - ``None``: producer must assume the legacy default stream (default).
+            - ``None``: legacy default stream (default).
             - ``0``: the default stream.
-            - ``> 2``: stream number represented as a Python integer.
-            - Using ``1`` and ``2`` is not supported.
+            - ``> 2``: stream number as a Python integer.
+            - ``1`` and ``2`` are not supported.
 
-            .. note::
-                When ``dl_device`` is provided explicitly, ``stream`` must be a valid
-                construct for the specified device type. In particular, when ``kDLCPU``
-                is in use, ``stream`` must be ``None`` and a synchronization must be
-                performed to ensure data safety.
-
-            .. admonition:: Tip
-                :class: important
-
-                It is recommended that implementers explicitly handle streams. If
-                they use the legacy default stream, specifying ``1`` (CUDA) or ``0``
-                (ROCm) is preferred. ``None`` is a safe default for developers who do
-                not want to think about stream handling at all, potentially at the
-                cost of more synchronizations than necessary.
-        max_version: Optional[tuple[int, int]]
-            the maximum DLPack version that the *consumer* (i.e., the caller of
-            ``__dlpack__``) supports, in the form of a 2-tuple ``(major, minor)``.
-            This method may return a capsule of version ``max_version`` (recommended
-            if it does support that), or of a different version.
-            This means the consumer must verify the version even when
-            `max_version` is passed.
-        dl_device: Optional[tuple[enum.Enum, int]]
-            the DLPack device type. Default is ``None``, meaning the exported capsule
-            should be on the same device as ``self`` is. When specified, the format
-            must be a 2-tuple, following that of the return value of :meth:`array.__dlpack_device__`.
-            If the device type cannot be handled by the producer, this function must
-            raise ``BufferError``.
-
-            The v2023.12 standard only mandates that a compliant library should offer a way for
-            ``__dlpack__`` to return a capsule referencing an array whose underlying memory is
-            accessible to the Python interpreter (represented by the ``kDLCPU`` enumerator in DLPack).
-            If a copy must be made to enable this support but ``copy`` is set to ``False``, the
-            function must raise ``ValueError``.
-
-            Other device kinds will be considered for standardization in a future version of this
-            API standard.
-        copy: Optional[bool]
-            boolean indicating whether or not to copy the input. If ``True``, the
-            function must always copy (performed by the producer). If ``False``, the
-            function must never copy, and raise a ``BufferError`` in case a copy is
-            deemed necessary (e.g. if a cross-device data movement is requested, and
-            it is not possible without a copy). If ``None``, the function must reuse
-            the existing memory buffer if possible and copy otherwise. Default: ``None``.
-
-            When a copy happens, the ``DLPACK_FLAG_BITMASK_IS_COPIED`` flag must be set.
-
-            .. note::
-                If a copy happens, and if the consumer-provided ``stream`` and ``dl_device``
-                can be understood by the producer, the copy must be performed over ``stream``.
+            When ``dl_device`` is provided, ``stream`` must be valid for that
+            device type. For ``kDLCPU``, ``stream`` must be ``None``.
+        max_version: tuple[int, int] | None
+            the maximum DLPack version the consumer supports, as ``(major, minor)``.
+            The returned capsule may be of this version or a different one; the
+            consumer must verify the version regardless.
+        dl_device: tuple[Enum, int] | None
+            the DLPack device type to export to, as ``(device_type, device_id)``
+            (same format as ``__dlpack_device__``). ``None`` means export on the
+            same device as ``self``. If the device type is not supported, raises
+            ``BufferError``. If a copy is required to reach ``kDLCPU`` but
+            ``copy=False``, raises ``ValueError``.
+        copy: bool | None
+            whether to copy the array. If ``True``, always copies. If ``False``,
+            never copies and raises ``BufferError`` if a copy would be required.
+            If ``None``, reuses existing memory if possible, otherwise copies.
+            Default: ``None``.
 
         Returns
         -------
         capsule: PyCapsule
-            a DLPack capsule for the array. See :ref:`data-interchange` for details.
+            a DLPack capsule for the array.
 
         Raises
         ------
         BufferError
-            Implementations should raise ``BufferError`` when the data cannot
-            be exported as DLPack (e.g., incompatible dtype or strides). Other
-            errors are raised when export fails for other reasons (e.g., incorrect
-            arguments passed or out of memory).
-
-        Notes
-        -----
-        The DLPack version scheme is SemVer, where the major DLPack versions
-        represent ABI breaks, and minor versions represent ABI-compatible additions
-        (e.g., new enum values for new data types or device types).
-
-        The ``max_version`` keyword was introduced in v2023.12, and goes
-        together with the ``DLManagedTensorVersioned`` struct added in DLPack
-        1.0. This keyword may not be used by consumers until a later time after
-        introduction, because producers may implement the support at a different
-        point in time.
-
-        It is recommended for the producer to use this logic in the implementation
-        of ``__dlpack__``:
-
-        .. code:: python
-
-            if max_version is None:
-                # Keep and use the DLPack 0.X implementation
-                # Note: from March 2025 onwards (but ideally as late as
-                # possible), it's okay to raise BufferError here
-            else:
-                # We get to produce `DLManagedTensorVersioned` now. Note that
-                # our_own_dlpack_version is the max version that the *producer*
-                # supports and fills in the `DLManagedTensorVersioned::version`
-                # field
-                if max_version >= our_own_dlpack_version:
-                    # Consumer understands us, just return a Capsule with our max version
-                elif max_version[0] == our_own_dlpack_version[0]:
-                    # major versions match, we should still be fine here -
-                    # return our own max version
-                else:
-                    # if we're at a higher major version internally, did we
-                    # keep an implementation of the older major version around?
-                    # For example, if the producer is on DLPack 1.x and the consumer
-                    # is 0.y, can the producer still export a capsule containing
-                    # DLManagedTensor and not DLManagedTensorVersioned?
-                    # If so, use that. Else, the producer should raise a BufferError
-                    # here to tell users that the consumer's max_version is too
-                    # old to allow the data exchange to happen.
-
-        And this logic for the consumer in :func:`~array_api.from_dlpack`:
-
-        .. code:: python
-
-            try:
-                x.__dlpack__(max_version=(1, 0), ...)
-                # if it succeeds, store info from the capsule named "dltensor_versioned",
-                # and need to set the name to "used_dltensor_versioned" when we're done
-            except TypeError:
-                x.__dlpack__(...)
-
-        This logic is also applicable to handling of the new ``dl_device`` and ``copy``
-        keywords.
-
-        DLPack 1.0 added a flag to indicate that the array is read-only
-        (``DLPACK_FLAG_BITMASK_READ_ONLY``). A consumer that does not support
-        read-only arrays should ignore this flag (this is preferred over
-        raising an exception; the user is then responsible for ensuring the
-        memory isn't modified).
-
-        .. versionchanged:: 2022.12
-           Added BufferError.
-
-        .. versionchanged:: 2023.12
-           Added the ``max_version``, ``dl_device``, and ``copy`` keywords.
-
-        .. versionchanged:: 2023.12
-           Added recommendation for handling read-only arrays.
+            Raised when the data cannot be exported as DLPack (e.g., incompatible
+            dtype or strides), or when ``copy=False`` but a copy is required.
         """
         return self._data.__dlpack__(
             stream=stream, max_version=max_version, dl_device=dl_device, copy=copy
         )
 
-    def __dlpack_device__(self: array, /) -> Tuple[Enum, int]:
+    def __dlpack_device__(self: array, /) -> tuple[Enum, int]:
         """
-        Returns device type and device ID in DLPack format. Meant for use within :func:`~array_api.from_dlpack`.
+        Returns device type and device ID in DLPack format, for use with ``from_dlpack``.
 
         Parameters
         ----------
@@ -581,7 +450,7 @@ class array:
 
         Returns
         -------
-        device: Tuple[Enum, int]
+        device: tuple[Enum, int]
             a tuple ``(device_type, device_id)`` in DLPack format. Valid device type enum members are:
 
             ::
@@ -601,44 +470,36 @@ class array:
 
     def __eq__(self: array, other: array | int | float | complex, /) -> array:  # type: ignore
         r"""
-        Computes the truth value of ``self_i == other_i`` for each element of an array instance with the respective element of the array ``other``.
+        Computes the truth value of ``self_i == other_i`` for each element of the array.
 
         Parameters
         ----------
         self: array
             array instance. May have any data type.
-        other: Union[int, float, bool, array]
-            other array. Must be compatible with ``self`` (see :ref:`broadcasting`). May have any data type.
+        other: array | int | float | complex
+            other array. Must be broadcast-compatible with ``self``. May have any data type.
 
         Returns
         -------
         out: array
-            an array containing the element-wise results. The returned array must have a data type of ``bool``.
-
-
-        .. note::
-           Element-wise results, including special cases, must equal the results returned by the equivalent element-wise function :func:`~array_api.equal`.
+            an array containing the element-wise results. The returned array has a data type of ``bool``.
         """
-        from spekk.ops import equal
-
-        return equal(self, other)
+        return ops.equal(self, other)
 
     def __float__(self: array, /) -> float:
         """
         Converts a zero-dimensional array to a Python ``float`` object.
 
-        .. note::
-           Casting integer values outside the representable bounds of Python's float type is not specified and is implementation-dependent.
-
         Parameters
         ----------
         self: array
-            zero-dimensional array instance. Should have a real-valued or boolean data type. If ``self`` has a complex floating-point data type, the function must raise a ``TypeError``.
+            zero-dimensional array instance. Has a real-valued or boolean data type.
+            If ``self`` has a complex floating-point data type, the function must raise a ``TypeError``.
 
         Returns
         -------
         out: float
-            a Python ``float`` object representing the single element of the array instance.
+            a Python ``float`` object representing the single element of the array.
 
         Notes
         -----
@@ -649,101 +510,69 @@ class array:
 
         - If ``self`` is ``True``, the result is ``1``.
         - If ``self`` is ``False``, the result is ``0``.
-
-        **Lazy implementations**
-
-        The Python language requires the return value to be of type ``float``. Lazy implementations are therefore not able to return any kind of lazy/delayed object here and should raise a ``ValueError`` instead.
-
-        .. versionchanged:: 2022.12
-            Added boolean and complex data type support.
-
-        .. versionchanged:: 2023.12
-            Allowed lazy implementations to error.
         """
         return self._data.__float__()
 
     def __floordiv__(self: array, other: array | int | float, /) -> array:
         """
-        Evaluates ``self_i // other_i`` for each element of an array instance with the respective element of the array ``other``.
-
-        .. note::
-           For input arrays which promote to an integer data type, the result of division by zero is unspecified and thus implementation-defined.
+        Evaluates ``self_i // other_i`` for each element of the array.
 
         Parameters
         ----------
         self: array
-            array instance. Should have a real-valued data type.
-        other: Union[int, float, array]
-            other array. Must be compatible with ``self`` (see :ref:`broadcasting`). Should have a real-valued data type.
+            array instance. Has a real-valued data type.
+        other: int | float | array
+            other array. Must be broadcast-compatible with ``self``. Has a real-valued data type.
 
         Returns
         -------
         out: array
-            an array containing the element-wise results. The returned array must have a data type determined by :ref:`type-promotion`.
-
-
-        .. note::
-           Element-wise results, including special cases, must equal the results returned by the equivalent element-wise function :func:`~array_api.floor_divide`.
+            an array containing the element-wise results. The returned array has a data type determined by type promotion.
         """
-        from spekk.ops import floor_divide
-
-        return floor_divide(self, other)
+        return ops.floor_divide(self, other)
 
     def __ge__(self: array, other: array | int | float, /) -> array:
         """
-        Computes the truth value of ``self_i >= other_i`` for each element of an array instance with the respective element of the array ``other``.
-
-        .. note::
-           For backward compatibility, conforming implementations may support complex numbers; however, inequality comparison of complex numbers is unspecified and thus implementation-dependent (see :ref:`complex-number-ordering`).
+        Computes the truth value of ``self_i >= other_i`` for each element of the array.
 
         Parameters
         ----------
         self: array
-            array instance. Should have a real-valued data type.
-        other: Union[int, float, array]
-            other array. Must be compatible with ``self`` (see :ref:`broadcasting`). Should have a real-valued data type.
+            array instance. Has a real-valued data type.
+        other: int | float | array
+            other array. Must be broadcast-compatible with ``self``. Has a real-valued data type.
 
         Returns
         -------
         out: array
-            an array containing the element-wise results. The returned array must have a data type of ``bool``.
-
-
-        .. note::
-           Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.greater_equal`.
+            an array containing the element-wise results. The returned array has a data type of ``bool``.
         """
-        from spekk.ops import greater_equal
-
-        return greater_equal(self, other)
+        return ops.greater_equal(self, other)
 
     def __getitem__(
         self: array,
-        key: Union[
-            int,
-            slice,
-            ellipsis,
-            None,
-            Tuple[Union[int, slice, ellipsis, None], ...],
-            array,
-        ],
+        key: int
+        | slice
+        | ellipsis
+        | None
+        | tuple[int | slice | ellipsis | None, ...]
+        | array,
         /,
     ) -> array:
         """
         Returns ``self[key]``.
 
-        See :ref:`indexing` for details on supported indexing semantics.
-
         Parameters
         ----------
         self: array
             array instance.
-        key: Union[int, slice, ellipsis, None, Tuple[Union[int, slice, ellipsis, None], ...], array]
+        key: int | slice | ellipsis | None | tuple[int | slice | ellipsis | None, ...] | array
             index key.
 
         Returns
         -------
         out: array
-            an array containing the accessed value(s). The returned array must have the same data type as ``self``.
+            an array containing the accessed value(s) with the same data type as ``self``.
         """
         from spekk.ops._indexing import getitem
 
@@ -751,57 +580,37 @@ class array:
 
     def __gt__(self: array, other: array | int | float, /) -> array:
         """
-        Computes the truth value of ``self_i > other_i`` for each element of an array instance with the respective element of the array ``other``.
-
-        .. note::
-           For backward compatibility, conforming implementations may support complex numbers; however, inequality comparison of complex numbers is unspecified and thus implementation-dependent (see :ref:`complex-number-ordering`).
+        Computes the truth value of ``self_i > other_i`` for each element of the array.
 
         Parameters
         ----------
         self: array
-            array instance. Should have a real-valued data type.
-        other: Union[int, float, array]
-            other array. Must be compatible with ``self`` (see :ref:`broadcasting`). Should have a real-valued data type.
+            array instance. Has a real-valued data type.
+        other: int | float | array
+            other array. Must be broadcast-compatible with ``self``. Has a real-valued data type.
 
         Returns
         -------
         out: array
-            an array containing the element-wise results. The returned array must have a data type of ``bool``.
-
-
-        .. note::
-           Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.greater`.
+            an array containing the element-wise results. The returned array has a data type of ``bool``.
         """
-        from spekk.ops import greater
-
-        return greater(self, other)
+        return ops.greater(self, other)
 
     def __index__(self: array, /) -> int:
         """
         Converts a zero-dimensional integer array to a Python ``int`` object.
 
-        .. note::
-           This method is called to implement `operator.index() <https://docs.python.org/3/reference/datamodel.html#object.__index__>`_. See also `PEP 357 <https://www.python.org/dev/peps/pep-0357/>`_.
+        Called to implement ``operator.index()``.
 
         Parameters
         ----------
         self: array
-            zero-dimensional array instance. Should have an integer data type. If ``self`` has a floating-point data type, the function must raise a ``TypeError``.
+            Zero-dimensional array instance. Must have an integer data type. If ``self`` has a floating-point data type, raises ``TypeError``.
 
         Returns
         -------
         out: int
-            a Python ``int`` object representing the single element of the array instance.
-
-        Notes
-        -----
-
-        **Lazy implementations**
-
-        The Python language requires the return value to be of type ``int``. Lazy implementations are therefore not able to return any kind of lazy/delayed object here and should raise a ``ValueError`` instead.
-
-        .. versionchanged:: 2023.12
-            Allowed lazy implementations to error.
+            A Python ``int`` representing the single element of the array.
         """
         return self._data.__index__()
 
@@ -812,12 +621,13 @@ class array:
         Parameters
         ----------
         self: array
-            zero-dimensional array instance. Should have a real-valued or boolean data type. If ``self`` has a complex floating-point data type, the function must raise a ``TypeError``.
+            Zero-dimensional array instance. Must have a boolean or real-valued data type.
+            If ``self`` has a complex floating-point data type, raises ``TypeError``.
 
         Returns
         -------
         out: int
-            a Python ``int`` object representing the single element of the array instance.
+            A Python ``int`` representing the single element of the array.
 
         Notes
         -----
@@ -833,26 +643,8 @@ class array:
 
         - If ``self`` is a finite number, the result is the integer part of ``self``.
         - If ``self`` is ``-0``, the result is ``0``.
-
-        **Raises**
-
-        For floating-point operands,
-
-        - If ``self`` is either ``+infinity`` or ``-infinity``, raise ``OverflowError``.
-        - If ``self`` is ``NaN``, raise ``ValueError``.
-
-        Notes
-        -----
-
-        **Lazy implementations**
-
-        The Python language requires the return value to be of type ``int``. Lazy implementations are therefore not able to return any kind of lazy/delayed object here and should raise a ``ValueError`` instead.
-
-        .. versionchanged:: 2022.12
-            Added boolean and complex data type support.
-
-        .. versionchanged:: 2023.12
-            Allowed lazy implementations to error.
+        - If ``self`` is either ``+infinity`` or ``-infinity``, raises ``OverflowError``.
+        - If ``self`` is ``NaN``, raises ``ValueError``.
         """
         return self._data.__int__()
 
@@ -863,295 +655,206 @@ class array:
         Parameters
         ----------
         self: array
-            array instance. Should have an integer or boolean data type.
+            Array instance. Has an integer or boolean data type.
 
         Returns
         -------
         out: array
-            an array containing the element-wise results. The returned array must have the same data type as `self`.
-
-
-        .. note::
-           Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.bitwise_invert`.
+            An array containing the element-wise results with the same data type as ``self``.
         """
-        from spekk.ops import bitwise_invert
+        return ops.bitwise_invert(self)
 
-        return bitwise_invert(self)
-
-    def __le__(self: array, other: array | int | float, /) -> array:
+    def __le__(self: array, other: int | float | array, /) -> array:
         """
         Computes the truth value of ``self_i <= other_i`` for each element of an array instance with the respective element of the array ``other``.
 
-        .. note::
-           For backward compatibility, conforming implementations may support complex numbers; however, inequality comparison of complex numbers is unspecified and thus implementation-dependent (see :ref:`complex-number-ordering`).
-
         Parameters
         ----------
         self: array
-            array instance. Should have a real-valued data type.
-        other: Union[int, float, array]
-            other array. Must be compatible with ``self`` (see :ref:`broadcasting`). Should have a real-valued data type.
+            Array instance. Has a real-valued data type.
+        other: int | float | array
+            Other array. Must be broadcast-compatible with ``self``. Has a real-valued data type.
 
         Returns
         -------
         out: array
-            an array containing the element-wise results. The returned array must have a data type of ``bool``.
-
-
-        .. note::
-           Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.less_equal`.
+            An array containing the element-wise results with a boolean data type.
         """
-        from spekk.ops import less_equal
+        return ops.less_equal(self, other)
 
-        return less_equal(self, other)
-
-    def __lshift__(self: array, other: Union[int, array], /) -> array:
+    def __lshift__(self: array, other: int | array, /) -> array:
         """
-        Evaluates ``self_i << other_i`` for each element of an array instance with the respective element  of the array ``other``.
+        Evaluates ``self_i << other_i`` for each element of an array instance with the respective element of the array ``other``.
 
         Parameters
         ----------
         self: array
-            array instance. Should have an integer data type.
-        other: Union[int, array]
-            other array. Must be compatible with ``self`` (see :ref:`broadcasting`). Should have an integer data type. Each element must be greater than or equal to ``0``.
+            Array instance. Has an integer data type.
+        other: int | array
+            Other array. Must be broadcast-compatible with ``self``. Has an integer data type. Each element must be greater than or equal to ``0``.
 
         Returns
         -------
         out: array
-            an array containing the element-wise results. The returned array must have the same data type as ``self``.
-
-
-        .. note::
-           Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.bitwise_left_shift`.
+            An array containing the element-wise results with the same data type as ``self``.
         """
-        from spekk.ops import bitwise_left_shift
+        return ops.bitwise_left_shift(self, other)
 
-        return bitwise_left_shift(self, other)
-
-    def __lt__(self: array, other: array | int | float, /) -> array:
+    def __lt__(self: array, other: int | float | array, /) -> array:
         """
         Computes the truth value of ``self_i < other_i`` for each element of an array instance with the respective element of the array ``other``.
 
-        .. note::
-           For backward compatibility, conforming implementations may support complex numbers; however, inequality comparison of complex numbers is unspecified and thus implementation-dependent (see :ref:`complex-number-ordering`).
-
         Parameters
         ----------
         self: array
-            array instance. Should have a real-valued data type.
-        other: Union[int, float, array]
-            other array. Must be compatible with ``self`` (see :ref:`broadcasting`). Should have a real-valued data type.
+            Array instance. Has a real-valued data type.
+        other: int | float | array
+            Other array. Must be broadcast-compatible with ``self``. Has a real-valued data type.
 
         Returns
         -------
         out: array
-            an array containing the element-wise results. The returned array must have a data type of ``bool``.
-
-
-        .. note::
-           Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.less`.
+            An array containing the element-wise results with a boolean data type.
         """
-        from spekk.ops import less
-
-        return less(self, other)
+        return ops.less(self, other)
 
     def __matmul__(self: array, other: array, /) -> array:
         """
-        Computes the matrix product.
-
-        .. note::
-           The ``matmul`` function must implement the same semantics as the built-in ``@`` operator (see `PEP 465 <https://www.python.org/dev/peps/pep-0465>`_).
+        Computes the matrix product (implements the ``@`` operator).
 
         Parameters
         ----------
         self: array
-            array instance. Should have a numeric data type. Must have at least one dimension. If ``self`` is one-dimensional having shape ``(M,)`` and ``other`` has more than one dimension, ``self`` must be promoted to a two-dimensional array by prepending ``1`` to its dimensions (i.e., must have shape ``(1, M)``). After matrix multiplication, the prepended dimensions in the returned array must be removed. If ``self`` has more than one dimension (including after vector-to-matrix promotion), ``shape(self)[:-2]`` must be compatible with ``shape(other)[:-2]`` (after vector-to-matrix promotion) (see :ref:`broadcasting`). If ``self`` has shape ``(..., M, K)``, the innermost two dimensions form matrices on which to perform matrix multiplication.
+            Array instance. Has a numeric data type. Must have at least one dimension.
+            If ``self`` is one-dimensional with shape ``(M,)`` and ``other`` has more than one
+            dimension, ``self`` is treated as shape ``(1, M)`` and the leading dimension is removed
+            from the result. If ``self`` has shape ``(..., M, K)``, the innermost two dimensions
+            form the matrices to multiply. ``shape(self)[:-2]`` must be broadcast-compatible with
+            ``shape(other)[:-2]``.
         other: array
-            other array. Should have a numeric data type. Must have at least one dimension. If ``other`` is one-dimensional having shape ``(N,)`` and ``self`` has more than one dimension, ``other`` must be promoted to a two-dimensional array by appending ``1`` to its dimensions (i.e., must have shape ``(N, 1)``). After matrix multiplication, the appended dimensions in the returned array must be removed. If ``other`` has more than one dimension (including after vector-to-matrix promotion), ``shape(other)[:-2]`` must be compatible with ``shape(self)[:-2]`` (after vector-to-matrix promotion) (see :ref:`broadcasting`). If ``other`` has shape ``(..., K, N)``, the innermost two dimensions form matrices on which to perform matrix multiplication.
-
-
-        .. note::
-           If either ``x1`` or ``x2`` has a complex floating-point data type, neither argument must be complex-conjugated or transposed. If conjugation and/or transposition is desired, these operations should be explicitly performed prior to computing the matrix product.
+            Other array. Has a numeric data type. Must have at least one dimension.
+            If ``other`` is one-dimensional with shape ``(N,)`` and ``self`` has more than one
+            dimension, ``other`` is treated as shape ``(N, 1)`` and the trailing dimension is
+            removed from the result. If ``other`` has shape ``(..., K, N)``, the innermost two
+            dimensions form the matrices to multiply. ``shape(other)[:-2]`` must be
+            broadcast-compatible with ``shape(self)[:-2]``.
 
         Returns
         -------
         out: array
-            -   if both ``self`` and ``other`` are one-dimensional arrays having shape ``(N,)``, a zero-dimensional array containing the inner product as its only element.
-            -   if ``self`` is a two-dimensional array having shape ``(M, K)`` and ``other`` is a two-dimensional array having shape ``(K, N)``, a two-dimensional array containing the `conventional matrix product <https://en.wikipedia.org/wiki/Matrix_multiplication>`_ and having shape ``(M, N)``.
-            -   if ``self`` is a one-dimensional array having shape ``(K,)`` and ``other`` is an array having shape ``(..., K, N)``, an array having shape ``(..., N)`` (i.e., prepended dimensions during vector-to-matrix promotion must be removed) and containing the `conventional matrix product <https://en.wikipedia.org/wiki/Matrix_multiplication>`_.
-            -   if ``self`` is an array having shape ``(..., M, K)`` and ``other`` is a one-dimensional array having shape ``(K,)``, an array having shape ``(..., M)`` (i.e., appended dimensions during vector-to-matrix promotion must be removed) and containing the `conventional matrix product <https://en.wikipedia.org/wiki/Matrix_multiplication>`_.
-            -   if ``self`` is a two-dimensional array having shape ``(M, K)`` and ``other`` is an array having shape ``(..., K, N)``, an array having shape ``(..., M, N)`` and containing the `conventional matrix product <https://en.wikipedia.org/wiki/Matrix_multiplication>`_ for each stacked matrix.
-            -   if ``self`` is an array having shape ``(..., M, K)`` and ``other`` is a two-dimensional array having shape ``(K, N)``, an array having shape ``(..., M, N)`` and containing the `conventional matrix product <https://en.wikipedia.org/wiki/Matrix_multiplication>`_ for each stacked matrix.
-            -   if either ``self`` or ``other`` has more than two dimensions, an array having a shape determined by :ref:`broadcasting` ``shape(self)[:-2]`` against ``shape(other)[:-2]`` and containing the `conventional matrix product <https://en.wikipedia.org/wiki/Matrix_multiplication>`_ for each stacked matrix.
-            -   The returned array must have a data type determined by :ref:`type-promotion`.
+            The matrix product result. Shape depends on the dimensionality of the inputs:
 
-        Notes
-        -----
+            - Both 1-D with shape ``(N,)``: a zero-dimensional array (inner product).
+            - ``self`` is ``(M, K)`` and ``other`` is ``(K, N)``: shape ``(M, N)``.
+            - ``self`` is ``(K,)`` and ``other`` is ``(..., K, N)``: shape ``(..., N)``.
+            - ``self`` is ``(..., M, K)`` and ``other`` is ``(K,)``: shape ``(..., M)``.
+            - Otherwise: batched result with shape from broadcasting ``shape(self)[:-2]``
+              against ``shape(other)[:-2]``.
 
-        .. note::
-           Results must equal the results returned by the equivalent function :func:`~array_api.matmul`.
+            The data type is determined by type promotion.
 
-        **Raises**
-
-        - if either ``self`` or ``other`` is a zero-dimensional array.
-        - if ``self`` is a one-dimensional array having shape ``(K,)``, ``other`` is a one-dimensional array having shape ``(L,)``, and ``K != L``.
-        - if ``self`` is a one-dimensional array having shape ``(K,)``, ``other`` is an array having shape ``(..., L, N)``, and ``K != L``.
-        - if ``self`` is an array having shape ``(..., M, K)``, ``other`` is a one-dimensional array having shape ``(L,)``, and ``K != L``.
-        - if ``self`` is an array having shape ``(..., M, K)``, ``other`` is an array having shape ``(..., L, N)``, and ``K != L``.
-
-        .. versionchanged:: 2022.12
-            Added complex data type support.
+        Raises
+        ------
+        ValueError
+            If either ``self`` or ``other`` is a zero-dimensional array, or if the inner
+            dimensions are incompatible (``K != L``).
         """
-        from spekk.ops import matmul
+        return ops.matmul(self, other)
 
-        return matmul(self, other)
-
-    def __mod__(self: array, other: Union[int, float, array], /) -> array:
+    def __mod__(self: array, other: int | float | array, /) -> array:
         """
         Evaluates ``self_i % other_i`` for each element of an array instance with the respective element of the array ``other``.
 
-        .. note::
-           For input arrays which promote to an integer data type, the result of division by zero is unspecified and thus implementation-defined.
+        For integer inputs, the result of division by zero is backend-dependent.
 
         Parameters
         ----------
         self: array
-            array instance. Should have a real-valued data type.
-        other: Union[int, float, array]
-            other array. Must be compatible with ``self`` (see :ref:`broadcasting`). Should have a real-valued data type.
+            Array instance. Has a real-valued data type.
+        other: int | float | array
+            Other array. Must be broadcast-compatible with ``self``. Has a real-valued data type.
 
         Returns
         -------
         out: array
-            an array containing the element-wise results. Each element-wise result must have the same sign as the respective element ``other_i``. The returned array must have a real-valued floating-point data type determined by :ref:`type-promotion`.
-
-
-        .. note::
-           Element-wise results, including special cases, must equal the results returned by the equivalent element-wise function :func:`~array_api.remainder`.
+            An array containing the element-wise results. Each element-wise result has the same sign as the respective element ``other_i``. The data type is determined by type promotion.
         """
-        from spekk.ops import remainder
+        return ops.remainder(self, other)
 
-        return remainder(self, other)
-
-    def __mul__(self: array, other: array | int | float | complex, /) -> array:
+    def __mul__(self: array, other: int | float | complex | array, /) -> array:
         r"""
         Calculates the product for each element of an array instance with the respective element of the array ``other``.
 
-        .. note::
-           Floating-point multiplication is not always associative due to finite precision.
-
         Parameters
         ----------
         self: array
-            array instance. Should have a numeric data type.
-        other: Union[int, float, array]
-            other array. Must be compatible with ``self`` (see :ref:`broadcasting`). Should have a numeric data type.
+            Array instance. Has a numeric data type.
+        other: int | float | complex | array
+            Other array. Must be broadcast-compatible with ``self``. Has a numeric data type.
 
         Returns
         -------
         out: array
-            an array containing the element-wise products. The returned array must have a data type determined by :ref:`type-promotion`.
-
-        Notes
-        -----
-
-        .. note::
-           Element-wise results, including special cases, must equal the results returned by the equivalent element-wise function :func:`~array_api.multiply`.
-
-        .. versionchanged:: 2022.12
-            Added complex data type support.
+            An array containing the element-wise products. The data type is determined by type promotion.
         """
-        from spekk.ops import multiply
+        return ops.multiply(self, other)
 
-        return multiply(self, other)
-
-    def __ne__(self: array, other: array | int | float | complex, /) -> array:  # type: ignore
+    def __ne__(self: array, other: int | float | complex | array, /) -> array:  # type: ignore
         """
         Computes the truth value of ``self_i != other_i`` for each element of an array instance with the respective element of the array ``other``.
 
         Parameters
         ----------
         self: array
-            array instance. May have any data type.
-        other: Union[int, float, bool, array]
-            other array. Must be compatible with ``self`` (see :ref:`broadcasting`). May have any data type.
+            Array instance. May have any data type.
+        other: int | float | complex | array
+            Other array. Must be broadcast-compatible with ``self``. May have any data type.
 
         Returns
         -------
         out: array
-            an array containing the element-wise results. The returned array must have a data type of ``bool`` (i.e., must be a boolean array).
-
-
-        Notes
-        -----
-
-        .. note::
-           Element-wise results, including special cases, must equal the results returned by the equivalent element-wise function :func:`~array_api.not_equal`.
-
-        .. versionchanged:: 2022.12
-            Added complex data type support.
+            An array containing the element-wise results with a boolean data type.
         """
-        from spekk.ops import not_equal
-
-        return not_equal(self, other)
+        return ops.not_equal(self, other)
 
     def __neg__(self: array, /) -> array:
         """
         Evaluates ``-self_i`` for each element of an array instance.
 
-        .. note::
-           For signed integer data types, the numerical negative of the minimum representable integer is implementation-dependent.
-
-        .. note::
-           If ``self`` has a complex floating-point data type, both the real and imaginary components for each ``self_i`` must be negated (a result which follows from the rules of complex number multiplication).
+        For signed integer data types, the numerical negative of the minimum representable integer
+        is backend-dependent. For complex data types, both the real and imaginary components are
+        negated.
 
         Parameters
         ----------
         self: array
-            array instance. Should have a numeric data type.
+            Array instance. Has a numeric data type.
 
         Returns
         -------
         out: array
-            an array containing the evaluated result for each element in ``self``. The returned array must have a data type determined by :ref:`type-promotion`.
-
-        Notes
-        -----
-
-        .. note::
-           Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.negative`.
-
-        .. versionchanged:: 2022.12
-            Added complex data type support.
+            An array containing the element-wise negations. The data type is determined by type
+            promotion.
         """
-        from spekk.ops import negative
+        return ops.negative(self)
 
-        return negative(self)
-
-    def __or__(self: array, other: array | int, /) -> array:
+    def __or__(self: array, other: bool | int | array, /) -> array:
         """
-        Evaluates ``self_i | other_i`` for each element of an array instance with the respective element of the array ``other``.
+        Evaluates ``self_i | other_i`` for each element of an array instance with the respective element of ``other``.
 
         Parameters
         ----------
         self: array
-            array instance. Should have an integer or boolean data type.
-        other: Union[int, bool, array]
-            other array. Must be compatible with ``self`` (see :ref:`broadcasting`). Should have an integer or boolean data type.
+            array instance. Has an integer or boolean data type.
+        other: bool | int | array
+            other array. Must be broadcast-compatible with ``self``. Has an integer or boolean data type.
 
         Returns
         -------
         out: array
-            an array containing the element-wise results. The returned array must have a data type determined by :ref:`type-promotion`.
-
-
-        .. note::
-           Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.bitwise_or`.
+            an array containing the element-wise results. The returned array has a data type determined by type-promotion.
         """
-        from spekk.ops import bitwise_or
-
-        return bitwise_or(self, other)
+        return ops.bitwise_or(self, other)
 
     def __pos__(self: array, /) -> array:
         """
@@ -1160,90 +863,60 @@ class array:
         Parameters
         ----------
         self: array
-            array instance. Should have a numeric data type.
+            array instance. Has a numeric data type.
 
         Returns
         -------
         out: array
-            an array containing the evaluated result for each element. The returned array must have the same data type as ``self``.
-
-        Notes
-        -----
-
-        .. note::
-           Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.positive`.
-
-        .. versionchanged:: 2022.12
-            Added complex data type support.
+            an array containing the evaluated result for each element. The returned array has the same data type as ``self``.
         """
-        from spekk.ops import positive
+        return ops.positive(self)
 
-        return positive(self)
-
-    def __pow__(self: array, other: array | int | float | complex, /) -> array:
+    def __pow__(self: array, other: int | float | complex | array, /) -> array:
         r"""
-        Calculates an implementation-dependent approximation of exponentiation by raising each element (the base) of an array instance to the power of ``other_i`` (the exponent), where ``other_i`` is the corresponding element of the array ``other``.
+        Raises each element of an array instance to the power of the corresponding element of ``other``.
 
         .. note::
-           If both ``self`` and ``other`` have integer data types, the result of ``__pow__`` when `other_i` is negative (i.e., less than zero) is unspecified and thus implementation-dependent.
+           If both ``self`` and ``other`` have integer data types, the result when ``other_i`` is negative (less than zero) is backend-dependent.
 
-           If ``self`` has an integer data type and ``other`` has a floating-point data type, behavior is implementation-dependent, as type promotion between data type "kinds" (e.g., integer versus floating-point) is unspecified.
+           If ``self`` has an integer data type and ``other`` has a floating-point data type, behavior is backend-dependent, as type promotion between data type "kinds" (e.g., integer versus floating-point) is unspecified.
 
         Parameters
         ----------
         self: array
-            array instance whose elements correspond to the exponentiation base. Should have a numeric data type.
-        other: Union[int, float, array]
-            other array whose elements correspond to the exponentiation exponent. Must be compatible with ``self`` (see :ref:`broadcasting`). Should have a numeric data type.
+            array instance whose elements are the exponentiation base. Has a numeric data type.
+        other: int | float | complex | array
+            exponent array. Must be broadcast-compatible with ``self``. Has a numeric data type.
 
         Returns
         -------
         out: array
-            an array containing the element-wise results. The returned array must have a data type determined by :ref:`type-promotion`.
-
-        Notes
-        -----
-
-        .. note::
-           Element-wise results, including special cases, must equal the results returned by the equivalent element-wise function :func:`~array_api.pow`.
-
-        .. versionchanged:: 2022.12
-            Added complex data type support.
+            an array containing the element-wise results. The returned array has a data type determined by type-promotion.
         """
-        from spekk.ops import pow
+        return ops.pow(self, other)
 
-        return pow(self, other)
-
-    def __rshift__(self: array, other: Union[int, array], /) -> array:
+    def __rshift__(self: array, other: int | array, /) -> array:
         """
-        Evaluates ``self_i >> other_i`` for each element of an array instance with the respective element of the array ``other``.
+        Evaluates ``self_i >> other_i`` for each element of an array instance with the respective element of ``other``.
 
         Parameters
         ----------
         self: array
-            array instance. Should have an integer data type.
-        other: Union[int, array]
-            other array. Must be compatible with ``self`` (see :ref:`broadcasting`). Should have an integer data type. Each element must be greater than or equal to ``0``.
+            array instance. Has an integer data type.
+        other: int | array
+            other array. Must be broadcast-compatible with ``self``. Has an integer data type. Each element must be greater than or equal to ``0``.
 
         Returns
         -------
         out: array
-            an array containing the element-wise results. The returned array must have the same data type as ``self``.
-
-
-        .. note::
-           Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.bitwise_right_shift`.
+            an array containing the element-wise results. The returned array has the same data type as ``self``.
         """
-        from spekk.ops import bitwise_right_shift
-
-        return bitwise_right_shift(self, other)
+        return ops.bitwise_right_shift(self, other)
 
     def __setitem__(
         self: array,
-        key: Union[
-            int, slice, ellipsis, Tuple[Union[int, slice, ellipsis], ...], array
-        ],
-        value: Union[int, float, bool, array],
+        key: int | slice | ellipsis | tuple[int | slice | ellipsis, ...] | array,
+        value: bool | int | float | array,
         /,
     ) -> None:
         from spekk.ops._indexing import setitem
@@ -1252,189 +925,142 @@ class array:
         self._data = new_array.data
         self._dims = new_array.dims
 
-    def __sub__(self: array, other: array | int | float | complex, /) -> array:
+    def __sub__(self: array, other: int | float | complex | array, /) -> array:
         """
-        Calculates the difference for each element of an array instance with the respective element of the array ``other``.
+        Calculates the element-wise difference ``self_i - other_i``.
 
-        The result of ``self_i - other_i`` must be the same as ``self_i + (-other_i)`` and must be governed by the same floating-point rules as addition (see :meth:`array.__add__`).
+        The result of ``self_i - other_i`` is the same as ``self_i + (-other_i)`` and is governed by the same floating-point rules as addition (see ``__add__``).
 
         Parameters
         ----------
         self: array
-            array instance (minuend array). Should have a numeric data type.
-        other: Union[int, float, array]
-            subtrahend array. Must be compatible with ``self`` (see :ref:`broadcasting`). Should have a numeric data type.
+            array instance (minuend). Has a numeric data type.
+        other: int | float | complex | array
+            subtrahend array. Must be broadcast-compatible with ``self``. Has a numeric data type.
 
         Returns
         -------
         out: array
-            an array containing the element-wise differences. The returned array must have a data type determined by :ref:`type-promotion`.
-
-        Notes
-        -----
-
-        .. note::
-           Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.subtract`.
-
-        .. versionchanged:: 2022.12
-            Added complex data type support.
+            an array containing the element-wise differences. The returned array has a data type determined by type-promotion.
         """
-        from spekk.ops import subtract
+        return ops.subtract(self, other)
 
-        return subtract(self, other)
-
-    def __truediv__(self: array, other: array | int | float | complex, /) -> array:
+    def __truediv__(self: array, other: int | float | complex | array, /) -> array:
         r"""
-        Evaluates ``self_i / other_i`` for each element of an array instance with the respective element of the array ``other``.
+        Evaluates ``self_i / other_i`` for each element of an array instance with the respective element of ``other``.
 
         .. note::
-           If one or both of ``self`` and ``other`` have integer data types, the result is implementation-dependent, as type promotion between data type "kinds" (e.g., integer versus floating-point) is unspecified.
-
-           Specification-compliant libraries may choose to raise an error or return an array containing the element-wise results. If an array is returned, the array must have a real-valued floating-point data type.
+           If one or both of ``self`` and ``other`` have integer data types, the result is backend-dependent, as type promotion between data type "kinds" (e.g., integer versus floating-point) is unspecified.
 
         Parameters
         ----------
         self: array
-            array instance. Should have a numeric data type.
-        other: Union[int, float, array]
-            other array. Must be compatible with ``self`` (see :ref:`broadcasting`). Should have a numeric data type.
+            array instance. Has a numeric data type.
+        other: int | float | complex | array
+            other array. Must be broadcast-compatible with ``self``. Has a numeric data type.
 
         Returns
         -------
         out: array
-            an array containing the element-wise results. The returned array should have a floating-point data type determined by :ref:`type-promotion`.
-
-        Notes
-        -----
-
-        .. note::
-           Element-wise results, including special cases, must equal the results returned by the equivalent element-wise function :func:`~array_api.divide`.
-
-        .. versionchanged:: 2022.12
-            Added complex data type support.
+            an array containing the element-wise results. The returned array has a floating-point data type determined by type-promotion.
         """
-        from spekk.ops import divide
+        return ops.divide(self, other)
 
-        return divide(self, other)
-
-    def __xor__(self: array, other: array | bool | int, /) -> array:
+    def __xor__(self: array, other: bool | int | array, /) -> array:
         """
-        Evaluates ``self_i ^ other_i`` for each element of an array instance with the respective element of the array ``other``.
+        Evaluates ``self_i ^ other_i`` for each element of an array instance with the respective element of ``other``.
 
         Parameters
         ----------
         self: array
-            array instance. Should have an integer or boolean data type.
-        other: Union[int, bool, array]
-            other array. Must be compatible with ``self`` (see :ref:`broadcasting`). Should have an integer or boolean data type.
+            array instance. Has an integer or boolean data type.
+        other: bool | int | array
+            other array. Must be broadcast-compatible with ``self``. Has an integer or boolean data type.
 
         Returns
         -------
         out: array
-            an array containing the element-wise results. The returned array must have a data type determined by :ref:`type-promotion`.
-
-
-        .. note::
-           Element-wise results must equal the results returned by the equivalent element-wise function :func:`~array_api.bitwise_xor`.
+            an array containing the element-wise results. The returned array has a data type determined by type-promotion.
         """
-        from spekk.ops import bitwise_xor
+        return ops.bitwise_xor(self, other)
 
-        return bitwise_xor(self, other)
+    def __radd__(self: array, other: int | float | complex | array) -> array:
 
-    def __radd__(self: array, other: array | int | float | complex) -> array:
-        from spekk.ops import add
+        return ops.add(other, self)
 
-        return add(other, self)
+    def __rsub__(self: array, other: int | float | complex | array) -> array:
 
-    def __rsub__(self: array, other: array | int | float | complex) -> array:
-        from spekk.ops import subtract
+        return ops.subtract(other, self)
 
-        return subtract(other, self)
+    def __rmul__(self: array, other: int | float | complex | array) -> array:
 
-    def __rmul__(self: array, other: array | int | float | complex) -> array:
-        from spekk.ops import multiply
+        return ops.multiply(other, self)
 
-        return multiply(other, self)
+    def __rtruediv__(self: array, other: int | float | complex | array) -> array:
 
-    def __rtruediv__(self: array, other: array | int | float | complex) -> array:
-        from spekk.ops import divide
+        return ops.divide(other, self)
 
-        return divide(other, self)
+    def __rfloordiv__(self: array, other: int | float | array) -> array:
 
-    def __rfloordiv__(self: array, other: array | int | float) -> array:
-        from spekk.ops import floor_divide
+        return ops.floor_divide(other, self)
 
-        return floor_divide(other, self)
+    def __rmod__(self: array, other: int | float | array) -> array:
 
-    def __rmod__(self: array, other: array | int | float) -> array:
-        from spekk.ops import remainder
+        return ops.remainder(other, self)
 
-        return remainder(other, self)
+    def __rpow__(self: array, other: int | float | complex | array) -> array:
 
-    def __rpow__(self: array, other: array | int | float | complex) -> array:
-        from spekk.ops import pow
-
-        return pow(other, self)
+        return ops.pow(other, self)
 
     def __rmatmul__(self: array, other: array) -> array:
-        from spekk.ops import matmul
 
-        return matmul(other, self)
+        return ops.matmul(other, self)
 
-    def __rand__(self: array, other: array | bool) -> array:
-        from spekk.ops import logical_and
+    def __rand__(self: array, other: bool | array) -> array:
 
-        return logical_and(other, self)
+        return ops.logical_and(other, self)
 
-    def __ror__(self: array, other: array | bool) -> array:
-        from spekk.ops import logical_or
+    def __ror__(self: array, other: bool | array) -> array:
 
-        return logical_or(other, self)
+        return ops.logical_or(other, self)
 
-    def __rxor__(self: array, other: array | bool) -> array:
-        from spekk.ops import logical_xor
+    def __rxor__(self: array, other: bool | array) -> array:
 
-        return logical_xor(other, self)
+        return ops.logical_xor(other, self)
 
-    def __rlshift__(self: array, other: array | int) -> array:
-        from spekk.ops import bitwise_left_shift
+    def __rlshift__(self: array, other: int | array) -> array:
 
-        return bitwise_left_shift(other, self)
+        return ops.bitwise_left_shift(other, self)
 
-    def __rrshift__(self: array, other: array | int) -> array:
-        from spekk.ops import bitwise_right_shift
+    def __rrshift__(self: array, other: int | array) -> array:
 
-        return bitwise_right_shift(other, self)
+        return ops.bitwise_right_shift(other, self)
 
     def to_device(
-        self: array, device: DeviceLike, /, *, stream: Optional[Union[int, Any]] = None
+        self: array, device: DeviceLike, /, *, stream: int | Any | None = None
     ) -> array:
         """
-        Copy the array from the device on which it currently resides to the specified ``device``.
+        Copy the array to the specified ``device``.
 
         Parameters
         ----------
         self: array
             array instance.
-        device: device
-            a ``device`` object (see :ref:`device-support`).
-        stream: Optional[Union[int, Any]]
-            stream object to use during copy. In addition to the types supported in :meth:`array.__dlpack__`, implementations may choose to support any library-specific stream object with the caveat that any code using such an object would not be portable.
+        device: DeviceLike
+            target device.
+        stream: int | Any | None
+            stream object to use during copy. Default: ``None``.
 
         Returns
         -------
         out: array
             an array with the same data and data type as ``self`` and located on the specified ``device``.
 
-
         Notes
         -----
 
-        -   When a provided ``device`` object corresponds to the same device on which an array instance resides, implementations may choose to perform an explicit copy or return ``self``.
-        -   If ``stream`` is provided, the copy operation should be enqueued on the provided ``stream``; otherwise, the copy operation should be enqueued on the default stream/queue. Whether the copy is performed synchronously or asynchronously is implementation-dependent. Accordingly, if synchronization is required to guarantee data safety, this must be clearly explained in a conforming array library's documentation.
-
-        .. versionchanged:: 2023.12
-           Clarified behavior when a provided ``device`` object corresponds to the device on which an array instance resides.
+        -   When ``device`` corresponds to the current device, the backend may return ``self`` or an explicit copy.
+        -   If ``stream`` is provided, the copy is enqueued on that stream; otherwise the default stream is used. Whether the copy is synchronous or asynchronous is backend-dependent.
         """
         return array(array_api_compat.to_device(self.data, device, stream=stream), self._dims)
 
@@ -1463,77 +1089,972 @@ class array:
         return self._dims.copy()
 
     @property
-    def dim_sizes(self) -> Dict[Dim, int]:
+    def dim_sizes(self) -> dict[str, int]:
         return {d: s for d, s in zip(self.dims, self.shape)}
 
-    def dim_index(self, dim: Dim) -> int:
+    def dim_index(self, dim: str) -> int:
+        """
+        Return the positional index of a named dimension.
+
+        Parameters
+        ----------
+        dim: str
+            the name of the dimension to look up.
+
+        Returns
+        -------
+        out: int
+            the zero-based index of ``dim`` in ``self.dims``.
+        """
         return self.dims.index(dim)
 
-    def rename_dim(self, dim: Dim | int, new_dim: Dim) -> "array":
-        axis = self.dims.index(dim) if isinstance(dim, Dim) else dim
+    def rename_dim(self, dim: str | int, new_dim: str) -> "array":
+        """
+        Return a new array with one dimension renamed.
+
+        Parameters
+        ----------
+        dim: str | int
+            the dimension to rename, identified by name or positional index.
+        new_dim: str
+            the new name for the dimension.
+
+        Returns
+        -------
+        out: array
+            an array with the same data and shape as ``self``, with the
+            specified dimension renamed to ``new_dim``.
+        """
+        axis = self.dims.index(dim) if isinstance(dim, str) else dim
         dims = list(self.dims)
         dims[axis] = new_dim
         return array(self.data, dims)
 
     def clear_dims(self):
+        """
+        Clear all named dimensions on this array in-place.
+
+        Each dimension is replaced with an undefined dimension marker.
+        Returns ``self`` to allow chaining.
+
+        Returns
+        -------
+        out: array
+            ``self``, with all dimensions set to undefined.
+        """
         self._dims = [_UndefinedDim() for din in self.dims]
         return self  # return self for now to prevent updating array ID
 
     def max(self):
+        """
+        Return the maximum value of all elements in the array.
+
+        Returns
+        -------
+        out: array
+            a zero-dimensional array containing the maximum value.
+        """
         return ops.max(self)
 
     def min(self):
+        """
+        Return the minimum value of all elements in the array.
+
+        Returns
+        -------
+        out: array
+            a zero-dimensional array containing the minimum value.
+        """
         return ops.min(self)
 
     # Methods for casting dtype
     def int8(self):
+        """Cast the array to the ``int8`` data type."""
         return data_types.int8(self)
 
     def int16(self):
+        """Cast the array to the ``int16`` data type."""
         return data_types.int16(self)
 
     def int32(self):
+        """Cast the array to the ``int32`` data type."""
         return data_types.int32(self)
 
     def int64(self):
+        """Cast the array to the ``int64`` data type."""
         return data_types.int64(self)
 
     def uint8(self):
+        """Cast the array to the ``uint8`` data type."""
         return data_types.uint8(self)
 
     def uint16(self):
+        """Cast the array to the ``uint16`` data type."""
         return data_types.uint16(self)
 
     def uint32(self):
+        """Cast the array to the ``uint32`` data type."""
         return data_types.uint32(self)
 
     def uint64(self):
+        """Cast the array to the ``uint64`` data type."""
         return data_types.uint64(self)
 
     def float32(self):
+        """Cast the array to the ``float32`` data type."""
         return data_types.float32(self)
 
     def float64(self):
+        """Cast the array to the ``float64`` data type."""
         return data_types.float64(self)
 
     def complex64(self):
+        """Cast the array to the ``complex64`` data type."""
         return data_types.complex64(self)
 
     def complex128(self):
+        """Cast the array to the ``complex128`` data type."""
         return data_types.complex128(self)
 
     def bool(self):
+        """Cast the array to the ``bool`` data type."""
         return data_types.bool(self)
 
     @property
     def at(self) -> "ArrayIndexUpdateHelper":
+        """
+        Return an index-update helper for immutable-style element updates.
+
+        Use this property to perform functional updates on slices of the
+        array without modifying it in place. For example::
+
+            x = x.at[{"dim": 0}].set(value)
+
+        Returns
+        -------
+        out: ArrayIndexUpdateHelper
+            a helper object that supports ``.set()``, ``.add()``, and
+            similar update operations indexed by named dimensions.
+        """
         from spekk.ops._indexing import ArrayIndexUpdateHelper
 
         return ArrayIndexUpdateHelper(self)
 
     def __repr__(self):
+        """
+        Return a string representation of the array.
+
+        For zero-dimensional arrays, the representation omits the ``dims``
+        field. For all other arrays, ``dims`` and ``dtype`` are shown
+        alongside the underlying data.
+        """
         if self.ndim == 0:
             return f"spekk.ops.array({self.data}, dtype={self.dtype.name})"
         return (
             f"spekk.ops.array(\n{self.data}, dims={self.dims}, dtype={self.dtype.name})"
         )
+
+    def all(
+        self: array,
+        /,
+        *,
+        axis: int | str | tuple[int | str, ...] | None = None,
+        keepdims: bool = False,
+    ) -> array:
+        """
+        Tests whether all input array elements evaluate to ``True`` along a specified axis.
+
+        .. note::
+           Positive infinity, negative infinity, and NaN evaluate to ``True``.
+
+        .. note::
+           If the array has a complex floating-point data type, elements having a non-zero component (real or imaginary) evaluate to ``True``.
+
+        .. note::
+           If the array is an empty array or the size of the axis along which to evaluate elements is zero, the test result is ``True``.
+
+        Parameters
+        ----------
+        self: array
+            Input array.
+        axis: int | str | tuple[int | str, ...] | None
+            Axis or axes along which to perform a logical AND reduction. If ``None``, reduces over the entire array. Default: ``None``.
+        keepdims: bool
+            If ``True``, reduced axes are kept as singleton dimensions. Default: ``False``.
+
+        Returns
+        -------
+        out: array
+            Array containing the test result(s) with data type ``bool``.
+        """
+        return ops.all(self, axis=axis, keepdims=keepdims)
+
+    def any(
+        self: array,
+        /,
+        *,
+        axis: int | str | tuple[int | str, ...] | None = None,
+        keepdims: bool = False,
+    ) -> array:
+        """
+        Tests whether any input array element evaluates to ``True`` along a specified axis.
+
+        .. note::
+           Positive infinity, negative infinity, and NaN evaluate to ``True``.
+
+        .. note::
+           If the array has a complex floating-point data type, elements having a non-zero component (real or imaginary) evaluate to ``True``.
+
+        .. note::
+           If the array is an empty array or the size of the axis along which to evaluate elements is zero, the test result is ``False``.
+
+        Parameters
+        ----------
+        self: array
+            Input array.
+        axis: int | str | tuple[int | str, ...] | None
+            Axis or axes along which to perform a logical OR reduction. If ``None``, reduces over the entire array. Default: ``None``.
+        keepdims: bool
+            If ``True``, reduced axes are kept as singleton dimensions. Default: ``False``.
+
+        Returns
+        -------
+        out: array
+            Array containing the test result(s) with data type ``bool``.
+        """
+        return ops.any(self, axis=axis, keepdims=keepdims)
+
+    def argmax(
+        self: array, /, *, axis: int | str | None = None, keepdims: bool = False
+    ) -> array:
+        """
+        Returns the indices of the maximum values along a specified axis.
+
+        When the maximum value occurs multiple times, only the indices corresponding to the first occurrence are returned.
+
+        Parameters
+        ----------
+        self: array
+            input array. Has a real-valued data type.
+        axis: int | str | None
+            axis along which to search. If ``None``, returns the index of the maximum value of the flattened array. Default: ``None``.
+        keepdims: bool
+            if ``True``, the reduced axes (dimensions) are included in the result as singleton dimensions, and the result is broadcastable with the input array. Otherwise, if ``False``, the reduced axes (dimensions) are not included in the result. Default: ``False``.
+
+        Returns
+        -------
+        out: array
+            if ``axis`` is ``None``, a zero-dimensional array containing the index of the first occurrence of the maximum value; otherwise, a non-zero-dimensional array containing the indices of the maximum values. The returned array has the default array index data type.
+        """
+        return ops.argmax(self, axis=axis, keepdims=keepdims)
+
+    def argmin(
+        self: array, /, *, axis: int | str | None = None, keepdims: bool = False
+    ) -> array:
+        """
+        Returns the indices of the minimum values along a specified axis.
+
+        When the minimum value occurs multiple times, only the indices corresponding to the first occurrence are returned.
+
+        Parameters
+        ----------
+        self: array
+            input array. Has a real-valued data type.
+        axis: int | str | None
+            axis along which to search. If ``None``, returns the index of the minimum value of the flattened array. Default: ``None``.
+        keepdims: bool
+            if ``True``, the reduced axes (dimensions) are included in the result as singleton dimensions, and the result is broadcastable with the input array. Otherwise, if ``False``, the reduced axes (dimensions) are not included in the result. Default: ``False``.
+
+        Returns
+        -------
+        out: array
+            if ``axis`` is ``None``, a zero-dimensional array containing the index of the first occurrence of the minimum value; otherwise, a non-zero-dimensional array containing the indices of the minimum values. The returned array has the default array index data type.
+        """
+        return ops.argmin(self, axis=axis, keepdims=keepdims)
+
+    def argsort(
+        self: array,
+        /,
+        *,
+        axis: int | str = -1,
+        descending: bool = False,
+        stable: bool = True,
+    ) -> array:
+        """
+        Returns the indices that sort the array along a specified axis.
+
+        Parameters
+        ----------
+        self : array
+            input array. Has a real-valued data type.
+        axis: int | str
+            axis along which to sort. May be an integer index or a named dimension name. If set to ``-1``, the function sorts along the last axis. Default: ``-1``.
+        descending: bool
+            sort order. If ``True``, the returned indices sort the array in descending order (by value). If ``False``, the returned indices sort the array in ascending order (by value). Default: ``False``.
+        stable: bool
+            sort stability. If ``True``, the returned indices maintain the relative order of the array values which compare as equal. If ``False``, the relative order of the array values which compare as equal is backend-dependent. Default: ``True``.
+
+        Returns
+        -------
+        out : array
+            an array of indices. The returned array has the same shape as the input array and the default array index data type.
+        """
+        return ops.argsort(self, axis=axis, descending=descending, stable=stable)
+
+    def clip(
+        self: array,
+        /,
+        min: int | float | array | None = None,
+        max: int | float | array | None = None,
+    ) -> array:
+        r"""
+        Clamps each element ``x_i`` of the input array to the range ``[min, max]``.
+
+        Parameters
+        ----------
+        self: array
+            input array. Has a real-valued data type.
+        min: int | float | array | None
+            lower-bound of the range to which to clamp. If ``None``, no lower bound is applied. Broadcasted with the input array. Has a real-valued data type. Default: ``None``.
+        max: int | float | array | None
+            upper-bound of the range to which to clamp. If ``None``, no upper bound is applied. Broadcasted with the input array. Has a real-valued data type. Default: ``None``.
+
+        Returns
+        -------
+        out: array
+            an array containing element-wise results. The returned array has the same data type as the input array.
+
+        Notes
+        -----
+
+        - If both ``min`` and ``max`` are ``None``, the elements of the returned array equal the respective elements in the array.
+        - If a broadcasted element in ``min`` is greater than a corresponding broadcasted element in ``max``, behavior is backend-dependent.
+        - If the array and either ``min`` or ``max`` have different data type kinds (e.g., integer versus floating-point), behavior is backend-dependent.
+        """
+        return ops.clip(self, min=min, max=max)
+
+    def cumsum(
+        self: array,
+        /,
+        *,
+        axis: int | str | None = None,
+        dtype: DType | None = None,
+        include_initial: bool = False,
+    ) -> array:
+        """
+        Calculates the cumulative sum of elements in the input array.
+
+        Parameters
+        ----------
+        self: array
+            input array. Has a numeric data type.
+        axis: int | str | None
+            axis along which to compute the cumulative sum. An integer refers to a positional axis (negative counts from the end), a string refers to a named dimension.
+
+            If the array has more than one dimension, providing an ``axis`` is required.
+
+        dtype: DType | None
+            data type of the returned array. If ``None``, the returned array has the same data type as the input array, unless the array has an integer data type supporting a smaller range of values than the default integer data type, in which case the default integer data type (or its unsigned equivalent) is used. If specified and differs from the data type of the array, the input array is cast before computing the sum. Default: ``None``.
+
+        include_initial: bool
+            whether to include the initial value (zero) as the first value in the output. Default: ``False``.
+
+        Returns
+        -------
+        out: array
+            an array containing the cumulative sums.
+
+            Let ``N`` be the size of the axis along which to compute the cumulative sum.
+
+            -   if ``include_initial`` is ``True``, the returned array has the same shape as the input array, except the size of the cumulated axis is ``N+1``.
+            -   if ``include_initial`` is ``False``, the returned array has the same shape as the input array.
+        """
+        return ops.cumulative_sum(
+            self, axis=axis, dtype=dtype, include_initial=include_initial
+        )
+
+    def diagonal(
+        self: array,
+        /,
+        *,
+        offset: int = 0,
+        new_dim: str | None = None,
+    ) -> array:
+        """
+        Returns the specified diagonals of a matrix (or a stack of matrices).
+
+        Parameters
+        ----------
+        self: array
+            input array having shape ``(..., M, N)`` and whose innermost two dimensions form ``MxN`` matrices.
+        offset: int
+            offset specifying the off-diagonal relative to the main diagonal.
+
+            - ``offset = 0``: the main diagonal.
+            - ``offset > 0``: off-diagonal above the main diagonal.
+            - ``offset < 0``: off-diagonal below the main diagonal.
+
+            Default: ``0``.
+        new_dim: str | None
+            name for the new dimension created by extracting the diagonal. If ``None``, the dimension name is inferred.
+
+            Default: ``None``.
+
+        Returns
+        -------
+        out: array
+            an array containing the diagonals and whose shape is determined by removing the last two dimensions and appending a dimension equal to the size of the resulting diagonals. The returned array has the same data type as the input array.
+        """
+        return ops.diagonal(self, offset=offset, new_dim=new_dim)
+
+    def imag(
+        self: array,
+        /,
+    ) -> array:
+        """
+        Returns the imaginary component of each element ``x_i`` of the array.
+
+        Parameters
+        ----------
+        self: array
+            Input array. Has a complex floating-point data type.
+
+        Returns
+        -------
+        out: array
+            An array containing the element-wise results. The returned array has a
+            floating-point data type with the same precision as the input array (e.g., if
+            the input is ``complex64``, the returned array has data type ``float32``).
+        """
+        return ops.imag(self)
+
+    def mean(
+        self: array,
+        /,
+        *,
+        axis: int | str | tuple[int | str, ...] | None = None,
+        keepdims: bool = False,
+    ) -> array:
+        """
+        Calculates the arithmetic mean of the input array.
+
+        Parameters
+        ----------
+        self: array
+            input array. Has a numeric data type.
+        axis: int | str | tuple[int | str, ...] | None
+            axis or axes along which arithmetic means are computed. By default, the mean is computed over the entire array. Default: ``None``.
+        keepdims: bool
+            if ``True``, the reduced axes are included in the result as singleton dimensions. Otherwise, the reduced axes are not included in the result. Default: ``False``.
+
+        Returns
+        -------
+        out: array
+            if the arithmetic mean was computed over the entire array, a zero-dimensional array containing the arithmetic mean; otherwise, a non-zero-dimensional array containing the arithmetic means. If the array has an integer data type, the returned array has the default real-valued floating-point data type; otherwise, the returned array has the same data type as the input array.
+
+        Notes
+        -----
+
+        - If the number of elements is ``0``, the arithmetic mean is ``NaN``.
+        - If any element is ``NaN``, the arithmetic mean is ``NaN``.
+        """
+        return ops.mean(self, axis=axis, keepdims=keepdims)
+
+    def nonzero(self: array, /, *, dim: str | None = None) -> tuple[array, ...]:
+        """
+        Returns the indices of the array elements which are non-zero.
+
+        .. note::
+           If the input array has a complex floating-point data type, non-zero elements are those elements having at least one component (real or imaginary) which is non-zero.
+
+        .. note::
+           If the input array has a boolean data type, non-zero elements are those elements which are equal to ``True``.
+
+        .. admonition:: Data-dependent output shape
+           :class: important
+
+           The output shape of this function depends on the data values in the input array. Array libraries that build computation graphs (e.g., JAX, Dask) may find this function difficult to implement without knowing array values and may choose to omit it.
+
+        Parameters
+        ----------
+        self: array
+            input array. Must have a positive rank. If the array is zero-dimensional, the function raises an exception.
+        dim: str | None
+            name to assign to the output dimension of each returned index array. Default: ``None``.
+
+        Returns
+        -------
+        out: tuple[array, ...]
+            a tuple of ``k`` arrays, one for each dimension of the array and each of size ``n`` (where ``n`` is the total number of non-zero elements), containing the indices of the non-zero elements in that dimension. The indices are in row-major, C-style order. The returned array has the default array index data type.
+        """
+        return ops.nonzero(self, dim=dim)
+
+    def prod(
+        self: array,
+        /,
+        *,
+        axis: int | str | tuple[int | str, ...] | None = None,
+        dtype: DType | None = None,
+        keepdims: bool = False,
+    ) -> array:
+        """
+        Calculates the product of input array elements.
+
+        Parameters
+        ----------
+        self: array
+            input array. Has a numeric data type.
+        axis: int | str | tuple[int | str, ...] | None
+            axis or axes along which products are computed. By default, the product is computed over the entire array. If a tuple, products are computed over multiple axes. Default: ``None``.
+        dtype: DType | None
+            data type of the returned array. If ``None``, the returned array has the same data type as the input array, unless the input array has an integer data type supporting a smaller range of values than the default integer data type, in which case the default integer data type is used. If the resolved data type differs from the data type of the input array, the input array is cast before computing the product. Default: ``None``.
+        keepdims: bool
+            if ``True``, the reduced axes are included in the result as singleton dimensions. Otherwise, the reduced axes are not included in the result. Default: ``False``.
+
+        Returns
+        -------
+        out: array
+            if the product was computed over the entire array, a zero-dimensional array containing the product; otherwise, an array containing the products. The returned array has a data type as described by the ``dtype`` parameter above.
+
+        Notes
+        -----
+
+        -   If the number of elements over which to compute the product is ``0``, the product is ``1`` (i.e., the empty product).
+        """
+        return ops.prod(self, axis=axis, dtype=dtype, keepdims=keepdims)
+
+    def real(self: array, /) -> array:
+        """
+        Returns the real component of a complex number for each element ``x_i`` of the input array.
+
+        Parameters
+        ----------
+        self: array
+            input array. Has a complex floating-point data type.
+
+        Returns
+        -------
+        out: array
+            an array containing the element-wise results. The returned array has a floating-point data type with the same floating-point precision as the input array (e.g., if the input array is ``complex64``, the returned array has the floating-point data type ``float32``).
+        """
+        return ops.real(self)
+
+    def repeat(
+        self: array,
+        repeats: int,
+        /,
+        *,
+        axis: int | str | None = None,
+    ) -> array:
+        """
+        Repeats each element of an array a specified number of times.
+
+        Parameters
+        ----------
+        self: array
+            input array containing elements to repeat.
+        repeats: int
+            the number of repetitions for each element.
+        axis: int | str | None
+            the axis (dimension) along which to repeat elements. If ``axis`` is ``None``,
+            the input array is flattened in row-major (C-style) order before repeating, and
+            the result is a one-dimensional array. A string value is interpreted as a
+            dimension name. Default: ``None``.
+
+        Returns
+        -------
+        out: array
+            an output array containing repeated elements. The returned array has the same
+            data type as the input array. If ``axis`` is ``None``, the returned array is
+            one-dimensional; otherwise, it has the same shape as the input array except along the
+            repeated axis.
+        """
+        return ops.repeat(self, repeats, axis=axis)
+
+    def reshape(
+        self: array,
+        /,
+        shape: tuple[int, ...] | list[int],
+        dims: Sequence[str] | None = None,
+        *,
+        copy: bool | None = None,
+    ) -> array:
+        """
+        Reshapes an array without changing its data.
+
+        Parameters
+        ----------
+        self: array
+            input array to reshape.
+        shape: tuple[int, ...] | list[int]
+            a new shape compatible with the original shape. One shape dimension is allowed
+            to be ``-1``. When a shape dimension is ``-1``, the corresponding output array
+            shape dimension is inferred from the length of the array and the remaining
+            dimensions.
+        dims: Sequence[str] | None
+            the new list of dimension names. Must have the same length as ``shape``.
+            Default: ``None``.
+        copy: bool | None
+            whether or not to copy the input array. If ``True``, the function always
+            copies. If ``False``, the function never copies. If ``None``, the function
+            avoids copying if possible, and may copy otherwise. Default: ``None``.
+
+        Returns
+        -------
+        out: array
+            an output array having the same data type and elements as the input array.
+
+        Raises
+        ------
+        ValueError
+            If ``copy=False`` and a copy would be necessary. Also raised if ``shape`` and
+            ``dims`` do not have the same length.
+        """
+        return ops.reshape(self, shape, dims, copy=copy)
+
+    def round(self: array, /) -> array:
+        """
+        Rounds each element ``x_i`` of the input array to the nearest integer-valued number.
+
+        For complex floating-point operands, real and imaginary components are independently rounded.
+
+        Parameters
+        ----------
+        self: array
+            Input array. Has a numeric data type.
+
+        Returns
+        -------
+        out: array
+            An array containing the rounded result for each element in the array. The returned array has the same data type as the input array.
+
+        Notes
+        -----
+
+        **Special cases**
+
+        - If ``x_i`` is already integer-valued, the result is ``x_i``.
+        - If ``x_i`` is ``NaN``, the result is ``NaN``.
+        - If two integers are equally close to ``x_i``, the result is the even integer closest to ``x_i`` (banker's rounding).
+        """
+        return ops.round(self)
+
+    def searchsorted(
+        self: array,
+        x2: int | float | array,
+        /,
+        *,
+        side: Literal["left", "right"] = "left",
+        sorter: array | None = None,
+    ) -> array:
+        """
+        Finds the indices into the array such that, if the corresponding elements in ``x2`` were inserted before the indices, the order of the array, when sorted in ascending order, would be preserved.
+
+        Parameters
+        ----------
+        self: array
+            input array. Must be a one-dimensional array. Has a real-valued data type. If ``sorter`` is ``None``, must be sorted in ascending order; otherwise, ``sorter`` must be an array of indices that sort the array in ascending order.
+        x2: int | float | array
+            array containing search values. Has a real-valued data type.
+        side: Literal['left', 'right']
+            argument controlling which index is returned if a value lands exactly on an edge.
+
+            Let ``x`` be an array of rank ``N`` where ``v`` is an individual element given by ``v = x2[n,m,...,j]``.
+
+            If ``side == 'left'``, then
+
+            - each returned index ``i`` satisfies the index condition ``x1[i-1] < v <= x1[i]``.
+            - if no index satisfies the index condition, then the returned index for that element is ``0``.
+
+            Otherwise, if ``side == 'right'``, then
+
+            - each returned index ``i`` satisfies the index condition ``x1[i-1] <= v < x1[i]``.
+            - if no index satisfies the index condition, then the returned index for that element is ``N``, where ``N`` is the number of elements in the array.
+
+            Default: ``'left'``.
+        sorter: array | None
+            array of indices that sort the array in ascending order. The array must have the same shape as ``self`` and have an integer data type. Default: ``None``.
+
+        Returns
+        -------
+        out: array
+            an array of indices with the same shape as ``x2``. The returned array has the default array index data type.
+
+        Notes
+        -----
+        For real-valued floating-point arrays, the sort order of NaNs and signed zeros is backend-dependent. Accordingly, when a real-valued floating-point array contains NaNs and signed zeros, what constitutes ascending order may vary among backends.
+
+        Results are consistent with ``sort`` and ``argsort``: if a value in ``x2`` is inserted into the array at the corresponding index in the output array and ``sort`` is invoked on the resultant array, the sorted result is in the same order.
+        """
+        return ops.searchsorted(self, x2, side=side, sorter=sorter)
+
+    def sort(
+        self: array,
+        /,
+        *,
+        axis: int | str = -1,
+        descending: bool = False,
+        stable: bool = True,
+    ) -> array:
+        """
+        Returns a sorted copy of the input array.
+
+        Parameters
+        ----------
+        self: array
+            input array. Has a real-valued data type.
+        axis: int | str
+            axis along which to sort. May be an integer index or a named dimension name. If set to ``-1``, the function sorts along the last axis. Default: ``-1``.
+        descending: bool
+            sort order. If ``True``, the array is sorted in descending order (by value). If ``False``, the array is sorted in ascending order (by value). Default: ``False``.
+        stable: bool
+            sort stability. If ``True``, the returned array maintains the relative order of the input array values which compare as equal. If ``False``, the relative order of the input array values which compare as equal is backend-dependent. Default: ``True``.
+
+        Returns
+        -------
+        out : array
+            a sorted array with the same data type and shape as the input array.
+        """
+        return ops.sort(self, axis=axis, descending=descending, stable=stable)
+
+    def squeeze(
+        self: array,
+        /,
+        axis: int | str | Sequence[int] | Sequence[str],
+    ) -> array:
+        """
+        Removes singleton dimensions (axes) from the input array.
+
+        Parameters
+        ----------
+        self: array
+            input array.
+        axis: int | str | Sequence[int] | Sequence[str]
+            axis (or axes) to squeeze. A string value is interpreted as a dimension name.
+
+        Returns
+        -------
+        out: array
+            an output array having the same data type and elements as the input array.
+
+        Raises
+        ------
+        ValueError
+            If a specified axis has a size greater than one (i.e., it is not a
+            singleton dimension).
+        """
+        return ops.squeeze(self, axis=axis)
+
+    def std(
+        self: array,
+        /,
+        *,
+        axis: int | str | tuple[int | str, ...] | None = None,
+        correction: int | float = 0.0,
+        keepdims: bool = False,
+    ) -> array:
+        """
+        Calculates the standard deviation of the input array.
+
+        Parameters
+        ----------
+        self: array
+            input array. Has a numeric data type.
+        axis: int | str | tuple[int | str, ...] | None
+            axis or axes along which standard deviations are computed. By default, the standard deviation is computed over the entire array. If a tuple, standard deviations are computed over multiple axes. Default: ``None``.
+        correction: int | float
+            degrees of freedom adjustment. The divisor used in the calculation is ``N - correction`` where ``N`` is the number of elements. Use ``0`` for population standard deviation and ``1`` for sample standard deviation (Bessel's correction). Default: ``0``.
+        keepdims: bool
+            if ``True``, the reduced axes are included in the result as singleton dimensions. Otherwise, the reduced axes are not included in the result. Default: ``False``.
+
+        Returns
+        -------
+        out: array
+            if the standard deviation was computed over the entire array, a zero-dimensional array containing the standard deviation; otherwise, an array containing the standard deviations. If the input array has an integer data type, the returned array has the default real-valued floating-point data type; otherwise, the returned array has the same data type as the input array.
+
+        Notes
+        -----
+
+        -   If ``N - correction`` is less than or equal to ``0``, the standard deviation is ``NaN``.
+        -   If any element is ``NaN``, the standard deviation is ``NaN``.
+        """
+        return ops.std(self, axis=axis, correction=correction, keepdims=keepdims)
+
+    def sum(
+        self: array,
+        /,
+        *,
+        axis: int | str | tuple[int | str, ...] | None = None,
+        dtype: DType | None = None,
+        keepdims: bool = False,
+    ) -> array:
+        """
+        Calculates the sum of the input array.
+
+        Parameters
+        ----------
+        self: array
+            input array. Has a numeric data type.
+        axis: int | str | tuple[int | str, ...] | None
+            axis or axes along which sums are computed. By default, the sum is computed over the entire array. If a tuple, sums are computed over multiple axes. Default: ``None``.
+        dtype: DType | None
+            data type of the returned array. If ``None``, the returned array has the same data type as the input array, unless the input array has an integer data type supporting a smaller range of values than the default integer data type, in which case the default integer data type is used. If the resolved data type differs from the data type of the input array, the input array is cast before computing the sum. Default: ``None``.
+        keepdims: bool
+            if ``True``, the reduced axes are included in the result as singleton dimensions. Otherwise, the reduced axes are not included in the result. Default: ``False``.
+
+        Returns
+        -------
+        out: array
+            if the sum was computed over the entire array, a zero-dimensional array containing the sum; otherwise, an array containing the sums. The returned array has a data type as described by the ``dtype`` parameter above.
+
+        Notes
+        -----
+
+        -   If the number of elements over which to compute the sum is ``0``, the sum is ``0`` (i.e., the empty sum).
+        """
+        return ops.sum(self, axis=axis, dtype=dtype, keepdims=keepdims)
+
+    def take(
+        self: array,
+        indices: array,
+        /,
+        *,
+        axis: int | str | None = None,
+    ) -> array:
+        """
+        Returns elements of an array along an axis.
+
+        Conceptually, ``take(x, indices, axis=3)`` is equivalent to
+        ``x[:,:,:,indices,...]``.
+
+        Parameters
+        ----------
+        self: array
+            Input array.
+        indices: array
+            Array indices. Must be zero- or one-dimensional with an integer data
+            type. Out-of-bounds behavior is backend-dependent.
+        axis: int | str | None
+            Axis over which to select values. Can be a dimension name or an integer
+            position. If ``axis`` is negative, the axis is counted from the last
+            dimension.
+
+            If the array is one-dimensional, providing an ``axis`` is optional;
+            however, if the array has more than one dimension, providing an ``axis`` is
+            required.
+
+        Returns
+        -------
+        out: array
+            An array with the same data type and rank as the input array. The shape is the
+            same as the input array except along ``axis``, whose size equals the number of
+            elements in ``indices``. If ``indices`` is zero-dimensional, the
+            specified axis is removed.
+        """
+        return ops.take(self, indices, axis=axis)
+
+    def trace(self: array, /, *, offset: int = 0, dtype: DType | None = None) -> array:
+        """
+        Returns the sum along the specified diagonals of a matrix (or a stack of matrices).
+
+        Parameters
+        ----------
+        self: array
+            input array having shape ``(..., M, N)`` and whose innermost two dimensions form ``MxN`` matrices. Has a numeric data type.
+        offset: int
+            offset specifying the off-diagonal relative to the main diagonal.
+
+            -   ``offset = 0``: the main diagonal.
+            -   ``offset > 0``: off-diagonal above the main diagonal.
+            -   ``offset < 0``: off-diagonal below the main diagonal.
+
+            Default: ``0``.
+        dtype: DType | None
+            data type of the returned array. If ``None``, the returned array has the same data type as the input array, unless the input array has an integer data type supporting a smaller range of values than the default integer data type (e.g., the input array has an ``int16`` or ``uint32`` data type and the default integer data type is ``int64``). In those latter cases:
+
+            -   if the input array has a signed integer data type (e.g., ``int16``), the returned array has the default integer data type.
+            -   if the input array has an unsigned integer data type (e.g., ``uint16``), the returned array has an unsigned integer data type having the same number of bits as the default integer data type (e.g., if the default integer data type is ``int32``, the returned array has a ``uint32`` data type).
+
+            If the data type (either specified or resolved) differs from the data type of the input array, the input array should be cast to the specified data type before computing the sum (rationale: the ``dtype`` keyword argument is intended to help prevent overflows). Default: ``None``.
+
+        Returns
+        -------
+        out: array
+            an array containing the traces and whose shape is determined by removing the last two dimensions and storing the traces in the last array dimension. For example, if the input array has rank ``k`` and shape ``(I, J, K, ..., L, M, N)``, then an output array has rank ``k-2`` and shape ``(I, J, K, ..., L)`` where
+
+            ::
+
+              out[i, j, k, ..., l] = trace(a[i, j, k, ..., l, :, :])
+
+            The returned array has a data type as described by the ``dtype`` parameter above.
+
+        Notes
+        -----
+
+        **Special Cases**
+
+        Let ``N`` equal the number of elements over which to compute the sum.
+
+        -   If ``N`` is ``0``, the sum is ``0`` (i.e., the empty sum).
+
+        For both real-valued and complex floating-point operands, special cases are handled as if the operation is implemented by successive application of addition.
+        """
+        return ops.trace(self, offset=offset, dtype=dtype)
+
+    def transpose(
+        self: array,
+        /,
+        axes: tuple[int | str, ...] | list[int | str],
+    ) -> array:
+        """
+        Permutes the axes (dimensions) of an array.
+
+        Parameters
+        ----------
+        self: array
+            input array.
+        axes: tuple[int | str, ...] | list[int | str]
+            a permutation of axes specifying the desired order. Accepts dimension names (strings) or positional indices (integers).
+
+        Returns
+        -------
+        out: array
+            an array containing the axes permutation. The returned array has the same data
+            type as the input array.
+        """
+        return ops.permute_dims(self, axes=axes)
+
+    def var(
+        self: array,
+        /,
+        *,
+        axis: int | str | tuple[int | str, ...] | None = None,
+        correction: int | float = 0.0,
+        keepdims: bool = False,
+    ) -> array:
+        """
+        Calculates the variance of the input array.
+
+        Parameters
+        ----------
+        self: array
+            input array. Has a numeric data type.
+        axis: int | str | tuple[int | str, ...] | None
+            axis or axes along which variances are computed. By default, the variance is computed over the entire array. If a tuple, variances are computed over multiple axes. Default: ``None``.
+        correction: int | float
+            degrees of freedom adjustment. The divisor used in the calculation is ``N - correction`` where ``N`` is the number of elements. Use ``0`` for population variance and ``1`` for sample variance (Bessel's correction). Default: ``0``.
+        keepdims: bool
+            if ``True``, the reduced axes are included in the result as singleton dimensions. Otherwise, the reduced axes are not included in the result. Default: ``False``.
+
+        Returns
+        -------
+        out: array
+            if the variance was computed over the entire array, a zero-dimensional array containing the variance; otherwise, an array containing the variances. If the input array has an integer data type, the returned array has the default real-valued floating-point data type; otherwise, the returned array has the same data type as the input array.
+
+        Notes
+        -----
+
+        -   If ``N - correction`` is less than or equal to ``0``, the variance is ``NaN``.
+        -   If any element is ``NaN``, the variance is ``NaN``.
+        """
+        return ops.var(self, axis=axis, correction=correction, keepdims=keepdims)
