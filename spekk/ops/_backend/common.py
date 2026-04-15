@@ -264,9 +264,10 @@ def get_jit_fn(jit_impl):
                     original_args[static_argnum]
                 )
             for static_argname in static_argnames:
-                original_kwargs[static_argname] = tree.static_value(
-                    original_kwargs[static_argname]
-                )
+                if static_argname in original_kwargs:
+                    original_kwargs[static_argname] = tree.static_value(
+                        original_kwargs[static_argname]
+                    )
 
             # Flatten all args. flatten_result_outer knows which parts of the arguments
             # are static. The underlying jit_impl only ever sees non-static inputs; the
