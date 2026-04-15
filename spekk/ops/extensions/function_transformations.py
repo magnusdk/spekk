@@ -52,6 +52,44 @@ argmin_over_dims = functools.partial(_argf_over_dims, ops.argmin)
 argmax_over_dims = functools.partial(_argf_over_dims, ops.argmax)
 
 
+def static_argnames[TFunc: Callable](
+    *names: str,
+) -> Callable[[TFunc], TFunc]:
+    """Mark keyword arguments as static without JIT-compiling the function.
+
+    When the decorated function is later passed to `jit`, the marked arguments
+    are automatically treated as static (merged with any explicitly passed
+    `static_argnums`/`static_argnames`).
+
+    Example::
+
+        @static_argnames("keep_tx", "keep_rx")
+        def sta_das(bf_setup, *, keep_tx=False, keep_rx=False): ...
+
+        # Later, jit automatically picks up the static args:
+        sta_das_jitted = ops.jit(sta_das)
+    """
+
+    def decorator(f: TFunc) -> TFunc:
+        f._static_argnames = names  # type: ignore[attr-defined]
+        return f
+
+    return decorator
+
+
+def _merge_static_args(
+    f: Callable,
+    static_argnums: Sequence[int],
+    static_argnames: Sequence[str],
+) -> tuple[tuple[int, ...], tuple[str, ...]]:
+    """Merge explicit static_argnums/static_argnames with any metadata from @static_args."""
+    fn_argnums = getattr(f, "_static_argnums", ())
+    fn_argnames = getattr(f, "_static_argnames", ())
+    merged_argnums = tuple(dict.fromkeys((*fn_argnums, *static_argnums)))
+    merged_argnames = tuple(dict.fromkeys((*fn_argnames, *static_argnames)))
+    return merged_argnums, merged_argnames
+
+
 @overload
 def jit[TFunc: Callable](
     f: TFunc,
@@ -79,6 +117,8 @@ def jit[TFunc: Callable](
     Static arguments have to be hashable or be a nested list/tuple/dict of hashable
     arguments, or a `spekk.array`.
 
+    Any `@static_args(...)` metadata on `f` is automatically merged in.
+
     For backends that doesn't support JIT (like numpy), this is a no-op."""
 
     if f is None:
@@ -89,10 +129,11 @@ def jit[TFunc: Callable](
             )
 
         return wrapper
+    merged_argnums, merged_argnames = _merge_static_args(f, static_argnums, static_argnames)
     return backend.jit(
         f,
-        static_argnums=static_argnums,
-        static_argnames=static_argnames,
+        static_argnums=merged_argnums,
+        static_argnames=merged_argnames,
     )
 
 

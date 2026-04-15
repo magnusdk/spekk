@@ -21,6 +21,7 @@ from spekk.ops.extensions.function_transformations import (
     map_reduce_over_dim,
     reduce_over_dim,
     scan,
+    static_argnames,
     value_and_grad,
     vmap,
 )
@@ -83,7 +84,22 @@ def to_numpy(x: array):
 
 
 def to_device(data, device):
-    return tree.map(lambda x: x.to_device(device) if isinstance(x, ops.array) else x, data)    
+    def _move(x):
+        if not isinstance(x, ops.array):
+            return x
+        # Work around broken device-to-device transfers in JAX ≥0.9 by
+        # routing through host memory (numpy) when the array is not already
+        # on the target device.
+        try:
+            current_devices = x.data.devices()
+            if device not in current_devices:
+                import jax
+                np_data = backend.to_numpy(x.data)
+                return ops.array(jax.device_put(np_data, device), x._dims)
+        except (AttributeError, TypeError):
+            pass
+        return x.to_device(device)
+    return tree.map(_move, data)
 
     
 def median(a, axis: Optional[Dim], out=None, keepdims: bool = False) -> array:
