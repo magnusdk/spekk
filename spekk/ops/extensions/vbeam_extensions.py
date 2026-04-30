@@ -130,6 +130,10 @@ def median(a, axis: Optional[Dim], out=None, keepdims: bool = False) -> array:
             )
     return ops.array(arr, dims=dims)
 
+def quantile(a, q, axis=None, keepdims=False):
+    axis, dims = get_reduction_axes_and_resulting_dims(axis, a.dims, keepdims)
+    data = backend.quantile(a.data, q, axis=axis, keepdims=keepdims)
+    return array(data, dims=dims)
 
 def nanmean(
     x: array,

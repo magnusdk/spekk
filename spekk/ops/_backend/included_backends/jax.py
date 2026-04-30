@@ -36,6 +36,9 @@ def convolve1d(
     return apply_along_axis(lambda m: convolve(m, filter, mode=mode), axis, x)
 
 
+def quantile(a, q, axis=None, keepdims=False):
+    return jax.numpy.quantile(a, q, axis=axis, keepdims=keepdims)
+
 def flatten(x: jax.Array) -> jax.Array:
     return x.flatten()
 
