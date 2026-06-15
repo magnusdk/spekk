@@ -52,7 +52,7 @@ argmin_over_dims = functools.partial(_argf_over_dims, ops.argmin)
 argmax_over_dims = functools.partial(_argf_over_dims, ops.argmax)
 
 
-def static_argnames[TFunc: Callable](
+def jit_static_argnames[TFunc: Callable](
     *names: str,
 ) -> Callable[[TFunc], TFunc]:
     """Mark keyword arguments as static without JIT-compiling the function.
@@ -63,7 +63,7 @@ def static_argnames[TFunc: Callable](
 
     Example::
 
-        @static_argnames("keep_tx", "keep_rx")
+        @jit_static_argnames("keep_tx", "keep_rx")
         def sta_das(bf_setup, *, keep_tx=False, keep_rx=False): ...
 
         # Later, jit automatically picks up the static args:

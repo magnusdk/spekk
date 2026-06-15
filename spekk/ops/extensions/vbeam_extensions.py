@@ -21,7 +21,7 @@ from spekk.ops.extensions.function_transformations import (
     map_reduce_over_dim,
     reduce_over_dim,
     scan,
-    static_argnames,
+    jit_static_argnames,
     value_and_grad,
     vmap,
 )
