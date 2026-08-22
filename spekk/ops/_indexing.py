@@ -1,3 +1,160 @@
+"""Indexing of arrays with named dimensions.
+
+This module implements ``getitem`` and ``setitem`` for spekk arrays. The numbered
+rules below are the specification of how indexing behaves. They are written for
+ourselves (contributors) first, but should also be readable by curious users.
+
+
+## 1. Key forms
+
+The key is the object inside the brackets in ``x[key]``. It takes one of three
+mutually exclusive forms:
+
+1.1. **Positional (NumPy-style)**: ``x[0]``, ``x[0, 1:3]``, ``x[..., None]``.
+     Indices map to the array's dimensions by position, exactly as in NumPy
+     (an ellipsis expands to "all remaining dimensions"). Dimension names are
+     preserved on the result.
+
+1.2. **Dict**: ``x[{"a": 0, "b": slice(1, 3)}]``. Keys are dimension names and
+     values are indices. Order does not matter. Dimensions not mentioned are
+     left untouched.
+
+1.3. **Dim-index pairs**: ``x["a", 0, "b", 1:3]``. Alternating dimension names
+     and indices; syntactic sugar for the dict form. Every even position must be
+     a dimension name, each name may appear at most once, and the number of
+     names must equal the number of indices (IndexError otherwise).
+
+1.4. The forms cannot be mixed within a single key. If any element of a tuple
+     key is a Dim, the whole key is parsed as dim-index pairs (1.3).
+
+
+## 2. Index types
+
+2.1. Valid index types: int, slice, None, ellipsis (positional form only), 1D
+     lists/tuples of ints or bools, and arrays of integer or boolean dtype.
+     Anything else raises IndexError.
+
+2.2. Lists and tuples used as indices must be 1D and contain only ints or bools;
+     they are converted to arrays (and so follow section 4 or 5).
+
+
+## 3. Effect on dimensions (getitem)
+
+3.1. A dimension that is not indexed is kept as-is, as if indexed with ``:``.
+
+3.2. An int index removes the dimension. A slice keeps it (possibly resized).
+
+3.3. ``None`` creates a new dimension of size 1. In the dict/pairs forms the new
+     dimension gets the given name: ``x[{"new": None}]``. In the positional form
+     the new dimension is undefined (unnamed).
+
+3.4. Indexing a dimension name that does not exist in the array raises
+     IndexError (but see section 8 for Modules).
+
+
+## 4. Integer-array indices (vectorized/advanced indexing)
+
+4.1. Indexing a dimension with an integer array replaces that dimension with the
+     dimensions of the index array. E.g. if ``x`` has dims ``[a, b]`` and
+     ``idx`` has dims ``[c, d]``, then ``x[{"a": idx}]`` has dims
+     ``[c, d, b]``, with the sizes of ``c`` and ``d`` taken from ``idx``.
+
+4.2. The index array may reuse the name of the dimension it indexes, and may
+     change its size. The result is still consistent as long as the new size
+     agrees with every other *current* use of that name.
+
+4.3. If an index array has a dimension that also exists (un-indexed) in the
+     indexed array, the two are aligned ("zipped") rather than crossed: e.g.
+     with ``x`` having dims ``[a, b]`` and ``idx`` having dims ``[b]``,
+     ``x[{"a": idx}]`` selects ``x[idx[b], b]`` for each position along ``b`` —
+     a vectorized/diagonal selection. The sizes must broadcast.
+
+4.4. Multiple integer-array indices in one key are broadcast together by
+     dimension name, following spekk's ordinary broadcasting rules.
+
+4.5. A 1D integer index array with an *undefined* dimension inherits the name of
+     the dimension it indexes, i.e. it behaves like a reordering/filtering slice
+     along that dimension: ``x[{"a": ops.asarray([2, 0, 1])}]`` keeps dim "a".
+
+4.6. Placement of the resulting index dims follows NumPy's advanced-indexing
+     rule, applied to the array's dimension order: if all advanced indices
+     (arrays and ints) index adjacent dimensions, the broadcast index dims are
+     placed at the position of the first advanced index; otherwise they are
+     placed first. (See "Known limitations" for new axes.)
+
+
+## 5. Boolean masks
+
+5.1. A boolean mask filters the dimension(s) it spans. All of the mask's
+     dimensions must be defined (a 1D mask's dimension may be inferred, as in
+     4.5), must exist in the indexed array, and must have matching sizes;
+     otherwise IndexError.
+
+5.2. A 1D boolean mask keeps the name of the dimension it filters.
+
+5.3. A multi-dimensional mask flattens all of its dimensions into a single new
+     dimension. The flattened dimension is undefined, since there is no natural
+     name for it.
+
+5.4. A dimension spanned by a mask cannot also be explicitly indexed in the same
+     key (IndexError). Index it first in a separate operation instead.
+
+5.5. Masks are implemented by conversion to integer arrays via ``nonzero``, so
+     section 4 applies after conversion.
+
+
+## 6. Undefined dimensions
+
+6.1. If *every* dimension of both the array and all index arrays is undefined,
+     indexing falls back to exact NumPy semantics (fully positional, including
+     in-place placement of new axes).
+
+6.2. If the indexed array is fully named, integer index arrays may have
+     undefined dimensions; those dimensions are undefined in the result.
+     (Boolean masks may not — see 5.1.)
+
+6.3. If the indexed array has any undefined dimension, then all index arrays
+     must be fully named (after 4.5-inference) with dimensions that exist in the
+     array; otherwise the mapping is ambiguous and IndexError is raised.
+
+
+## 7. setitem — ``x.at[key].set(value)`` / ``.update(f)``
+
+7.1. Arrays are immutable; setitem returns a new array.
+
+7.2. The key follows the same rules as getitem. The value is broadcast against
+     the dims/shape that ``x[key]`` would select.
+
+7.3. If the value has dimensions that the target array lacks, the target array
+     is broadcast to include them before setting: the result can have *more*
+     dimensions than the original. This is a deliberate departure from NumPy,
+     consistent with spekk's broadcasting-by-name philosophy. Consequence: you
+     cannot assume ``x.at[key].set(v).dims == x.dims``.
+
+
+## 8. Modules (pytrees) — ``module.at[key].get()/.set()/.update()``
+
+8.1. The key is applied independently to every array leaf. For each leaf, key
+     entries for dimensions the leaf does not have are skipped rather than
+     raising IndexError (implemented via ``IndexingBehavior.only_index_dims``).
+
+8.2. Consequence of 8.1: for ``get``, a leaf without any of the indexed
+     dimensions is returned unchanged; for ``set``, such a leaf is fully
+     overwritten by the (broadcast) value. Indexing a dimension that exists on
+     no leaf at all is a silent no-op for ``get`` — including when the
+     dimension name is simply misspelled.
+
+
+## Known limitations
+
+L1. New axes (``None`` indices) are always placed *first* in the result,
+    regardless of their position in the key. This also applies to positional
+    keys when the array has named dimensions: ``x[:, None]`` has dims
+    ``[?, 'a', 'b']``, not ``['a', ?, 'b']``. Only the fully-positional
+    fallback of 6.1 places them at their key position. Placing them at their
+    key position would be more correct; this may change.
+"""
+
 import abc
 from collections import Counter
 from dataclasses import dataclass, field, replace
