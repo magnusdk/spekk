@@ -43,6 +43,7 @@ from spekk.ops._util import (
 )
 from spekk.ops.array_object import array
 from spekk.ops.constants import inf
+from spekk.ops.exceptions import MismatchedDimensionsError
 from spekk.ops.manipulation_functions import permute_dims
 
 
@@ -299,7 +300,17 @@ def eigvalsh(x: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
-    raise NotImplementedError("Please help me implement this!")
+    if x.ndim < 2:
+        raise ValueError(f"The input array must have at least 2 dimensions, got {x.dims}.")
+    if x.shape[-1] != x.shape[-2]:
+        raise MismatchedDimensionsError(
+            f"The innermost two dimensions must be square, but got shape {x.shape} "
+            f"(dims {x.dims})."
+        )
+    # One eigenvalue per row/column of each matrix: the two innermost dimensions of the
+    # input collapse into a single dimension, which is named after the last of them.
+    dims = [*x.dims[:-2], x.dims[-1]]
+    return array(backend.linalg.eigvalsh(x._data), dims)
 
 
 def inv(x: array, /) -> array:
@@ -717,7 +728,31 @@ def solve(x1: array, x2: array, /) -> array:
     .. versionchanged:: 2022.12
        Added complex data type support.
     """
-    raise NotImplementedError("Please help me implement this!")
+    if x1.ndim < 2:
+        raise ValueError(
+            f"The coefficient array must have at least 2 dimensions, got {x1.dims}."
+        )
+    if x1.shape[-1] != x1.shape[-2]:
+        raise MismatchedDimensionsError(
+            f"The innermost two dimensions of the coefficient array must be square, "
+            f"but got shape {x1.shape} (dims {x1.dims})."
+        )
+    if x2.ndim == 1:
+        # x2 has shape (M,), so the result has shape x1.shape[:-2] + (M,).
+        if x1.shape[-1] != x2.shape[0]:
+            raise MismatchedDimensionsError(
+                f"Incorrect shapes for solve: x1.shape={x1.shape}, x2.shape={x2.shape}"
+            )
+        dims = [*x1.dims[:-2], x2.dims[-1]]
+    else:
+        if x1.shape[-1] != x2.shape[-2]:
+            raise MismatchedDimensionsError(
+                f"Incorrect shapes for solve: x1.shape={x1.shape}, x2.shape={x2.shape}"
+            )
+        # The result has the shape of x2 (the batch dimensions being broadcast).
+        batch_dims = x1.dims[:-2] if x1.ndim > x2.ndim else x2.dims[:-2]
+        dims = [*batch_dims, x2.dims[-2], x2.dims[-1]]
+    return array(backend.linalg.solve(x1._data, x2._data), dims)
 
 
 def svd(x: array, /, *, full_matrices: bool = True) -> Tuple[array, array, array]:
