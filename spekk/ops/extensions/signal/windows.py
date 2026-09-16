@@ -1,7 +1,27 @@
 from spekk import ops
 from spekk.ops._types import (
     Dim,
+    undefined_dim,
 )
+from spekk.ops.extensions.signal.special import i0
+
+
+def kaiser(N: int, beta: float, *, dim: Dim = None):
+    """Symmetric Kaiser window of length N, matching scipy.signal.windows.kaiser.
+
+    ``beta`` controls sidelobe suppression. The result uses the active backend
+    and named dimension. Large beta can overflow i0 at the backend's precision.
+    """
+    if dim is None:
+        dim = undefined_dim
+    if int(N) != N or N < 0:
+        raise ValueError("Window length must be a non-negative integer")
+    N = int(N)
+    if N <= 1:
+        return ops.ones((N,), dims=[dim])
+    position = 2 * ops.arange(N, dim=dim) / (N - 1) - 1
+    argument = beta * ops.sqrt(ops.maximum(0.0, 1 - position**2))
+    return i0(argument) / i0(beta)
 
 def hanning(N: int, *, dim: Dim = None):
     n = ops.linspace(0,1,N, dim=dim)

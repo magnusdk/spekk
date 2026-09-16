@@ -118,6 +118,8 @@ def bilateral_filter_kernel(
 # @function_profiling
 def convNd(image: array, kernel: array, pad_mode="edge") -> array:
     """
+    Note: performs correlation rather than kernel-reversed convolution
+
     Args:
         image: Input array
         kernel: The kernel used, note that if the kernel includes an axis not present in image,
